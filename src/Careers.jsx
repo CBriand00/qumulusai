@@ -299,7 +299,8 @@ export default function CareersPortal() {
 
   const handleApply = async (formData) => {
     setForm(formData);
-    setStep(3); supabase.from("applications").insert([{
+    setStep(3); 
+   await supabase.from("applications").insert([{
  full_name: formData.name,
  email: formData.email,
  phone: formData.phone,

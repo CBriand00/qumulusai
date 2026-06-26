@@ -49,8 +49,8 @@ const NAV = [
   { id: "onboard",   label: "Onboarding",        icon: "◎", accent: C.teal },
   { id: "manager",   label: "Manager Coach",     icon: "◇", accent: C.blue },
   { id: "employee",  label: "Employee Hub",      icon: "○", accent: C.blueLight },
-  { id: "executive", label: "Workforce Intel",   icon: "◆", accent: C.amber },
-];
+  { id: "executive", label: "Workforce Intel",   icon: "◆", accent: C.amber },  
+  { id: "careers", label: "Careers Portal", icon: "◉", accent: C.emerald },
 
 // QumulusAI real profile: ~40 person AI infrastructure company, Atlanta GA
 // $500M financing secured, scaling aggressively to 300+ employees
@@ -679,7 +679,7 @@ export default function App() {
     onboard:   <OnboardingConcierge />,
     manager:   <ManagerCoach />,
     employee:  <EmployeeHub />,
-    executive: <WorkforceIntel />,
+    executive: <WorkforceIntel />,careers: <CareersPortal />,
   };
 
   return (

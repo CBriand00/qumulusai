@@ -4,7 +4,7 @@ const supabase = createClient(
  import.meta.env.VITE_SUPABASE_URL,
  import.meta.env.VITE_SUPABASE_ANON_KEY
 );
-
+ 
 const C = {
   bg:        "#080D1A",
   bgCard:    "#0F1828",

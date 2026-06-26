@@ -50,27 +50,32 @@ const NAV = [
   { id: "executive", label: "Workforce Intel",   icon: "◆", accent: C.amber },
 ];
 
+// QumulusAI real profile: ~40 person AI infrastructure company, Atlanta GA
+// $500M financing secured, scaling aggressively to 300+ employees
 const EMPLOYEES = [
-  { name: "Priya Nair",   role: "Senior Engineer",   dept: "Engineering", tenure: "3.2 yrs", sentiment: 82, risk: "low" },
-  { name: "James Okafor", role: "Product Manager",   dept: "Product",     tenure: "1.1 yrs", sentiment: 61, risk: "medium" },
-  { name: "Sofia Reyes",  role: "Account Executive", dept: "Sales",       tenure: "0.8 yrs", sentiment: 44, risk: "high" },
-  { name: "Marcus Liu",   role: "Data Scientist",    dept: "Analytics",   tenure: "2.4 yrs", sentiment: 75, risk: "low" },
+  { name: "Ryan Callahan", role: "GPU Infrastructure Engineer",  dept: "Infrastructure", tenure: "1.8 yrs", sentiment: 78, risk: "medium" },
+  { name: "Aisha Okonkwo", role: "AI Solutions Architect",       dept: "Solutions Eng",  tenure: "0.9 yrs", sentiment: 85, risk: "low" },
+  { name: "Derek Huang",   role: "Data Center Operations Lead",  dept: "DC Ops",         tenure: "2.1 yrs", sentiment: 52, risk: "high" },
+  { name: "Priya Menon",   role: "Enterprise Account Executive", dept: "Sales",          tenure: "0.6 yrs", sentiment: 67, risk: "medium" },
 ];
 
 const OPEN_ROLES = [
-  { title: "VP of Engineering",         dept: "Engineering", candidates: 18, stage: "Interviewing", days: 24 },
-  { title: "Head of People Operations", dept: "HR",          candidates: 11, stage: "Offer",        days: 38 },
-  { title: "Senior AI Product Manager", dept: "Product",     candidates: 31, stage: "Screening",    days: 12 },
-  { title: "Enterprise AE – EMEA",      dept: "Sales",       candidates: 47, stage: "Assessment",   days: 19 },
+  { title: "VP of People & Culture",         dept: "People",    candidates: 9,  stage: "Interviewing", days: 41 },
+  { title: "Senior GPU Infrastructure Eng",  dept: "Infra",     candidates: 34, stage: "Screening",    days: 14 },
+  { title: "Director of Enterprise Sales",   dept: "Sales",     candidates: 22, stage: "Assessment",   days: 28 },
+  { title: "AI Solutions Engineer - EMEA",   dept: "Solutions", candidates: 17, stage: "Offer",        days: 52 },
+  { title: "Data Center Operations Manager", dept: "DC Ops",    candidates: 28, stage: "Screening",    days: 9  },
+  { title: "CFO",                            dept: "Finance",   candidates: 6,  stage: "Interviewing", days: 63 },
 ];
 
+// Metrics for a 40-person company that just raised $500M and is about to 10x
 const METRICS = [
-  { label: "Headcount",       value: "412",  delta: "+14",    trend: "up" },
-  { label: "Attrition YTD",  value: "8.2%", delta: "−1.4pp", trend: "up" },
-  { label: "Time-to-Hire",   value: "28d",  delta: "−6d",    trend: "up" },
-  { label: "Engagement",     value: "74",   delta: "+3",     trend: "up" },
-  { label: "Labor / Rev",    value: "31%",  delta: "+2pp",   trend: "down" },
-  { label: "Offer Accept",   value: "87%",  delta: "+5pp",   trend: "up" },
+  { label: "Headcount",      value: "43",  delta: "+18",   trend: "up" },
+  { label: "Open Roles",     value: "21",  delta: "+12",   trend: "up" },
+  { label: "Time-to-Hire",   value: "38d", delta: "+10d",  trend: "down" },
+  { label: "Engagement",     value: "81",  delta: "+6",    trend: "up" },
+  { label: "Offer Accept",   value: "91%", delta: "+4pp",  trend: "up" },
+  { label: "Attrition YTD", value: "11%", delta: "+3pp",  trend: "down" },
 ];
 
 // ─── AI Hook ──────────────────────────────────────────────────────────────────
@@ -231,7 +236,7 @@ function HomeScreen({ setActive }) {
           <span style={{ color: C.cyan }}>powering your people.</span>
         </h1>
         <p style={{ color: C.textMid, fontSize: 16, maxWidth: 520, margin: "0 auto 36px", lineHeight: 1.75 }}>
-          QumulusAI sits above every people system — connecting recruiting, onboarding, performance, HR, and executive strategy into one AI-powered operating model.
+          QumulusAI is scaling from 43 to 300+ people on the back of $500M in financing. This platform ensures every hire, onboarding, and people decision keeps pace with infrastructure velocity.
         </p>
         <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
           <button onClick={() => setActive("recruit")} style={{ background: C.cyan, color: C.navy, border: "none", borderRadius: 8, padding: "13px 28px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
@@ -581,7 +586,7 @@ function EmployeeHub() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
         <Card>
           <Label color={C.blueLight}>Your Snapshot</Label>
-          {[["PTO Balance","14 days"],["Next Pay Date","Jul 1, 2026"],["Benefits Tier","Premium Plus"],["Manager","Keiko Tanaka"],["Open Enrollment","Aug 1–15, 2026"]].map(([k,v]) => (
+          {[["PTO Balance","12 days"],["Next Pay Date","Jul 1, 2026"],["Benefits Tier","Core Plus"],["Manager","Mike Maniscalco, CEO"],["Location","Atlanta, GA (HQ)"]].map(([k,v]) => (
             <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
               <span style={{ color: C.textMuted }}>{k}</span>
               <span style={{ color: C.textDark, fontWeight: 600 }}>{v}</span>
@@ -633,11 +638,11 @@ function WorkforceIntel() {
       <Card style={{ marginBottom: 14 }}>
         <Label color={C.amber}>Attrition Risk by Department</Label>
         {[
-          { dept: "Engineering",      risk: 12, headcount: 142 },
-          { dept: "Sales",            risk: 29, headcount: 87  },
-          { dept: "Customer Success", risk: 21, headcount: 63  },
-          { dept: "Product",          risk: 8,  headcount: 34  },
-          { dept: "G&A",              risk: 5,  headcount: 86  },
+          { dept: "Infrastructure",  risk: 18, headcount: 14 },
+          { dept: "Sales",           risk: 31, headcount: 8  },
+          { dept: "Solutions Eng",   risk: 12, headcount: 7  },
+          { dept: "DC Operations",   risk: 24, headcount: 6  },
+          { dept: "G&A / Finance",   risk: 8,  headcount: 8  },
         ].map(d => (
           <div key={d.dept} style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
             <div style={{ width: 130, fontSize: 13, color: C.textMid }}>{d.dept}</div>
@@ -719,4 +724,3 @@ export default function App() {
       </main>
     </div>
   );
-}

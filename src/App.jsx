@@ -51,7 +51,7 @@ const NAV = [
   { id: "employee",  label: "Employee Hub",      icon: "○", accent: C.blueLight },
   { id: "executive", label: "Workforce Intel",   icon: "◆", accent: C.amber },  
   { id: "careers", label: "Careers Portal", icon: "◉", accent: C.emerald },
-
+];
 // QumulusAI real profile: ~40 person AI infrastructure company, Atlanta GA
 // $500M financing secured, scaling aggressively to 300+ employees
 const EMPLOYEES = [

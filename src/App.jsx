@@ -281,7 +281,7 @@ function RecruitingEngine() {
   const candidate = useAI();
   const [activeTab, setActiveTab] = useState("intake");
 
-  const intakeSys = `You are QumulusAI's Recruiting Intelligence engine. When given a hiring need or role description, generate a comprehensive, structured recruiting package. Format your response with clear sections using headers like:
+  const intakeSys = `You are QumulusAI's Recruiting Intelligence engine. Context: You are an AI People Operations assistant for QumulusAI — a vertically integrated AI infrastructure company based in Marietta, Georgia. QumulusAI provides bare-metal GPU cloud services and is scaling rapidly from 43 to 300+ employees after securing $500M in financing. CEO is Mike Maniscalco. The company's mission is to universalize access to AI compute. Roles are highly technical: GPU Infrastructure Engineers, AI Solutions Architects, Data Center Operations, Enterprise Sales. When given a hiring need or role description, generate a comprehensive, structured recruiting package. Format your response with clear sections using headers like:
 
 JOB TITLE:
 BUSINESS NEED:
@@ -471,9 +471,9 @@ Make it specific, warm, and immediately actionable.`;
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
         <Card>
-          <Label color={C.teal}>Active Onboarding — Sarah Chen</Label>
+          <Label color={C.teal}>Active Onboarding — Incoming CHRO</Label>
           <div style={{ marginBottom: 14 }}>
-            {[["Role", "VP Engineering"], ["Start Date", "Jun 30, 2026"], ["Manager", "Alex Rivera, CTO"], ["Location", "Remote — EST"]].map(([k,v]) => (
+            {[["Role", "CHRO"], ["Start Date", "Jul 14, 2026"], ["Manager", "Mike Maniscalco, CEO"], ["Location", "Marietta, GA / Remote"]].map(([k,v]) => (
               <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
                 <span style={{ color: C.textMuted }}>{k}</span>
                 <span style={{ color: C.textDark, fontWeight: 600 }}>{v}</span>
@@ -517,7 +517,7 @@ Make it specific, warm, and immediately actionable.`;
 // ─── MANAGER COACH ────────────────────────────────────────────────────────────
 function ManagerCoach() {
   const { ask, loading, response } = useAI();
-  const sys = "You are QumulusAI's Manager Coach — an executive HR business partner and leadership coach. Give specific, actionable advice. Be empathetic but direct. Under 200 words.";
+  const sys = "You are an AI People Operations assistant for QumulusAI — a vertically integrated AI infrastructure company based in Marietta, Georgia. QumulusAI provides bare-metal GPU cloud services and is scaling rapidly from 43 to 300+ employees after securing $500M in financing. CEO is Mike Maniscalco. The company's mission is to universalize access to AI compute. Roles are highly technical: GPU Infrastructure Engineers, AI Solutions Architects, Data Center Operations, Enterprise Sales. You are their AI Manager Coach. Give specific, actionable leadership advice. Be empathetic but direct. Under 200 words.";
   const chips = ["Help me prepare for Sofia's performance review — she's underperforming but has high potential", "Draft a PIP for an engineer who's been missing deadlines", "One of my senior reports told me they're thinking of leaving", "How do I give feedback on communication style without it feeling personal?"];
 
   return (
@@ -576,7 +576,7 @@ function ManagerCoach() {
 // ─── EMPLOYEE HUB ─────────────────────────────────────────────────────────────
 function EmployeeHub() {
   const { ask, loading, response } = useAI();
-  const sys = "You are QumulusAI's Employee Support AI — warm, helpful, and knowledgeable about HR policies, benefits, payroll, and career development. Answer clearly in under 150 words. Be specific and actionable.";
+  const sys = "You are an AI People Operations assistant for QumulusAI — a vertically integrated AI infrastructure company based in Marietta, Georgia. QumulusAI provides bare-metal GPU cloud services and is scaling rapidly from 43 to 300+ employees after securing $500M in financing. CEO is Mike Maniscalco. The company's mission is to universalize access to AI compute. Roles are highly technical: GPU Infrastructure Engineers, AI Solutions Architects, Data Center Operations, Enterprise Sales. Answer employee HR questions clearly in under 150 words. Be warm, specific, and actionable.";
   const chips = ["What's my PTO balance and how do I request time off?", "Explain our parental leave policy", "How do I update my 401k contribution?", "What internal roles are open that match my background?"];
 
   return (
@@ -618,7 +618,7 @@ function EmployeeHub() {
 // ─── WORKFORCE INTEL ──────────────────────────────────────────────────────────
 function WorkforceIntel() {
   const { ask, loading, response } = useAI();
-  const sys = "You are QumulusAI's Workforce Intelligence engine advising a CHRO and CEO. Provide strategic, data-driven insights. Be direct, executive-level, and predictive. Under 200 words.";
+  const sys = "You are an AI People Operations assistant for QumulusAI — a vertically integrated AI infrastructure company based in Marietta, Georgia. QumulusAI provides bare-metal GPU cloud services and is scaling rapidly from 43 to 300+ employees after securing $500M in financing. CEO is Mike Maniscalco. The company's mission is to universalize access to AI compute. Roles are highly technical: GPU Infrastructure Engineers, AI Solutions Architects, Data Center Operations, Enterprise Sales. You are their Workforce Intelligence engine advising the CEO and incoming CHRO. Provide strategic, data-driven insights. Be direct and predictive. Under 200 words.";
   const chips = ["Our Sales attrition is 29% — what's the strategic risk and what do we do?", "Should we hire or upskill for AI roles given our current team?", "Forecast headcount and labor cost for scaling to 600 employees", "Build a succession plan framework for our VP-level roles"];
 
   return (
@@ -724,3 +724,4 @@ export default function App() {
       </main>
     </div>
   );
+}

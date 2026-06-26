@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 const supabase = createClient(
- import.meta.env.VITE_SUPABASE_URL,
- import.meta.env.VITE_SUPABASE_ANON_KEY
+ "https://oomdaguzvdheotrkqdxs.supabase.co",
+ "sb_publishable_aPi0IL43lMzVqPnDsnTfSA_7fpnmom8"
 );
  
 const C = {

@@ -1,4 +1,9 @@
 import { useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+const supabase = createClient(
+ import.meta.env.VITE_SUPABASE_URL,
+ import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 const C = {
   bg:        "#080D1A",
@@ -294,7 +299,16 @@ export default function CareersPortal() {
 
   const handleApply = async (formData) => {
     setForm(formData);
-    setStep(3);
+    setStep(3); supabase.from("applications").insert([{
+ full_name: formData.name,
+ email: formData.email,
+ phone: formData.phone,
+ linkedin_url: formData.linkedin,
+ role_title: selectedRole.title,
+ department: selectedRole.dept,
+ cover_letter: formData.why,
+ status: "new",
+}]);
     await ask(
       `You are QumulusAI's AI recruiting screener. QumulusAI is a 43-person bare-metal GPU cloud company in Atlanta, GA with $500M in financing, scaling to 300+ employees. CEO: Mike Maniscalco. Mission: universalize access to AI compute.
 

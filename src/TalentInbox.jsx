@@ -471,7 +471,8 @@ function OfferLetter({ app }) {
   const [saving, setSaving] = useState(false);
 
   const [saved, setSaved] = useState(false);
-
+const [savedLink, setSavedLink] = useState("");
+ 
 
 
   async function generateLetter() {
@@ -510,31 +511,25 @@ function OfferLetter({ app }) {
 
 
 
-  async function saveOffer() {
-
-    setSaving(true);
-
-    await supabase.from("offers").insert({
-
-      application_id: app.id,
-
-      candidate_name: app.full_name,
-
-      role: app.role_title,
-
-      department: app.department,
-
-      salary, start_date: startDate, letter
-
-    });
-
-    setSaving(false);
-
-    setSaved(true);
-
-    setTimeout(() => setSaved(false), 3000);
-
-  }
+ async function saveOffer() {
+ setSaving(true);
+ const { data } = await supabase.from("offers").insert({
+   application_id: app.id,
+   candidate_name: app.full_name,
+   role: app.role_title,
+   department: app.department,
+   salary,
+   start_date: startDate,
+   letter,
+   candidate_email: app.email,
+ }).select().single();
+ if (data) {
+   const link = `https://qumulusai.vercel.app?sign=${data.signing_token}`;
+   setSavedLink(link);
+ }
+ setSaving(false);
+ setSaved(true);
+}
 
 
 
@@ -563,7 +558,11 @@ function OfferLetter({ app }) {
             {saved ? "✓ Saved!" : saving ? "Saving…" : "Save Offer Letter"}
 
           </button>
-
+{savedLink && (
+<div style={{...styles.input, marginTop: 8, fontSize: 12, color: "#10B981", wordBreak: "break-all"}}>
+   📋 Signing link: {savedLink}
+</div>
+)}
         </>
 
       )}

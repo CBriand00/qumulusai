@@ -28,9 +28,12 @@ const [nameSet, setNameSet] = useState(false);
 useEffect(() => {
  supabase.auth.getUser().then(({ data: { user } }) => {
    if (user) {
-     const displayName = user.email.split("@")[0];
-     setName(displayName);
-     setNameSet(true);
+     supabase.from("profiles").select("full_name").eq("id", user.id).single()
+       .then(({ data }) => {
+         const displayName = data?.full_name || user.email.split("@")[0];
+         setName(displayName);
+         setNameSet(true);
+       });
    }
  });
 }, []);

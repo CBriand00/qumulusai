@@ -181,6 +181,3 @@ const styles = {
   successSub: { fontSize: 14, color: "#6B6B80", margin: 0 },
 
 };
-Buy styles.ai | Spaceship
-Own styles.ai today. Secure checkout and guided transfer support. No hidden fees.
- 

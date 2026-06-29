@@ -98,15 +98,13 @@ export default function TalentInbox() {
 
 
 
-  async function updateStatus(id, newStatus) {
-
-    setUpdating(id);
-
-    await supabase.from("applications").update({ status: newStatus }).eq("id", id);
-
-    setUpdating(null);
-
-  }
+async function updateStatus(id, newStatus) {
+ setUpdating(id);
+ await supabase.from("applications").update({ status: newStatus }).eq("id", id);
+ setApps((prev) => prev.map((a) => a.id === id ? { ...a, status: newStatus } : a));
+ setSelected((s) => s?.id === id ? { ...s, status: newStatus } : s);
+ setUpdating(null);
+}
 
 
 

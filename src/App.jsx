@@ -688,7 +688,8 @@ export default function App() {
    return () => subscription.unsubscribe();
  }, []);
  if (loading) return <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0A0A0F", color: "#E8E8F0" }}>Loading…</div>;
- if (!session) return <Auth onAuth={() => {}} />;
+if (!session) return <Auth onAuth={() => supabase.auth.getSession()} />;
+ 
 
   const screens = {
     home:      <HomeScreen setActive={setActive} />,

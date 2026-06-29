@@ -486,7 +486,7 @@ function OfferLetter({ app }) {
 
       method: "POST",
 
-      headers: { "Content-Type": "application/json", "x-api-key": "proxy", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      headers: { "Content-Type": "application/json", "x-api-key": ""x-api-key": import.meta.env.VITE_ANTHROPIC_KEY,", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
 
       body: JSON.stringify({
 

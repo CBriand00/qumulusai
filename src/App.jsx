@@ -690,12 +690,8 @@ const [userRole, setUserRole] = useState(null);
      setSession(session);
    });
    return () => subscription.unsubscribe();
- }, []);
- if (loading) return <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0A0A0F", color: "#E8E8F0" }}>Loading…</div>;
-if (!session) return <Auth onAuth={() => supabase.auth.getSession()} />;
-
-
-useEffect(() => {
+ }, []); 
+  useEffect(() => {
 
   if (session) {
 
@@ -706,6 +702,11 @@ useEffect(() => {
   }
 
 }, [session]);
+ if (loading) return <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0A0A0F", color: "#E8E8F0" }}>Loading…</div>;
+if (!session) return <Auth onAuth={() => supabase.auth.getSession()} />;
+
+
+
 
 if (session && userRole === "employee") return <EmployeePortal user={session.user} />;
  

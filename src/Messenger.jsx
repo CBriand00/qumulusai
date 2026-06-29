@@ -25,16 +25,12 @@ export default function Messenger() {
  const [name, setName] = useState("");
 const [nameSet, setNameSet] = useState(false);
   const [sending, setSending]     = useState(false);
-  useEffect(() => {
+useEffect(() => {
  supabase.auth.getUser().then(({ data: { user } }) => {
    if (user) {
-     supabase.from("profiles").select("full_name").eq("id", user.id).single()
-       .then(({ data }) => {
-         if (data?.full_name) {
-           setName(data.full_name);
-           setNameSet(true);
-         }
-       });
+     const displayName = user.email.split("@")[0];
+     setName(displayName);
+     setNameSet(true);
    }
  });
 }, []);

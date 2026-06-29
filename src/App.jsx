@@ -4,7 +4,7 @@ import { supabase } from "./supabase";
 import CareersPortal from "./Careers";
 import TalentInbox from "./TalentInbox";
 import Messenger from "./Messenger";
- 
+import EmployeePortal from "./EmployeePortal";
 
 // ─── QumulusAI Design Tokens ──────────────────────────────────────────────────
 // Palette: deep space navy + electric cyan + warm white
@@ -692,6 +692,21 @@ export default function App() {
  }, []);
  if (loading) return <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0A0A0F", color: "#E8E8F0" }}>Loading…</div>;
 if (!session) return <Auth onAuth={() => supabase.auth.getSession()} />;
+const [userRole, setUserRole] = useState(null);
+
+useEffect(() => {
+
+  if (session) {
+
+    supabase.from("profiles").select("role").eq("id", session.user.id).single()
+
+      .then(({ data }) => setUserRole(data?.role || "recruiter"));
+
+  }
+
+}, [session]);
+
+if (session && userRole === "employee") return <EmployeePortal user={session.user} />;
  
 
   const screens = {

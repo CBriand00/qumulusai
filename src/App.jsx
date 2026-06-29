@@ -1,4 +1,6 @@
-import { useState } from "react"; import CareersPortal from "./Careers"; import TalentInbox from "./TalentInbox"; import Messenger from "./Messenger";
+import { useState, useEffect } from "react";
+import Auth from "./Auth";
+import { supabase } from "./supabase";
  
 
 // ─── QumulusAI Design Tokens ──────────────────────────────────────────────────
@@ -672,7 +674,21 @@ function WorkforceIntel() {
 
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
 export default function App() {
-  const [active, setActive] = useState("home");
+ const [active, setActive] = useState("home");
+ const [session, setSession] = useState(null);
+ const [loading, setLoading] = useState(true);
+ useEffect(() => {
+   supabase.auth.getSession().then(({ data: { session } }) => {
+     setSession(session);
+     setLoading(false);
+   });
+   const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+     setSession(session);
+   });
+   return () => subscription.unsubscribe();
+ }, []);
+ if (loading) return <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0A0A0F", color: "#E8E8F0" }}>Loading…</div>;
+ if (!session) return <Auth onAuth={() => {}} />;
 
   const screens = {
     home:      <HomeScreen setActive={setActive} />,
@@ -709,7 +725,9 @@ export default function App() {
             </button>
           ))}
         </nav>
-
+<button onClick={() => supabase.auth.signOut()} style={{ width: "100%", background: "transparent", border: `1px solid ${C.borderDark}`, borderRadius: 6, padding: "7px 0", color: C.textMutedDark, fontSize: 12, cursor: "pointer", marginBottom: 8, fontFamily: "inherit" }}>
+ Sign Out
+</button>
         {/* Demo badge */}
         <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.borderDark}` }}>
           <div style={{ background: `${C.cyan}15`, border: `1px solid ${C.cyan}30`, borderRadius: 6, padding: "8px 10px" }}>

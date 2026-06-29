@@ -680,7 +680,8 @@ export default function App() {
  const [active, setActive] = useState("home");
  const [session, setSession] = useState(null);
  const [loading, setLoading] = useState(true);
- useEffect(() => {
+const [userRole, setUserRole] = useState(null); 
+  useEffect(() => {
    supabase.auth.getSession().then(({ data: { session } }) => {
      setSession(session);
      setLoading(false);
@@ -692,7 +693,7 @@ export default function App() {
  }, []);
  if (loading) return <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0A0A0F", color: "#E8E8F0" }}>Loading…</div>;
 if (!session) return <Auth onAuth={() => supabase.auth.getSession()} />;
-const [userRole, setUserRole] = useState(null);
+
 
 useEffect(() => {
 

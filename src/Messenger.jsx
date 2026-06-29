@@ -90,7 +90,7 @@ const [nameSet, setNameSet] = useState(false);
   }
 
   // Name setup screen
-  if (!nameSet) {
+  if (!nameSet && !name) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg }}>
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 48, width: 360, display: "flex", flexDirection: "column", gap: 20 }}>

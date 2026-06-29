@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import Auth from "./Auth";
 import { supabase } from "./supabase";
+import CareersPortal from "./Careers";
+import TalentInbox from "./TalentInbox";
+import Messenger from "./Messenger";
  
 
 // ─── QumulusAI Design Tokens ──────────────────────────────────────────────────

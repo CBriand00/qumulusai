@@ -22,9 +22,22 @@ export default function Messenger() {
   const [messages, setMessages]   = useState([]);
   const [loading, setLoading]     = useState(true);
   const [input, setInput]         = useState("");
-  const [name, setName]           = useState("");
-  const [nameSet, setNameSet]     = useState(false);
+ const [name, setName] = useState("");
+const [nameSet, setNameSet] = useState(false);
   const [sending, setSending]     = useState(false);
+  useEffect(() => {
+ supabase.auth.getUser().then(({ data: { user } }) => {
+   if (user) {
+     supabase.from("profiles").select("full_name").eq("id", user.id).single()
+       .then(({ data }) => {
+         if (data?.full_name) {
+           setName(data.full_name);
+           setNameSet(true);
+         }
+       });
+   }
+ });
+}, []);
   const bottomRef                 = useRef(null);
 
   // Fetch messages for current channel

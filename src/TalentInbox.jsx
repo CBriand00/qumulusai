@@ -167,7 +167,9 @@ function DetailPanel({ app, onUpdateStatus, updating }) {
           <p style={styles.coverLetter}>{app.cover_letter}</p>
         </Section>
       )}
-      <Section title="Move Pipeline">
+{app.status === "interview" && (
+<ScheduleInterview app={app} />
+     )}      <Section title="Move Pipeline">
         <div style={styles.pipelineGrid}>
           {STATUSES.map((s) => {
             const sm = STATUS_META[s];
@@ -193,7 +195,41 @@ function Section({ title, children }) {
     </div>
   );
 }
-
+function ScheduleInterview({ app }) {
+ const [date, setDate] = useState("");
+ const [time, setTime] = useState("");
+ const [interviewer, setInterviewer] = useState("");
+ const [notes, setNotes] = useState("");
+ const [saving, setSaving] = useState(false);
+ const [saved, setSaved] = useState(false);
+ async function handleSchedule() {
+   if (!date || !time || !interviewer) return;
+   setSaving(true);
+   await supabase.from("interviews").insert({
+     application_id: app.id,
+     candidate_name: app.full_name,
+     role: app.role_title,
+     interviewer,
+     date,
+     time,
+     notes,
+   });
+   setSaving(false);
+   setSaved(true);
+   setTimeout(() => setSaved(false), 3000);
+ }
+ return (
+<Section title="Schedule Interview">
+<input style={styles.input} type="date" value={date} onChange={e => setDate(e.target.value)} />
+<input style={styles.input} type="time" value={time} onChange={e => setTime(e.target.value)} />
+<input style={styles.input} placeholder="Interviewer name" value={interviewer} onChange={e => setInterviewer(e.target.value)} />
+<textarea style={{...styles.input, height: 80, resize: "vertical"}} placeholder="Notes (optional)" value={notes} onChange={e => setNotes(e.target.value)} />
+<button style={{...styles.pipeBtn, background: "#1A1530", color: "#7B61FF", borderColor: "#7B61FF"}} onClick={handleSchedule} disabled={saving}>
+       {saved ? "✓ Scheduled!" : saving ? "Saving…" : "Schedule Interview"}
+</button>
+</Section>
+ );
+}
 function DetailRow({ label, value }) {
   return (
     <div style={styles.detailRow}>
@@ -249,7 +285,8 @@ const styles = {
   coverLetter: { fontSize: 14, lineHeight: 1.7, color: "#C0C0D0", margin: 0 },
   pipelineGrid: { display: "flex", flexWrap: "wrap", gap: 8 },
   pipeBtn: { padding: "8px 14px", fontSize: 12, fontWeight: 600, borderRadius: 8, border: `1px solid ${C.border}`, background: C.surface, color: C.muted, cursor: "pointer" },
-  empty: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 48 },
+ input: { background: "#111118", border: "1px solid #1E1E2E", borderRadius: 8, padding: "9px 12px", color: "#E8E8F0", fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" },
+ empty: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 48 },
   emptyIcon: { fontSize: 32, color: C.muted, margin: 0 },
   emptyText: { fontSize: 14, color: C.muted, margin: 0, textAlign: "center" },
 };

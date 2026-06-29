@@ -5,7 +5,7 @@ import CareersPortal from "./Careers";
 import TalentInbox from "./TalentInbox";
 import Messenger from "./Messenger";
 import EmployeePortal from "./EmployeePortal";
-
+import OfferSigning from "./OfferSigning";
 // ─── QumulusAI Design Tokens ──────────────────────────────────────────────────
 // Palette: deep space navy + electric cyan + warm white
 // Signature: the "Q" mark and cyan glow — confident, AI-forward, boardroom-ready
@@ -704,7 +704,9 @@ const [userRole, setUserRole] = useState(null);
 }, [session]);
  if (loading) return <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0A0A0F", color: "#E8E8F0" }}>Loading…</div>;
 if (!session) return <Auth onAuth={() => supabase.auth.getSession()} />;
-
+const params = new URLSearchParams(window.location.search);
+const signingToken = params.get("sign");
+if (signingToken) return <OfferSigning token={signingToken} />;
 
 
 

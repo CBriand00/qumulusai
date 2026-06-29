@@ -1,4 +1,5 @@
-import { useState } from "react"; import CareersPortal from "./Careers";
+import { useState } from "react"; import CareersPortal from "./Careers"; import TalentInbox from "./TalentInbox";
+ 
 
 // ─── QumulusAI Design Tokens ──────────────────────────────────────────────────
 // Palette: deep space navy + electric cyan + warm white
@@ -50,7 +51,7 @@ const NAV = [
   { id: "manager",   label: "Manager Coach",     icon: "◇", accent: C.blue },
   { id: "employee",  label: "Employee Hub",      icon: "○", accent: C.blueLight },
   { id: "executive", label: "Workforce Intel",   icon: "◆", accent: C.amber },  
-  { id: "careers", label: "Careers Portal", icon: "◉", accent: C.emerald },
+  { id: "careers", label: "Careers Portal", icon: "◉", accent: C.emerald }, { id: "inbox", label: "Talent Inbox", icon: "◎", accent: C.rose },
 ];
 // QumulusAI real profile: ~40 person AI infrastructure company, Atlanta GA
 // $500M financing secured, scaling aggressively to 300+ employees
@@ -679,7 +680,7 @@ export default function App() {
     onboard:   <OnboardingConcierge />,
     manager:   <ManagerCoach />,
     employee:  <EmployeeHub />,
-    executive: <WorkforceIntel />,careers: <CareersPortal />,
+    executive: <WorkforceIntel />,careers: <CareersPortal />, inbox: <TalentInbox />,
   };
 
   return (

@@ -99,6 +99,7 @@ export default function OfferSigning({ token }) {
      signed_at: new Date().toISOString(),
      status: "signed"
    }).eq("signing_token", token);
+   const onboardingToken = crypto.randomUUID();
    await supabase.from("employees").insert({
      full_name: offer.candidate_name,
      email: offer.candidate_email,
@@ -106,6 +107,18 @@ export default function OfferSigning({ token }) {
      application_id: offer.application_id,
      status: "active",
      start_date: offer.start_date || new Date().toISOString().slice(0, 10),
+     onboarding_token: onboardingToken,
+   });
+   const onboardLink = `https://qumulusai.vercel.app?onboard=${onboardingToken}`;
+   await supabase.functions.invoke("send-offer-email", {
+     body: {
+       candidateEmail: offer.candidate_email,
+       candidateName: offer.candidate_name,
+       role: offer.role,
+       signingLink: onboardLink,
+       subject: "Complete Your New Hire Documents — QumulusAI",
+       bodyText: `Welcome to QumulusAI, ${offer.candidate_name}! Please complete your new hire documents (W-4, Direct Deposit, I-9) by clicking the link below. This should take about 5 minutes.`,
+     },
    });
    setSigning(false);
    setSigned(true);

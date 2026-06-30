@@ -752,10 +752,15 @@ if (session && userRole === "employee") return <EmployeePortal user={session.use
 </button>
         {/* Demo badge */}
         <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.borderDark}` }}>
-          <div style={{ background: `${C.cyan}15`, border: `1px solid ${C.cyan}30`, borderRadius: 6, padding: "8px 10px" }}>
+          <div style={{ background: `${C.cyan}15`, border: `1px solid ${C.cyan}30`, borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
             <div style={{ fontSize: 9, fontWeight: 800, color: C.cyan, letterSpacing: "0.1em", marginBottom: 2 }}>LIVE DEMO</div>
             <div style={{ fontSize: 10, color: C.textMutedDark, lineHeight: 1.5 }}>All AI responses are live. Powered by Claude.</div>
           </div>
+          <button
+            onClick={() => window.location.href = "?onboard=test"}
+            style={{ width: "100%", background: "transparent", border: `1px solid ${C.cyan}40`, borderRadius: 6, padding: "6px 0", color: C.cyan, fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.06em" }}>
+            ◎ Test Onboarding Portal
+          </button>
         </div>
       </aside>
 

@@ -1,3 +1,8 @@
+// IMPORTANT: The following Supabase tables must be exposed in the Data API settings
+// (Supabase → Integrations → Data API → Exposed tables):
+// organizations, departments, employees, performance_reviews, goals, skills,
+// employee_skills, engagement_scores, flight_risk_scores, compensation_bands,
+// labor_costs, certifications, training_records, required_documents
 import { supabase } from "../supabase";
 
 export const hiringService = {

@@ -53,6 +53,19 @@ export default function TalentInbox() {
     await supabase.from("applications").update({ status: newStatus }).eq("id", id);
     setApps((prev) => prev.map((a) => a.id === id ? { ...a, status: newStatus } : a));
     setSelected((s) => s?.id === id ? { ...s, status: newStatus } : s);
+    if (newStatus === "hired") {
+      const app = apps.find((a) => a.id === id);
+      if (app) {
+        await supabase.from("employees").insert({
+          full_name: app.full_name,
+          email: app.email,
+          role_title: app.role_title,
+          application_id: app.id,
+          status: "active",
+          start_date: new Date().toISOString().slice(0, 10),
+        });
+      }
+    }
     setUpdating(null);
   }
 

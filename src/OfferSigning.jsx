@@ -99,6 +99,14 @@ export default function OfferSigning({ token }) {
      signed_at: new Date().toISOString(),
      status: "signed"
    }).eq("signing_token", token);
+   await supabase.from("employees").insert({
+     full_name: offer.candidate_name,
+     email: offer.candidate_email,
+     role_title: offer.role,
+     application_id: offer.application_id,
+     status: "active",
+     start_date: offer.start_date || new Date().toISOString().slice(0, 10),
+   });
    setSigning(false);
    setSigned(true);
  }

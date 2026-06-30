@@ -46,7 +46,7 @@ function Widget({ label, value, accent }) {
   );
 }
 
-export default function CommandCenter() {
+export default function CommandCenter({ greeting }) {
   const [hiring, setHiring] = useState(null);
   const [workforce, setWorkforce] = useState(null);
   const [retention, setRetention] = useState(null);
@@ -95,7 +95,7 @@ export default function CommandCenter() {
     <div>
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: `${C.cyan}15`, border: `1px solid ${C.cyan}40`, borderRadius: 100, padding: "5px 18px", marginBottom: 16, fontSize: 10, fontWeight: 800, color: C.cyan, letterSpacing: "0.14em", textTransform: "uppercase" }}>✦ AI Command Center</div>
-        <h1 style={{ fontSize: 28, fontWeight: 900, color: C.textDark, margin: "0 0 6px", letterSpacing: "-0.02em" }}>Good day. Here's what's happening.</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 900, color: C.textDark, margin: "0 0 6px", letterSpacing: "-0.02em" }}>{greeting || "Good day. Here's what's happening."}</h1>
         <p style={{ color: C.textMuted, fontSize: 14, margin: 0 }}>Live data from every connected module, orchestrated by your AI Chief of Staff.</p>
       </div>
 
@@ -111,8 +111,8 @@ export default function CommandCenter() {
           </button>
         </div>
         {(asking || answer) && (
-          <div style={{ background: `${C.cyan}08`, border: `1px solid ${C.cyan}25`, borderLeft: `3px solid ${C.cyan}`, borderRadius: 8, padding: 18, marginTop: 14, fontSize: 14, lineHeight: 1.8, color: C.textDark, whiteSpace: "pre-wrap" }}>
-            {asking ? <span style={{ color: C.cyan, fontWeight: 600 }}>◈ Querying every module…</span> : answer}
+          <div style={{ background: `${C.cyan}08`, border: `1px solid ${C.cyan}25`, borderLeft: `3px solid ${C.cyan}`, borderRadius: 8, padding: 18, marginTop: 14, fontSize: 14, lineHeight: 1.8, color: C.textDark }}>
+            {asking ? <span style={{ color: C.cyan, fontWeight: 600 }}>◈ Querying every module…</span> : renderMarkdown(answer)}
           </div>
         )}
       </Card>

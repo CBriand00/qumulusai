@@ -51,7 +51,7 @@ const C = {
 };
 
 const NAV = [
-  { id: "home",      label: "Overview",         icon: "❖", accent: C.cyan },
+  { id: "home",      label: "Command Center",    icon: "❖", accent: C.cyan },
   { id: "recruit",   label: "Recruiting Engine", icon: "◈", accent: C.violet },
   { id: "onboard",   label: "Onboarding",        icon: "◎", accent: C.teal },
   { id: "manager",   label: "Manager Coach",     icon: "◇", accent: C.blue },
@@ -703,7 +703,7 @@ if (session && userRole === "employee") return <EmployeePortal user={session.use
  
 
   const screens = {
-    home:      <CommandCenter />,
+    home:      <CommandCenter greeting={userRole === "ceo" || userRole === "executive" ? "Good day, Executive. Here's your workforce at a glance." : undefined} />,
     recruit:   <RecruitingEngine />,
     onboard:   <OnboardingConcierge />,
     manager:   <ManagerCoach />,

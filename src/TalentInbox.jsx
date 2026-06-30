@@ -498,7 +498,7 @@ const [relocation, setRelocation] = useState("");
 
         model: "claude-sonnet-4-6", max_tokens: 1000,
 
-     messages: [{ role: "user", content: `Write a professional offer letter from QumulusAI (the hiring company) to ${app.full_name} (the candidate) for the role of ${app.role_title} in the ${app.department} department. Always refer to the employer as "QumulusAI" — never use the candidate's name as the company name. Compensation: Base Salary $${salary}, Start Date ${startDate}${bonus ? `, Annual Bonus ${bonus}` : ''}${rsu ? `, RSU Grant ${rsu}` : ''}${signOnBonus ? `, Sign-On Bonus ${signOnBonus}` : ''}${relocation ? `, Relocation Assistance ${relocation}` : ''}. Only mention compensation items that have values provided.` }]
+     messages: [{ role: "user", content: `Write a professional offer letter from QumulusAI (the hiring company) to ${app.full_name} (the candidate) for the role of ${app.role_title} in the ${app.department} department. Always refer to the employer as "QumulusAI" — never use the candidate's name as the company name. Compensation: Base Salary $${salary}, Start Date ${startDate}${bonus ? `, Annual Bonus ${bonus}` : ''}${rsu ? `, RSU Grant ${rsu}` : ''}${signOnBonus ? `, Sign-On Bonus ${signOnBonus}` : ''}${relocation ? `, Relocation Assistance ${relocation}` : ''}. Do not include a title or heading like "OFFER LETTER" at the very start of the letter — begin directly with the company name and date.Only mention compensation items that have values provided.` }]
  
       })
 

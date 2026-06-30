@@ -554,7 +554,10 @@ const [relocation, setRelocation] = useState("");
       <input style={styles.input} placeholder="Salary (e.g. $120,000)" value={salary} onChange={e => setSalary(e.target.value)} />
 
       <input style={styles.input} type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-
+<input style={styles.input} placeholder="Annual Bonus (optional, e.g. $20,000)" value={bonus} onChange={e => setBonus(e.target.value)} />
+<input style={styles.input} placeholder="RSU Grant (optional, e.g. $50,000 over 4 years)" value={rsu} onChange={e => setRsu(e.target.value)} />
+<input style={styles.input} placeholder="Sign-On Bonus (optional, e.g. $10,000)" value={signOnBonus} onChange={e => setSignOnBonus(e.target.value)} />
+<input style={styles.input} placeholder="Relocation Assistance (optional, e.g. $5,000)" value={relocation} onChange={e => setRelocation(e.target.value)} />
       <button style={{...styles.pipeBtn, background: "#061410", color: "#10B981", borderColor: "#10B981"}} onClick={generateLetter} disabled={generating}>
 
         {generating ? "Generating…" : "✦ Generate with AI"}

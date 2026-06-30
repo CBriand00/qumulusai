@@ -148,6 +148,82 @@ export default function NewHirePortal({ token }) {
     setStep(3);
   }
 
+  async function triggerOnboardingChannel({ doc, employee, w4, dd }) {
+    const firstName = employee.full_name?.split(" ")[0]?.toLowerCase() || "newhire";
+    const startDate = employee.start_date || new Date().toISOString().slice(0, 10);
+    const channel = `onboarding-${firstName}-${startDate}`;
+
+    // Fetch offer data for salary/bonus info
+    const { data: offerData } = await supabase
+      .from("offers")
+      .select("salary, bonus, sign_on_bonus, rsu")
+      .eq("application_id", employee.application_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Next pay date (first of the month after start)
+    const start = new Date(startDate);
+    const nextPay = new Date(start.getFullYear(), start.getMonth() + 1, 1)
+      .toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    const itDeadline = new Date(new Date(startDate).getTime() - 3 * 86400000)
+      .toLocaleDateString("en-US", { month: "long", day: "numeric" });
+
+    const equipment = () => {
+      const role = (employee.role_title || "").toLowerCase();
+      if (role.includes("engineer") || role.includes("infra") || role.includes("data center"))
+        return "□ MacBook Pro 16\" M3 Max\n    □ 4K external monitor\n    □ YubiKey security key\n    □ Server rack access badge";
+      if (role.includes("sales") || role.includes("marketing"))
+        return "□ MacBook Pro 14\" M3\n    □ External monitor\n    □ USB-C hub";
+      return "□ MacBook Pro 14\" M3\n    □ External monitor\n    □ Standard peripherals";
+    };
+
+    const post = (sender_name, content) =>
+      supabase.from("messages").insert({ channel, sender_name, content });
+
+    await post(
+      "QumulusAI People & Culture",
+      `🎉 Welcome ${employee.full_name} to QumulusAI!\n\nRole: ${employee.role_title} | Start: ${startDate}\n\nAll onboarding documents have been completed ✅\n\n@hiring-manager @it-team @payroll — please see your action items below.`
+    );
+
+    await post(
+      "IT Provisioning Bot",
+      `💻 IT Setup Required for ${employee.full_name} — starting ${startDate}\n\n    Equipment:\n    ${equipment()}\n\n    Software:\n    □ Google Workspace: ${employee.email}\n    □ Slack invite\n    □ Notion access\n    □ 1Password\n    □ Zoom Pro\n    □ Role-specific tools\n\n    ⏰ Please confirm by ${itDeadline}\n    React ✅ when complete.`
+    );
+
+    const payLines = [
+      offerData?.salary    ? `Base Salary: $${offerData.salary}` : null,
+      offerData?.bonus     ? `Annual Bonus: $${offerData.bonus}` : null,
+      offerData?.sign_on_bonus ? `Sign-On Bonus: $${offerData.sign_on_bonus} — due within 30 days` : null,
+      offerData?.rsu       ? `RSU Grant: ${offerData.rsu}` : null,
+    ].filter(Boolean).join("\n    ");
+
+    await post(
+      "Payroll Bot",
+      `💰 Payroll Setup Required for ${employee.full_name}\n\n    ${payLines || "Compensation details in offer letter"}\n\n    W-4 Status: ✅ On file\n    Direct Deposit: ✅ On file\n    Filing Status: ${w4.filing_status || "—"}\n\n    First paycheck: ${nextPay}\n    React ✅ when complete.`
+    );
+
+    await post(
+      "People & Culture Bot",
+      `👋 Manager Checklist for ${employee.full_name}'s First Day\n\n    Before ${startDate}:\n    □ Schedule Day 1 welcome 1:1\n    □ Prepare 30-60-90 day plan\n    □ Send team introduction email\n    □ Review QumulusAI onboarding guide\n\n    Day 1:\n    □ Morning coffee/welcome chat\n    □ Team introductions\n    □ Share current priorities\n    □ Set up recurring 1:1 cadence\n\n    React ✅ when complete.`
+    );
+
+    // AI-generated first day agenda
+    try {
+      const { data: aiData } = await supabase.functions.invoke("ai-query", {
+        body: {
+          max_tokens: 600,
+          system: "You are QumulusAI's AI Chief of Staff. Write a warm, practical first-day agenda for a new hire. Be specific to their role. Format with clear time blocks.",
+          messages: [{ role: "user", content: `Create a first-day agenda for ${employee.full_name}, a new ${employee.role_title} starting on ${startDate} at QumulusAI (a fast-growing GPU AI infrastructure company in Atlanta, GA).` }],
+        },
+      });
+      const agenda = aiData?.content?.[0]?.text || "First day agenda to be shared by your manager.";
+      await post("QumulusAI Chief of Staff", `📋 Personalized First Day Agenda — ${employee.full_name}\n\n${agenda}`);
+    } catch (_) {
+      await post("QumulusAI Chief of Staff", `📋 First Day Agenda for ${employee.full_name}\n\nYour manager will share your personalized Day 1 schedule shortly. Welcome to the team!`);
+    }
+  }
+
   async function saveI9() {
     setValErr("");
     if (!i9.address.trim()) { setValErr("Address is required."); return; }
@@ -173,6 +249,8 @@ export default function NewHirePortal({ token }) {
     await supabase.from("required_documents")
       .update({ status: "verified", submitted_at: new Date().toISOString() })
       .eq("employee_id", employee.id).ilike("document_name", "%I-9%");
+    // Fire onboarding channel automation (non-blocking)
+    triggerOnboardingChannel({ doc, employee, w4, dd }).catch(console.error);
     setSaving(false);
     setComplete(true);
   }

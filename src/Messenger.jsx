@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
-const CHANNELS = [
+const STATIC_CHANNELS = [
   { id: "general",    label: "# general",    desc: "Company-wide announcements and conversation" },
   { id: "recruiting", label: "# recruiting", desc: "Hiring updates, candidate discussions" },
   { id: "engineering",label: "# engineering",desc: "Tech talk, infrastructure, and builds" },
@@ -22,21 +22,39 @@ export default function Messenger() {
   const [messages, setMessages]   = useState([]);
   const [loading, setLoading]     = useState(true);
   const [input, setInput]         = useState("");
- const [name, setName] = useState("");
-const [nameSet, setNameSet] = useState(false);
+  const [name, setName]           = useState("");
+  const [nameSet, setNameSet]     = useState(false);
   const [sending, setSending]     = useState(false);
-useEffect(() => {
- supabase.auth.getUser().then(({ data: { user } }) => {
-   if (user) {
-     supabase.from("profiles").select("full_name").eq("id", user.id).single()
-       .then(({ data }) => {
-         const displayName = data?.full_name || user.email.split("@")[0];
-         setName(displayName);
-         setNameSet(true);
-       });
-   }
- });
-}, []);
+  const [onboardingChannels, setOnboardingChannels] = useState([]);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        supabase.from("profiles").select("full_name").eq("id", user.id).single()
+          .then(({ data }) => {
+            const displayName = data?.full_name || user.email.split("@")[0];
+            setName(displayName);
+            setNameSet(true);
+          });
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    // Find all onboarding channels dynamically
+    supabase.from("messages")
+      .select("channel")
+      .like("channel", "onboarding-%")
+      .then(({ data }) => {
+        if (!data) return;
+        const unique = [...new Set(data.map(m => m.channel))].sort().reverse();
+        setOnboardingChannels(unique.map(id => ({
+          id,
+          label: "🎉 " + id.replace("onboarding-", "").replace(/-/g, " "),
+          desc: "New hire onboarding coordination",
+          isOnboarding: true,
+        })));
+      });
+  }, []);
   const bottomRef                 = useRef(null);
 
   // Fetch messages for current channel
@@ -117,7 +135,8 @@ useEffect(() => {
     );
   }
 
-  const currentChannel = CHANNELS.find((c) => c.id === channel);
+  const ALL_CHANNELS = [...STATIC_CHANNELS, ...onboardingChannels];
+  const currentChannel = ALL_CHANNELS.find((c) => c.id === channel);
 
   return (
     <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", height: "100vh", background: C.bg, color: C.text, fontFamily: "'Inter', sans-serif" }}>
@@ -146,20 +165,39 @@ useEffect(() => {
         </div>
 
         {/* Channels */}
-        <div style={{ padding: "16px 12px 8px" }}>
+        <div style={{ padding: "16px 12px 8px", overflowY: "auto", flex: 1 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: "0.1em", padding: "0 8px 8px" }}>CHANNELS</div>
-          {CHANNELS.map((ch) => (
+          {STATIC_CHANNELS.map((ch) => (
             <button key={ch.id} onClick={() => setChannel(ch.id)} style={{
               display: "block", width: "100%", textAlign: "left",
               padding: "8px 12px", borderRadius: 8, border: "none",
               background: channel === ch.id ? C.accent + "20" : "transparent",
               color: channel === ch.id ? C.text : C.muted,
               fontSize: 13, fontWeight: channel === ch.id ? 600 : 400,
-              cursor: "pointer", marginBottom: 2,
+              cursor: "pointer", marginBottom: 2, fontFamily: "inherit",
             }}>
               {ch.label}
             </button>
           ))}
+          {onboardingChannels.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: "0.1em", padding: "12px 8px 8px" }}>NEW HIRE ONBOARDING</div>
+              {onboardingChannels.map((ch) => (
+                <button key={ch.id} onClick={() => setChannel(ch.id)} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  width: "100%", textAlign: "left",
+                  padding: "8px 12px", borderRadius: 8, border: "none",
+                  background: channel === ch.id ? C.accent + "20" : "transparent",
+                  color: channel === ch.id ? C.text : C.muted,
+                  fontSize: 13, fontWeight: channel === ch.id ? 600 : 400,
+                  cursor: "pointer", marginBottom: 2, fontFamily: "inherit",
+                }}>
+                  <span>{ch.label}</span>
+                  <span style={{ fontSize: 9, background: "#16A34A", color: "#fff", borderRadius: 4, padding: "1px 5px", fontWeight: 700, letterSpacing: "0.05em" }}>NEW</span>
+                </button>
+              ))}
+            </>
+          )}
         </div>
       </aside>
 

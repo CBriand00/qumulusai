@@ -677,7 +677,8 @@ export default function App() {
  const [active, setActive] = useState("home");
  const [session, setSession] = useState(null);
  const [loading, setLoading] = useState(true);
-const [userRole, setUserRole] = useState(null); 
+ const [userRole, setUserRole] = useState(null);
+ const [onboardingCount, setOnboardingCount] = useState(0);
   useEffect(() => {
    supabase.auth.getSession().then(({ data: { session } }) => {
      setSession(session);
@@ -699,6 +700,14 @@ const [userRole, setUserRole] = useState(null);
   }
 
 }, [session]);
+
+  useEffect(() => {
+    supabase.from("messages").select("channel").like("channel", "onboarding-%")
+      .then(({ data }) => {
+        if (!data) return;
+        setOnboardingCount(new Set(data.map(m => m.channel)).size);
+      });
+  }, []);
  if (loading) return <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0A0A0F", color: "#E8E8F0" }}>Loading…</div>;
 if (!session) return <Auth onAuth={() => supabase.auth.getSession()} />;
 const params = new URLSearchParams(window.location.search);
@@ -744,6 +753,9 @@ if (session && userRole === "employee") return <EmployeePortal user={session.use
             >
               <span style={{ fontSize: 13, color: active === n.id ? n.accent : "inherit" }}>{n.icon}</span>
               {n.label}
+              {n.id === "messenger" && onboardingCount > 0 && (
+                <span style={{ marginLeft: "auto", background: "#16A34A", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "1px 6px", lineHeight: 1.6 }}>{onboardingCount}</span>
+              )}
             </button>
           ))}
         </nav>

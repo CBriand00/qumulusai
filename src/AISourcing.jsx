@@ -88,10 +88,12 @@ Be specific and actionable.`,
       });
       console.log("PDL full response:", data);
       if (error) throw new Error(typeof error === "object" ? JSON.stringify(error) : error);
-      // Surface PDL-level errors clearly
-      if (data?.pdl_error) throw new Error(`PDL error: ${JSON.stringify(data.pdl_error)}`);
-      if (data?.error) throw new Error(`PDL error: ${typeof data.error === "object" ? JSON.stringify(data.error) : data.error}`);
-      const people = data?.data || [];
+      // data = { status: <http code>, data: <pdl response> }
+      const pdl = data?.data;
+      if (data?.status && data.status !== 200) {
+        throw new Error(`PDL ${data.status}: ${pdl?.error?.message || pdl?.message || JSON.stringify(pdl).slice(0, 200)}`);
+      }
+      const people = pdl?.data || [];
       const mapped = people.map(p => ({
         name: p.full_name,
         title: p.job_title,
@@ -101,7 +103,7 @@ Be specific and actionable.`,
         email: p.emails?.[0]?.address || null,
       }));
       setCandidates(mapped);
-      if (mapped.length === 0) setSourcingError(`No candidates found (PDL returned 0 results). Raw: ${JSON.stringify(data?.raw || data).slice(0, 200)}`);
+      if (mapped.length === 0) setSourcingError("No candidates found. Try a broader role title or different location.");
     } catch (e) {
       setSourcingError("Sourcing unavailable: " + e.message);
     }

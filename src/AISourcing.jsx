@@ -30,12 +30,6 @@ export default function AISourcing() {
   const [aiResult, setAiResult]   = useState("");
   const [generating, setGenerating] = useState(false);
 
-  // Apollo candidate sourcing
-  const [sourcing, setSourcing]   = useState(false);
-  const [candidates, setCandidates] = useState([]);
-  const [apolloError, setApolloError] = useState("");
-  const [addedIds, setAddedIds]   = useState(new Set());
-
   // Passive radar
   const [openRoles, setOpenRoles] = useState([]);
 
@@ -77,36 +71,6 @@ Be specific and actionable.`,
     setGenerating(false);
   }
 
-  async function handleSourceCandidates() {
-    if (!roleDesc.trim()) return;
-    setSourcing(true);
-    setCandidates([]);
-    setApolloError("");
-    try {
-      const { data, error } = await supabase.functions.invoke("source-candidates", {
-        body: { role_title: roleDesc, location: location || "Atlanta, Georgia", skills },
-      });
-      if (error) throw error;
-      setCandidates(data?.candidates || []);
-      if ((data?.candidates || []).length === 0) setApolloError("No candidates returned. Try a broader role title or location.");
-    } catch (e) {
-      setApolloError("Apollo sourcing unavailable: " + e.message + ". Add APOLLO_API_KEY to Supabase secrets.");
-    }
-    setSourcing(false);
-  }
-
-  async function addToPipeline(c) {
-    const { data } = await supabase.from("applications").insert({
-      full_name: c.name,
-      email: c.email || "",
-      role_title: roleDesc,
-      status: "new",
-      source: "ai_sourced",
-      linkedin_url: c.linkedin_url,
-    }).select("id").single();
-    if (data) setAddedIds(prev => new Set([...prev, c.linkedin_url || c.name]));
-  }
-
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "0 0 48px" }}>
       {/* Header */}
@@ -138,54 +102,11 @@ Be specific and actionable.`,
               style={{ width: "100%", boxSizing: "border-box", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "9px 12px", color: C.text, fontSize: 14, outline: "none" }} />
           </div>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={handleGenerate} disabled={generating || !roleDesc.trim()}
-            style={{ flex: 1, background: C.violet, border: "none", borderRadius: 8, padding: "13px 0", color: "#fff", fontSize: 14, fontWeight: 700, cursor: generating ? "default" : "pointer", opacity: generating ? 0.7 : 1, fontFamily: "inherit" }}>
-            {generating ? "◈ Generating strategy…" : "✦ Generate Sourcing Strategy"}
-          </button>
-          <button onClick={handleSourceCandidates} disabled={sourcing || !roleDesc.trim()}
-            style={{ background: C.blue, border: "none", borderRadius: 8, padding: "13px 20px", color: "#fff", fontSize: 14, fontWeight: 700, cursor: sourcing ? "default" : "pointer", opacity: sourcing ? 0.7 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
-            {sourcing ? "Sourcing…" : "◈ Source Candidates"}
-          </button>
-        </div>
+        <button onClick={handleGenerate} disabled={generating || !roleDesc.trim()}
+          style={{ width: "100%", background: C.violet, border: "none", borderRadius: 8, padding: "13px 0", color: "#fff", fontSize: 14, fontWeight: 700, cursor: generating ? "default" : "pointer", opacity: generating ? 0.7 : 1, fontFamily: "inherit" }}>
+          {generating ? "◈ Generating strategy…" : "✦ Generate Sourcing Strategy"}
+        </button>
       </div>
-
-      {/* Apollo candidate results */}
-      {(candidates.length > 0 || apolloError) && (
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: C.blue, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 16 }}>◈ Sourced Candidates — Apollo.io</div>
-          {apolloError && <p style={{ fontSize: 13, color: "#DC2626", margin: 0 }}>{apolloError}</p>}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {candidates.map((c, i) => {
-              const key = c.linkedin_url || c.name;
-              const added = addedIds.has(key);
-              return (
-                <div key={i} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 16px", display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", background: `${C.blue}15`, color: C.blue, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, flexShrink: 0 }}>
-                    {c.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{c.name}</div>
-                    <div style={{ fontSize: 12, color: C.muted }}>{c.title}{c.company ? ` · ${c.company}` : ""}</div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                    {c.linkedin_url && (
-                      <a href={c.linkedin_url} target="_blank" rel="noreferrer"
-                        style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 6, padding: "6px 12px", color: C.blue, fontSize: 12, fontWeight: 600, textDecoration: "none" }}>
-                        LinkedIn →
-                      </a>
-                    )}
-                    <button onClick={() => addToPipeline(c)} disabled={added}
-                      style={{ background: added ? "#ECFDF5" : C.blue, border: "none", borderRadius: 6, padding: "6px 12px", color: added ? C.emerald : "#fff", fontSize: 12, fontWeight: 600, cursor: added ? "default" : "pointer", fontFamily: "inherit" }}>
-                      {added ? "✓ Added" : "+ Pipeline"}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* AI Strategy result */}
       {(generating || aiResult) && (

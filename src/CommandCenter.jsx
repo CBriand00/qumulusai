@@ -11,6 +11,24 @@ const C = {
   rose: "#DC2626", emerald: "#059669",
 };
 
+function renderMarkdown(text) {
+  if (!text) return null;
+  return text.split("\n").map((line, idx) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("## ")) return <h2 key={idx} style={{ fontSize: 17, fontWeight: 700, color: "#0D1117", margin: "16px 0 6px" }}>{trimmed.slice(3)}</h2>;
+    if (trimmed.startsWith("### ")) return <h3 key={idx} style={{ fontSize: 15, fontWeight: 700, color: "#0D1117", margin: "12px 0 4px" }}>{trimmed.slice(4)}</h3>;
+    if (trimmed === "---") return <hr key={idx} style={{ border: "none", borderTop: "1px solid #DDE3ED", margin: "12px 0" }} />;
+    if (trimmed === "") return <div key={idx} style={{ height: 6 }} />;
+    const parts = trimmed.split(/(\*\*[^*]+\*\*)/g);
+    const formatted = parts.map((p, i) =>
+      p.startsWith("**") && p.endsWith("**")
+        ? <strong key={i}>{p.slice(2, -2)}</strong>
+        : p
+    );
+    return <p key={idx} style={{ margin: "2px 0", fontSize: 14, lineHeight: 1.75, color: "#0D1117" }}>{formatted}</p>;
+  });
+}
+
 function Card({ children, style }) {
   return <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: 22, ...style }}>{children}</div>;
 }
@@ -103,7 +121,7 @@ export default function CommandCenter() {
         <Label color={C.violet}>Today's Briefing — AI Chief of Staff</Label>
         {briefingLoading
           ? <div style={{ fontSize: 13, color: C.violet, fontWeight: 600 }}>◈ Preparing your briefing…</div>
-          : <p style={{ fontSize: 14, lineHeight: 1.8, color: C.textDark, margin: 0, whiteSpace: "pre-wrap" }}>{briefing}</p>}
+          : <div style={{ fontSize: 14, lineHeight: 1.75, color: C.textDark }}>{renderMarkdown(briefing)}</div>}
       </Card>
 
       <Label color={C.violet}>Hiring Intelligence</Label>

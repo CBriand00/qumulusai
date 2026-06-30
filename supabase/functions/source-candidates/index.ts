@@ -9,44 +9,54 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
   try {
-    const { role_title, location, skills } = await req.json();
-    const apolloKey = Deno.env.get("APOLLO_API_KEY");
+    const { role_title, skills, location } = await req.json();
+    const pdlKey = Deno.env.get("PDL_API_KEY");
 
-    if (!apolloKey) {
-      return new Response(JSON.stringify({ error: "APOLLO_API_KEY not configured in Supabase secrets." }), {
+    if (!pdlKey) {
+      return new Response(JSON.stringify({ error: "PDL_API_KEY not configured in Supabase secrets." }), {
         status: 400, headers: { ...CORS, "Content-Type": "application/json" },
       });
     }
 
-    const body: Record<string, unknown> = {
-      person_titles: [role_title],
-      person_locations: [location || "Atlanta, Georgia"],
-      per_page: 10,
-    };
+    const must: unknown[] = [
+      { term: { job_title: role_title } },
+      { term: { location_locality: location || "Atlanta" } },
+    ];
+
     if (skills) {
-      body.q_keywords = skills;
+      must.push({ term: { skills: skills } });
     }
 
-    const res = await fetch("https://api.apollo.io/v1/mixed_people/search", {
+    const res = await fetch("https://api.peopledatalabs.com/v5/person/search", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apolloKey,
+        "X-Api-Key": pdlKey,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        query: { bool: { must } },
+        size: 10,
+        pretty: true,
+      }),
     });
 
     const data = await res.json();
 
-    const candidates = (data.people || []).map((p: Record<string, unknown>) => ({
-      name: p.name,
-      title: p.title,
-      company: (p.organization as Record<string, unknown>)?.name ?? p.employment_history?.[0]?.organization_name ?? null,
+    if (!res.ok) {
+      return new Response(JSON.stringify({ error: data?.error?.message || "PDL API error", status: res.status }), {
+        status: res.status, headers: { ...CORS, "Content-Type": "application/json" },
+      });
+    }
+
+    const candidates = (data.data || []).map((p: Record<string, unknown>) => ({
+      name: p.full_name,
+      title: p.job_title,
+      company: p.job_company_name,
       linkedin_url: p.linkedin_url,
-      email: p.email,
+      email: Array.isArray(p.emails) ? (p.emails as { address: string }[])[0]?.address : null,
     }));
 
-    return new Response(JSON.stringify({ candidates }), {
+    return new Response(JSON.stringify({ candidates, total: data.total }), {
       headers: { ...CORS, "Content-Type": "application/json" },
     });
   } catch (e) {

@@ -8,6 +8,7 @@ import Messenger from "./Messenger";
 import EmployeePortal from "./EmployeePortal";
 import OfferSigning from "./OfferSigning";
 import NewHirePortal from "./NewHirePortal";
+import AISourcing from "./AISourcing";
 // ─── QumulusAI Design Tokens ──────────────────────────────────────────────────
 // Palette: deep space navy + electric cyan + warm white
 // Signature: the "Q" mark and cyan glow — confident, AI-forward, boardroom-ready
@@ -58,7 +59,7 @@ const NAV = [
   { id: "manager",   label: "Manager Coach",     icon: "◇", accent: C.blue },
   { id: "employee",  label: "Employee Hub",      icon: "○", accent: C.blueLight },
   { id: "executive", label: "Workforce Intel",   icon: "◆", accent: C.amber },  
-  { id: "careers", label: "Careers Portal", icon: "◉", accent: C.emerald }, { id: "inbox", label: "Talent Inbox", icon: "◎", accent: C.rose }, { id: "messenger", label: "Messenger", icon: "◈", accent: C.cyan },
+  { id: "careers", label: "Careers Portal", icon: "◉", accent: C.emerald }, { id: "inbox", label: "Talent Inbox", icon: "◎", accent: C.rose }, { id: "sourcing", label: "AI Sourcing", icon: "◈", accent: C.violet }, { id: "messenger", label: "Messenger", icon: "◈", accent: C.cyan },
 ];
 // QumulusAI real profile: ~40 person AI infrastructure company, Atlanta GA
 // $500M financing secured, scaling aggressively to 300+ employees
@@ -711,7 +712,7 @@ if (session && userRole === "employee") return <EmployeePortal user={session.use
     onboard:   <OnboardingConcierge />,
     manager:   <ManagerCoach />,
     employee:  <EmployeeHub />,
-    executive: <WorkforceIntel />,careers: <CareersPortal />, inbox: <TalentInbox />, messenger: <Messenger />,
+    executive: <WorkforceIntel />,careers: <CareersPortal />, inbox: <TalentInbox />, sourcing: <AISourcing />, messenger: <Messenger />,
   };
 
   return (

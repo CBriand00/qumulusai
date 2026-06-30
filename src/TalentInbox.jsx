@@ -181,6 +181,7 @@ function DetailPanel({ app, onUpdateStatus, updating }) {
         </Section>
       )}
       {app.status === "interview" && <ScheduleInterview app={app} />}
+      {app.status === "interview" && <InterviewIntelligence app={app} />}
       {app.status === "offer" && <OfferLetter app={app} />}
       <Section title="Move Pipeline">
         <div style={styles.pipelineGrid}>
@@ -240,6 +241,98 @@ function ScheduleInterview({ app }) {
       <button style={{...styles.pipeBtn, background: "#EFF6FF", color: "#2563EB", borderColor: "#2563EB"}} onClick={handleSchedule} disabled={saving}>
         {saved ? "✓ Scheduled!" : saving ? "Saving…" : "Schedule Interview"}
       </button>
+    </Section>
+  );
+}
+
+function renderMd(text) {
+  if (!text) return null;
+  return text.split("\n").map((line, i) => {
+    const t = line.trim();
+    const bold = (s) => s.split(/(\*\*[^*]+\*\*)/).map((p, j) =>
+      p.startsWith("**") && p.endsWith("**") ? <strong key={j}>{p.slice(2,-2)}</strong> : p
+    );
+    if (t.startsWith("### ")) return <h3 key={i} style={{ fontSize: 13, fontWeight: 700, margin: "12px 0 4px", color: "#0F172A" }}>{t.slice(4)}</h3>;
+    if (t.startsWith("## "))  return <h2 key={i} style={{ fontSize: 14, fontWeight: 700, margin: "14px 0 4px", color: "#0F172A" }}>{t.slice(3)}</h2>;
+    if (t === "---") return <hr key={i} style={{ border: "none", borderTop: "1px solid #E5E7EB", margin: "8px 0" }} />;
+    if (t === "") return <div key={i} style={{ height: 4 }} />;
+    return <p key={i} style={{ margin: "2px 0", fontSize: 13, lineHeight: 1.7, color: "#334155" }}>{bold(t)}</p>;
+  });
+}
+
+function InterviewIntelligence({ app }) {
+  const [notes, setNotes]     = useState("");
+  const [debrief, setDebrief] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [saved, setSaved]     = useState(false);
+
+  async function generateDebrief() {
+    if (!notes.trim()) return;
+    setGenerating(true);
+    setDebrief("");
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-query", {
+        body: {
+          max_tokens: 1200,
+          system: `You are QumulusAI's Interview Intelligence engine. When given interview notes or a transcript, produce a structured debrief with:
+OVERALL RECOMMENDATION: (Strong Hire / Hire / No Hire / Strong No Hire)
+EXECUTIVE SUMMARY (2-3 sentences)
+COMPETENCY ASSESSMENT: rate key competencies 1-5 with evidence
+KEY STRENGTHS
+RISKS & CONCERNS
+SUGGESTED FOLLOW-UP QUESTIONS
+Be direct. Hiring managers need clarity.`,
+          messages: [{ role: "user", content: `Candidate: ${app.full_name}\nRole: ${app.role_title} (${app.department})\n\nInterview Notes / Transcript:\n${notes}` }],
+        },
+      });
+      if (error) throw error;
+      setDebrief(data?.content?.[0]?.text || "");
+    } catch (e) {
+      setDebrief("Error generating debrief: " + e.message);
+    }
+    setGenerating(false);
+  }
+
+  async function saveDebrief() {
+    setSaving(true);
+    await supabase.from("interviews")
+      .update({ interview_debrief: debrief })
+      .eq("application_id", app.id);
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  }
+
+  return (
+    <Section title="Interview Intelligence">
+      <textarea
+        style={{ ...styles.input, height: 100, resize: "vertical", fontFamily: "inherit" }}
+        placeholder="Paste interview notes or transcript here…"
+        value={notes}
+        onChange={e => setNotes(e.target.value)}
+      />
+      <button
+        style={{ ...styles.pipeBtn, background: "#EFF6FF", color: "#2563EB", borderColor: "#2563EB" }}
+        onClick={generateDebrief}
+        disabled={generating || !notes.trim()}>
+        {generating ? "Generating…" : "✦ Generate AI Debrief"}
+      </button>
+      {(generating || debrief) && (
+        <div style={{ background: "#F8FAFC", border: "1px solid #E5E7EB", borderLeft: "3px solid #2563EB", borderRadius: 8, padding: 14, marginTop: 4 }}>
+          {generating
+            ? <span style={{ color: "#2563EB", fontWeight: 600, fontSize: 13 }}>◈ Analyzing interview…</span>
+            : renderMd(debrief)}
+        </div>
+      )}
+      {debrief && !generating && (
+        <button
+          style={{ ...styles.pipeBtn, background: "#ECFDF5", color: "#059669", borderColor: "#059669" }}
+          onClick={saveDebrief}
+          disabled={saving}>
+          {saved ? "✓ Saved!" : saving ? "Saving…" : "Save Debrief"}
+        </button>
+      )}
     </Section>
   );
 }

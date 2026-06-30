@@ -2,16 +2,16 @@ import { useState } from "react";
 import { supabase } from "./supabase";
  
 const C = {
-  bg:        "#080D1A",
-  bgCard:    "#0F1828",
-  bgCardHov: "#141F2E",
-  border:    "#1A2A3A",
-  cyan:      "#00C2E0",
-  cyanDark:  "#0099B8",
+  bg:        "#F7F8FA",
+  bgCard:    "#FFFFFF",
+  bgCardHov: "#F0F4FF",
+  border:    "#E5E7EB",
+  cyan:      "#2563EB",
+  cyanDark:  "#1D4ED8",
   navy:      "#0A2540",
-  text:      "#E8EEF8",
-  textMid:   "#8AA0B8",
-  textMuted: "#4A6080",
+  text:      "#0F172A",
+  textMid:   "#374151",
+  textMuted: "#64748B",
   emerald:   "#059669",
   amber:     "#D97706",
   rose:      "#DC2626",
@@ -166,7 +166,7 @@ function ApplicationForm({ role, onBack, onSubmit }) {
   const [form, setForm] = useState({ name: "", email: "", phone: "", location: "", linkedin: "", experience: "", why: "", resume: "" });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const inputStyle = { width: "100%", background: "#0A1520", border: `1px solid ${C.border}`, borderRadius: 8, padding: "11px 14px", color: C.text, fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
+  const inputStyle = { width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "11px 14px", color: C.text, fontSize: 14, outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
   const labelStyle = { fontSize: 12, color: C.textMid, fontWeight: 600, marginBottom: 6, display: "block" };
 
   return (

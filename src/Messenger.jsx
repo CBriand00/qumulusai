@@ -8,13 +8,13 @@ const CHANNELS = [
 ];
 
 const C = {
-  bg:      "#0A0A0F",
-  surface: "#111118",
-  border:  "#1E1E2E",
-  accent:  "#7B61FF",
-  text:    "#E8E8F0",
-  muted:   "#6B6B80",
-  green:   "#22C55E",
+  bg:      "#F7F8FA",
+  surface: "#FFFFFF",
+  border:  "#E5E7EB",
+  accent:  "#7C3AED",
+  text:    "#0F172A",
+  muted:   "#64748B",
+  green:   "#16A34A",
 };
 
 export default function Messenger() {
@@ -92,7 +92,7 @@ useEffect(() => {
   if (!nameSet && !name) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg }}>
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 48, width: 360, display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 48, width: 360, display: "flex", flexDirection: "column", gap: 20, boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: C.text }}>
             Qumulus<span style={{ color: C.accent }}>AI</span> Messenger
           </div>
@@ -123,7 +123,7 @@ useEffect(() => {
     <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", height: "100vh", background: C.bg, color: C.text, fontFamily: "'Inter', sans-serif" }}>
 
       {/* Sidebar */}
-      <aside style={{ borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", background: "#0D0D14" }}>
+      <aside style={{ borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", background: C.surface }}>
         <div style={{ padding: "24px 20px 16px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.02em" }}>
             Qumulus<span style={{ color: C.accent }}>AI</span>
@@ -190,7 +190,7 @@ useEffect(() => {
             return (
               <div key={msg.id} style={{ display: "flex", gap: 12, marginTop: showName ? 16 : 2 }}>
                 {showName ? (
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: isMe ? C.accent + "30" : "#1E1E2E", color: isMe ? C.accent : C.muted, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: isMe ? C.accent + "20" : C.border, color: isMe ? C.accent : C.muted, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 2 }}>
                     {initials}
                   </div>
                 ) : (

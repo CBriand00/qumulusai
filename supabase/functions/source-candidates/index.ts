@@ -15,23 +15,24 @@ Deno.serve(async (req) => {
   try {
     const { role_title, location } = await req.json();
 
-    const params = new URLSearchParams({
-      job_title: role_title || "engineer",
-      location_locality: location || "Atlanta",
-      size: "10",
-      pretty: "true"
+    const res = await fetch("https://api.peopledatalabs.com/v5/person/search", {
+      method: "POST",
+      headers: {
+        "X-Api-Key": PDL_API_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        query: {
+          bool: {
+            must: [
+              { term: { "job_title": (role_title || "engineer").toLowerCase() } },
+              { term: { "location_locality": (location || "atlanta").toLowerCase() } }
+            ]
+          }
+        },
+        size: 10
+      })
     });
-
-    const res = await fetch(
-      `https://api.peopledatalabs.com/v5/person/search?${params}`,
-      {
-        method: "GET",
-        headers: {
-          "X-Api-Key": PDL_API_KEY,
-          "Content-Type": "application/json"
-        }
-      }
-    );
 
     const data = await res.json();
 

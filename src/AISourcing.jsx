@@ -86,9 +86,11 @@ Be specific and actionable.`,
       const { data, error } = await supabase.functions.invoke("source-candidates", {
         body: { role_title: roleDesc, location: location || "Atlanta", skills },
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      // PDL returns raw response: { data: [...people], total, status }
+      console.log("PDL full response:", data);
+      if (error) throw new Error(typeof error === "object" ? JSON.stringify(error) : error);
+      // Surface PDL-level errors clearly
+      if (data?.pdl_error) throw new Error(`PDL error: ${JSON.stringify(data.pdl_error)}`);
+      if (data?.error) throw new Error(`PDL error: ${typeof data.error === "object" ? JSON.stringify(data.error) : data.error}`);
       const people = data?.data || [];
       const mapped = people.map(p => ({
         name: p.full_name,
@@ -99,7 +101,7 @@ Be specific and actionable.`,
         email: p.emails?.[0]?.address || null,
       }));
       setCandidates(mapped);
-      if (mapped.length === 0) setSourcingError("No candidates found. Try a broader title or location.");
+      if (mapped.length === 0) setSourcingError(`No candidates found (PDL returned 0 results). Raw: ${JSON.stringify(data?.raw || data).slice(0, 200)}`);
     } catch (e) {
       setSourcingError("Sourcing unavailable: " + e.message);
     }

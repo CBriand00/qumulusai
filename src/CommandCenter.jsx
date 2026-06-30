@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ensureModulesRegistered, hiringService, workforceService, retentionService, performanceService, financialService, complianceService } from "./services/registerModules";
 import { askIntelligenceEngine, getChiefOfStaffBriefing } from "./services/intelligenceEngine";
+import { supabase } from "./supabase";
 
 ensureModulesRegistered();
 
@@ -46,8 +47,64 @@ function Widget({ label, value, accent }) {
   );
 }
 
+function ActionModal({ modal, onClose }) {
+  const [msg, setMsg] = useState(modal.defaultMessage);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  async function handleSend() {
+    setSending(true);
+    await supabase.from("messages").insert({
+      recipient_name: modal.employee,
+      content: msg,
+      sent_at: new Date().toISOString(),
+      type: modal.type,
+    });
+    setSending(false);
+    setSent(true);
+    setTimeout(onClose, 1200);
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ background: "#fff", borderRadius: 14, padding: 32, maxWidth: 480, width: "calc(100% - 48px)", boxShadow: "0 20px 60px rgba(0,0,0,0.18)", position: "relative" }}>
+        <button onClick={onClose} style={{ position: "absolute", top: 14, right: 16, background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#94A3B8", lineHeight: 1 }}>×</button>
+        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: modal.accent, marginBottom: 8 }}>{modal.label}</div>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: "#0D1117", margin: "0 0 6px" }}>{modal.employee}</h2>
+        {modal.details && <p style={{ fontSize: 13, color: "#64748B", margin: "0 0 16px", lineHeight: 1.5 }}>{modal.details}</p>}
+        <textarea
+          value={msg}
+          onChange={e => setMsg(e.target.value)}
+          rows={6}
+          style={{ width: "100%", boxSizing: "border-box", background: "#F8FAFC", border: "1px solid #E5E7EB", borderRadius: 8, padding: "12px 14px", color: "#0F172A", fontSize: 13, lineHeight: 1.6, outline: "none", resize: "vertical", fontFamily: "inherit" }}
+        />
+        <button
+          onClick={handleSend}
+          disabled={sending || sent || !msg.trim()}
+          style={{ width: "100%", marginTop: 12, background: sent ? "#16A34A" : "#0A2540", border: "none", borderRadius: 8, padding: "13px 0", color: "#fff", fontSize: 14, fontWeight: 700, cursor: (sending || sent) ? "default" : "pointer", opacity: sending ? 0.7 : 1, fontFamily: "inherit" }}>
+          {sent ? "✓ Sent!" : sending ? "Sending…" : "Send Message"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ClickableName({ name, onClick }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <span
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ cursor: "pointer", textDecoration: hover ? "underline" : "none", color: hover ? "#2563EB" : "inherit", fontWeight: 600 }}>
+      {name}
+    </span>
+  );
+}
+
 export default function CommandCenter({ greeting }) {
   const [hiring, setHiring] = useState(null);
+  const [activeModal, setActiveModal] = useState(null);
   const [workforce, setWorkforce] = useState(null);
   const [retention, setRetention] = useState(null);
   const [performance, setPerformance] = useState(null);
@@ -142,18 +199,75 @@ export default function CommandCenter({ greeting }) {
 
       <Label color={C.textMuted}>Other Intelligence Modules</Label>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-        {[
-          { title: "Retention Intelligence", accent: C.rose, text: retention?.highRiskCount > 0 ? `${retention.highRiskCount} high flight-risk • ${retention.highRiskEmployees.map(e => e.name).join(", ")}` : "No high flight-risk employees." },
-          { title: "Performance Intelligence", accent: C.blue, text: performance?.totalGoals > 0 ? `${performance.completedGoals}/${performance.totalGoals} goals completed` : "No data yet." },
-          { title: "Financial Intelligence", accent: C.teal, text: financial?.latestLaborCost ? `$${financial.latestLaborCost.toLocaleString()}` : "No data yet." },
-          { title: "Compliance Intelligence", accent: C.emerald, text: compliance?.missingDocuments > 0 ? `${compliance.missingDocuments} missing docs • ${[...new Set(compliance.missingDocDetails.map(d => d.name))].join(", ")}` : "No outstanding items." },
-        ].map(m => (
-          <Card key={m.title}>
-            <Label color={m.accent}>{m.title}</Label>
-            <div style={{ fontSize: 13, color: C.textMid }}>{m.text}</div>
-          </Card>
-        ))}
+        {/* Retention card — clickable employee names */}
+        <Card>
+          <Label color={C.rose}>Retention Intelligence</Label>
+          <div style={{ fontSize: 13, color: C.textMid }}>
+            {retention?.highRiskCount > 0 ? (
+              <>
+                {retention.highRiskCount} high flight-risk •{" "}
+                {retention.highRiskEmployees.map((e, i) => (
+                  <span key={e.name}>
+                    {i > 0 && ", "}
+                    <ClickableName name={e.name} onClick={() => setActiveModal({
+                      employee: e.name,
+                      label: "Retention — Stay Interview",
+                      accent: C.rose,
+                      type: "stay_interview",
+                      details: `${e.role} · Flight risk score: ${e.risk_score}`,
+                      defaultMessage: `Hi ${e.name.split(" ")[0]},\n\nI'd love to connect for a quick stay interview this week — just 20 minutes to hear how things are going and what we can do to make QumulusAI even better for you.\n\nDoes Thursday or Friday work?\n\nBest,\nMike`,
+                    })} />
+                  </span>
+                ))}
+              </>
+            ) : "No high flight-risk employees."}
+          </div>
+        </Card>
+
+        <Card>
+          <Label color={C.blue}>Performance Intelligence</Label>
+          <div style={{ fontSize: 13, color: C.textMid }}>
+            {performance?.totalGoals > 0 ? `${performance.completedGoals}/${performance.totalGoals} goals completed` : "No data yet."}
+          </div>
+        </Card>
+
+        <Card>
+          <Label color={C.teal}>Financial Intelligence</Label>
+          <div style={{ fontSize: 13, color: C.textMid }}>
+            {financial?.latestLaborCost ? `$${financial.latestLaborCost.toLocaleString()}` : "No data yet."}
+          </div>
+        </Card>
+
+        {/* Compliance card — clickable employee names */}
+        <Card>
+          <Label color={C.emerald}>Compliance Intelligence</Label>
+          <div style={{ fontSize: 13, color: C.textMid }}>
+            {compliance?.missingDocuments > 0 ? (
+              <>
+                {compliance.missingDocuments} missing docs •{" "}
+                {[...new Map(compliance.missingDocDetails.map(d => [d.name, d])).values()].map((d, i, arr) => {
+                  const docs = compliance.missingDocDetails.filter(x => x.name === d.name).map(x => x.document);
+                  return (
+                    <span key={d.name}>
+                      {i > 0 && ", "}
+                      <ClickableName name={d.name} onClick={() => setActiveModal({
+                        employee: d.name,
+                        label: "Compliance — Missing Documents",
+                        accent: C.emerald,
+                        type: "compliance_reminder",
+                        details: `Missing: ${docs.join(", ")}`,
+                        defaultMessage: `Hi ${d.name.split(" ")[0]},\n\nJust a quick reminder that we're still missing the following document(s) from your file:\n\n${docs.map(doc => `• ${doc}`).join("\n")}\n\nPlease complete these at your earliest convenience — they're required for compliance. Reply here or reach out to People & Culture if you have any questions.\n\nThank you,\nQumulusAI People & Culture`,
+                      })} />
+                    </span>
+                  );
+                })}
+              </>
+            ) : "No outstanding items."}
+          </div>
+        </Card>
       </div>
+
+      {activeModal && <ActionModal modal={activeModal} onClose={() => setActiveModal(null)} />}
     </div>
   );
 }

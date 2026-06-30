@@ -99,16 +99,21 @@ export default function OfferSigning({ token }) {
      signed_at: new Date().toISOString(),
      status: "signed"
    }).eq("signing_token", token);
-   const onboardingToken = crypto.randomUUID();
-   await supabase.from("employees").insert({
+   const { data: empData } = await supabase.from("employees").insert({
      full_name: offer.candidate_name,
      email: offer.candidate_email,
      role_title: offer.role,
      application_id: offer.application_id,
      status: "active",
      start_date: offer.start_date || new Date().toISOString().slice(0, 10),
-     onboarding_token: onboardingToken,
-   });
+   }).select("id").single();
+   const employeeId = empData?.id;
+   const { data: docData } = await supabase.from("employee_onboarding_docs").insert({
+     employee_id: employeeId,
+     organization_id: "00000000-0000-0000-0000-000000000001",
+     status: "pending",
+   }).select("onboarding_token").single();
+   const onboardingToken = docData?.onboarding_token;
    const onboardLink = `https://qumulusai.vercel.app?onboard=${onboardingToken}`;
    await supabase.functions.invoke("send-offer-email", {
      body: {

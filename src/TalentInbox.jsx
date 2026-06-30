@@ -525,7 +525,15 @@ const [savedLink, setSavedLink] = useState("");
  }).select().single();
  if (data) {
    const link = `https://qumulusai.vercel.app?sign=${data.signing_token}`;
-   setSavedLink(link);
+   setSavedLink(link); 
+   await supabase.functions.invoke('send-offer-email', {
+         body: {
+           candidateEmail: app.email,
+           candidateName: app.full_name,
+           role: app.role_title,
+           signingLink: link,
+         },
+       });
  }
  setSaving(false);
  setSaved(true);

@@ -50,7 +50,7 @@ INSERT INTO engagement_scores (employee_id, organization_id, score, source, reco
   ('e1000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 89, 'pulse_check', NOW() - INTERVAL '3 days');
 
 -- ─── FLIGHT RISK SCORES ──────────────────────────────────────────────────────
-INSERT INTO flight_risk_scores (employee_id, organization_id, risk_level, score, assessed_at) VALUES
+INSERT INTO flight_risk_scores (employee_id, organization_id, risk_level, risk_score, computed_at) VALUES
   ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'medium', 55, NOW() - INTERVAL '7 days'),
   ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'low',    22, NOW() - INTERVAL '7 days'),
   ('e1000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'low',    18, NOW() - INTERVAL '7 days'),

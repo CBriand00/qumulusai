@@ -83,38 +83,36 @@ Be specific and actionable.`,
     setCandidates([]);
     setSourcingError("");
     try {
-      const { data, error } = await supabase.functions.invoke("source-candidates", {
-        body: { role_title: roleDesc, location: location || "Atlanta" },
+      const { data, error } = await supabase.functions.invoke("ai-query", {
+        body: {
+          max_tokens: 1200,
+          system: "You are a talent sourcing assistant. Return ONLY valid JSON — no markdown, no explanation, just the raw JSON array.",
+          messages: [{
+            role: "user",
+            content: `Generate 5 realistic candidate profiles for a ${roleDesc} position in ${location || "Atlanta, GA"}. Return a JSON array where each object has exactly these fields: name (string), title (string), company (string), years_experience (number), skills (array of strings), linkedin_url (string in format linkedin.com/in/firstname-lastname), why_fit (string). Make the profiles realistic and varied.`,
+          }],
+        },
       });
 
-      if (error) {
-        setSourcingError("Edge function error: " + error.message);
-        setSourcing(false);
-        return;
-      }
+      if (error) { setSourcingError("Error: " + error.message); setSourcing(false); return; }
 
-      console.log("Full response:", JSON.stringify(data));
+      const text = data?.content?.[0]?.text || "";
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) { setSourcingError("Could not parse AI response. Try again."); setSourcing(false); return; }
 
-      const people = data?.data?.data || data?.data || [];
-
-      if (!Array.isArray(people)) {
-        setSourcingError("Unexpected response format: " + JSON.stringify(data).slice(0, 300));
-        setSourcing(false);
-        return;
-      }
-
-      const mapped = people.map(p => ({
-        name: p.full_name,
-        title: p.job_title,
-        company: p.job_company_name,
-        location: p.location_locality ? `${p.location_locality}${p.location_region ? ", " + p.location_region : ""}` : null,
-        linkedin_url: p.linkedin_url,
-        email: p.emails?.[0]?.address || null,
-      }));
-      setCandidates(mapped);
-      if (mapped.length === 0) setSourcingError("No candidates found. Try a broader role title or different location.");
+      const people = JSON.parse(jsonMatch[0]);
+      setCandidates(people.map(p => ({
+        name: p.name,
+        title: p.title,
+        company: p.company,
+        location: location || "Atlanta, GA",
+        linkedin_url: p.linkedin_url?.startsWith("http") ? p.linkedin_url : `https://${p.linkedin_url}`,
+        skills: p.skills,
+        why_fit: p.why_fit,
+        years_experience: p.years_experience,
+      })));
     } catch (e) {
-      setSourcingError("Sourcing unavailable: " + e.message);
+      setSourcingError("Sourcing error: " + e.message);
     }
     setSourcing(false);
   }
@@ -178,7 +176,7 @@ Be specific and actionable.`,
       {/* PDL candidate results */}
       {(candidates.length > 0 || sourcingError) && (
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24, marginBottom: 16 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: C.blue, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 16 }}>◈ Sourced Candidates — People Data Labs</div>
+          <div style={{ fontSize: 10, fontWeight: 800, color: C.blue, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 16 }}>◈ Sourced Candidates</div>
           {sourcingError && <p style={{ fontSize: 13, color: "#DC2626", margin: 0 }}>{sourcingError}</p>}
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {candidates.map((c, i) => {
@@ -192,8 +190,9 @@ Be specific and actionable.`,
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{c.name}</div>
                     <div style={{ fontSize: 12, color: C.muted }}>{c.title}{c.company ? ` · ${c.company}` : ""}</div>
-                    {c.location && <div style={{ fontSize: 12, color: C.muted }}>📍 {c.location}</div>}
-                    {c.email && <div style={{ fontSize: 12, color: C.muted }}>✉ {c.email}</div>}
+                    {c.location && <div style={{ fontSize: 12, color: C.muted }}>📍 {c.location}{c.years_experience ? ` · ${c.years_experience} yrs exp` : ""}</div>}
+                    {c.skills?.length > 0 && <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{c.skills.slice(0, 4).join(" · ")}</div>}
+                    {c.why_fit && <div style={{ fontSize: 12, color: "#374151", marginTop: 4, lineHeight: 1.4 }}>{c.why_fit}</div>}
                   </div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                     {c.linkedin_url && (

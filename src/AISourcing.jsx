@@ -86,14 +86,15 @@ Be specific and actionable.`,
       const { data, error } = await supabase.functions.invoke("source-candidates", {
         body: { role_title: roleDesc, location: location || "Atlanta", skills },
       });
-      console.log("PDL full response:", data);
+      console.log("PDL full response:", JSON.stringify(data));
       if (error) throw new Error(typeof error === "object" ? JSON.stringify(error) : error);
       // data = { status: <http code>, data: <pdl response> }
       const pdl = data?.data;
       if (data?.status && data.status !== 200) {
         throw new Error(`PDL ${data.status}: ${pdl?.error?.message || pdl?.message || JSON.stringify(pdl).slice(0, 200)}`);
       }
-      const people = pdl?.data || [];
+      // PDL nests the people array at data.data.data
+      const people = pdl?.data?.data || pdl?.data || pdl || [];
       const mapped = people.map(p => ({
         name: p.full_name,
         title: p.job_title,

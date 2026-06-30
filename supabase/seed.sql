@@ -106,13 +106,13 @@ INSERT INTO goals (employee_id, organization_id, title, status, due_date) VALUES
   ('e1000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'Reduce time-to-hire for technical roles from 45d to 30d',     'in_progress', '2024-12-31');
 
 -- ─── COMPENSATION BANDS ──────────────────────────────────────────────────────
-INSERT INTO compensation_bands (department_id, organization_id, role_level, min_salary, max_salary, notes) VALUES
-  ('d1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'IC',       140000, 220000, 'GPU/Networking Engineers; market premium for H100 expertise'),
-  ('d1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'IC',       130000, 200000, 'AI/ML Solutions Engineers; competitive with hyperscalers'),
-  ('d1000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'IC',        90000, 160000, 'Base only; OTE 2x base with uncapped commission'),
-  ('d1000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'IC',        95000, 150000, 'DC Technicians and Ops Leads'),
-  ('d1000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000001', 'IC',       120000, 180000, 'FP&A and Accounting'),
-  ('d1000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000001', 'IC',       110000, 170000, 'HRBP and Recruiting')
+INSERT INTO compensation_bands (department_id, organization_id, role_title, min_salary, max_salary, currency) VALUES
+  ('d1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'GPU Infrastructure Engineer',       140000, 220000, 'USD'),
+  ('d1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'AI Solutions Architect',            130000, 200000, 'USD'),
+  ('d1000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'Enterprise Account Executive',       90000, 160000, 'USD'),
+  ('d1000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'Data Center Operations Lead',        95000, 150000, 'USD'),
+  ('d1000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000001', 'Senior Financial Analyst',          120000, 180000, 'USD'),
+  ('d1000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000001', 'HR Business Partner',               110000, 170000, 'USD')
 ON CONFLICT DO NOTHING;
 
 -- ─── LABOR COSTS (last 6 months by department) ───────────────────────────────
@@ -162,67 +162,67 @@ INSERT INTO labor_costs (department_id, organization_id, period, total_cost, hea
 ON CONFLICT DO NOTHING;
 
 -- ─── CERTIFICATIONS ──────────────────────────────────────────────────────────
-INSERT INTO certifications (employee_id, organization_id, name, issuer, status, expiry_date) VALUES
+INSERT INTO certifications (employee_id, organization_id, name, status, issued_date, expiry_date) VALUES
   -- Infrastructure
-  ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'AWS Certified Solutions Architect – Professional', 'Amazon Web Services', 'active',         '2025-09-12'),
-  ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'NVIDIA DGX Systems Administration',                'NVIDIA',             'expiring_soon',  '2024-09-01'),
-  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'AWS Certified Advanced Networking – Specialty',    'Amazon Web Services', 'active',         '2026-02-14'),
-  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Linux Foundation Certified Engineer (LFCE)',       'Linux Foundation',   'expiring_soon',  '2024-08-20'),
-  ('e1000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'Cisco CCNP Data Center',                          'Cisco',              'active',         '2025-11-30'),
+  ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'AWS Certified Solutions Architect – Professional', 'active',        '2022-09-12', '2025-09-12'),
+  ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'NVIDIA DGX Systems Administration',                'expiring_soon', '2022-09-01', '2024-09-01'),
+  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'AWS Certified Advanced Networking – Specialty',    'active',        '2023-02-14', '2026-02-14'),
+  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Linux Foundation Certified Engineer (LFCE)',       'expiring_soon', '2022-08-20', '2024-08-20'),
+  ('e1000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'Cisco CCNP Data Center',                          'active',        '2022-11-30', '2025-11-30'),
   -- DC Operations
-  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'Uptime Institute ATD (Accredited Tier Designer)',  'Uptime Institute',   'active',         '2025-06-07'),
-  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'CompTIA Server+',                                 'CompTIA',            'expiring_soon',  '2024-09-15'),
-  ('e1000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'CompTIA Data+',                                   'CompTIA',            'active',         '2027-05-22'),
-  ('e1000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'EPI Data Center Technician (EDCTP)',               'EPI',                'active',         '2026-03-10');
+  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'Uptime Institute ATD (Accredited Tier Designer)',  'active',        '2022-06-07', '2025-06-07'),
+  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'CompTIA Server+',                                 'expiring_soon', '2021-09-15', '2024-09-15'),
+  ('e1000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'CompTIA Data+',                                   'active',        '2024-05-22', '2027-05-22'),
+  ('e1000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'EPI Data Center Technician (EDCTP)',               'active',        '2023-03-10', '2026-03-10');
 
 -- ─── TRAINING RECORDS ────────────────────────────────────────────────────────
-INSERT INTO training_records (employee_id, organization_id, course_name, status, completed_at, due_date) VALUES
+INSERT INTO training_records (employee_id, organization_id, training_name, status, completed_at) VALUES
   -- Security Awareness (all employees)
-  ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-15', '2024-01-31'),
-  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-12', '2024-01-31'),
-  ('e1000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-18', '2024-01-31'),
-  ('e1000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-20', '2024-01-31'),
-  ('e1000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-10', '2024-01-31'),
-  ('e1000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'pending',   NULL,         '2024-07-31'),
-  ('e1000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-22', '2024-01-31'),
-  ('e1000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'pending',   NULL,         '2024-07-31'),
-  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-09', '2024-01-31'),
-  ('e1000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-25', '2024-01-31'),
-  ('e1000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-11', '2024-01-31'),
-  ('e1000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-08', '2024-01-31'),
+  ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-15'),
+  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-12'),
+  ('e1000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-18'),
+  ('e1000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-20'),
+  ('e1000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-10'),
+  ('e1000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'pending',   NULL),
+  ('e1000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-22'),
+  ('e1000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'pending',   NULL),
+  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-09'),
+  ('e1000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-25'),
+  ('e1000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-11'),
+  ('e1000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'Annual Security Awareness Training',    'completed', '2024-01-08'),
   -- Compliance Training
-  ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'SOC 2 Compliance & Data Handling',      'completed', '2024-02-05', '2024-02-28'),
-  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'SOC 2 Compliance & Data Handling',      'completed', '2024-02-07', '2024-02-28'),
-  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'SOC 2 Compliance & Data Handling',      'pending',   NULL,         '2024-08-31'),
-  ('e1000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'SOC 2 Compliance & Data Handling',      'completed', '2024-02-03', '2024-02-28'),
+  ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'SOC 2 Compliance & Data Handling',      'completed', '2024-02-05'),
+  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'SOC 2 Compliance & Data Handling',      'completed', '2024-02-07'),
+  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'SOC 2 Compliance & Data Handling',      'pending',   NULL),
+  ('e1000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'SOC 2 Compliance & Data Handling',      'completed', '2024-02-03'),
   -- Manager Training
-  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'People Manager Foundations',            'completed', '2024-03-14', '2024-03-31'),
-  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'People Manager Foundations',            'pending',   NULL,         '2024-09-30');
+  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'People Manager Foundations',            'completed', '2024-03-14'),
+  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'People Manager Foundations',            'pending',   NULL);
 
 -- ─── REQUIRED DOCUMENTS ──────────────────────────────────────────────────────
-INSERT INTO required_documents (employee_id, organization_id, document_type, status) VALUES
+INSERT INTO required_documents (employee_id, organization_id, document_name, status, submitted_at) VALUES
   -- Most employees have all docs — only flag missing ones
-  ('e1000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'missing'),
-  ('e1000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'missing'),
-  ('e1000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000001', 'Direct Deposit Authorization',            'missing'),
+  ('e1000000-0000-0000-0000-000000000006', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'missing', NULL),
+  ('e1000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'missing', NULL),
+  ('e1000000-0000-0000-0000-000000000008', '00000000-0000-0000-0000-000000000001', 'Direct Deposit Authorization',            'missing', NULL),
   -- All others have complete docs (sample completed records)
-  ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete'),
-  ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete'),
-  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete'),
-  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete'),
-  ('e1000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete'),
-  ('e1000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete'),
-  ('e1000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete'),
-  ('e1000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete'),
-  ('e1000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete'),
-  ('e1000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete'),
-  ('e1000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete'),
-  ('e1000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete'),
-  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete'),
-  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete'),
-  ('e1000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete'),
-  ('e1000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete'),
-  ('e1000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete'),
-  ('e1000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete'),
-  ('e1000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete'),
-  ('e1000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete');
+  ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete', '2022-09-12'),
+  ('e1000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete', '2022-09-12'),
+  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete', '2021-11-01'),
+  ('e1000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete', '2021-11-01'),
+  ('e1000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete', '2023-03-20'),
+  ('e1000000-0000-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete', '2023-03-20'),
+  ('e1000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete', '2023-07-10'),
+  ('e1000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete', '2023-07-10'),
+  ('e1000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete', '2022-04-04'),
+  ('e1000000-0000-0000-0000-000000000005', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete', '2022-04-04'),
+  ('e1000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete', '2023-10-02'),
+  ('e1000000-0000-0000-0000-000000000007', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete', '2023-10-02'),
+  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete', '2021-06-07'),
+  ('e1000000-0000-0000-0000-000000000009', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete', '2021-06-07'),
+  ('e1000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete', '2023-05-22'),
+  ('e1000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete', '2023-05-22'),
+  ('e1000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete', '2022-08-15'),
+  ('e1000000-0000-0000-0000-000000000011', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete', '2022-08-15'),
+  ('e1000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'I-9 Employment Eligibility Verification', 'complete', '2023-01-09'),
+  ('e1000000-0000-0000-0000-000000000012', '00000000-0000-0000-0000-000000000001', 'W-4 Federal Tax Withholding',             'complete', '2023-01-09');

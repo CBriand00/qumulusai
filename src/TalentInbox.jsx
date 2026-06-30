@@ -472,7 +472,10 @@ function OfferLetter({ app }) {
 
   const [saved, setSaved] = useState(false);
 const [savedLink, setSavedLink] = useState("");
- 
+ const [bonus, setBonus] = useState("");
+const [rsu, setRsu] = useState("");
+const [signOnBonus, setSignOnBonus] = useState("");
+const [relocation, setRelocation] = useState("");
 
 
   async function generateLetter() {

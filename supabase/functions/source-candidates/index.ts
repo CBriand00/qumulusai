@@ -15,30 +15,56 @@ Deno.serve(async (req) => {
   try {
     const { role_title, location } = await req.json();
 
-    const res = await fetch("https://api.peopledatalabs.com/v5/person/search", {
-      method: "POST",
-      headers: {
-        "X-Api-Key": PDL_API_KEY,
-        "Content-Type": "application/json"
+    const pdlFetch = (body: object) =>
+      fetch("https://api.peopledatalabs.com/v5/person/search", {
+        method: "POST",
+        headers: { "X-Api-Key": PDL_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    // Primary query — role-based with location preference
+    let res = await pdlFetch({
+      query: {
+        bool: {
+          must: [
+            {
+              bool: {
+                should: [
+                  { term: { "job_title_role": "engineering" } },
+                  { term: { "job_title_sub_role": "hardware" } },
+                ],
+              },
+            },
+          ],
+          should: [
+            { term: { "location_country": "united states" } },
+          ],
+        },
       },
-      body: JSON.stringify({
+      size: 10,
+    });
+
+    let data = await res.json();
+
+    // Fallback — if empty, try broadest possible query to confirm API is working
+    if (!data?.data || data?.total === 0) {
+      res = await pdlFetch({
         query: {
           bool: {
             must: [
-              { term: { "job_title": (role_title || "engineer").toLowerCase() } },
-              { term: { "location_locality": (location || "atlanta").toLowerCase() } }
-            ]
-          }
+              { term: { "location_country": "united states" } },
+            ],
+          },
         },
-        size: 10
-      })
-    });
-
-    const data = await res.json();
+        size: 10,
+      });
+      data = await res.json();
+      data._fallback = true;
+    }
 
     return new Response(JSON.stringify({
       status: res.status,
-      data: data
+      data: data,
     }), {
       headers: {
         "Content-Type": "application/json",

@@ -498,8 +498,8 @@ const [relocation, setRelocation] = useState("");
 
         model: "claude-sonnet-4-6", max_tokens: 1000,
 
-        messages: [{ role: "user", content: `Write a professional offer letter for ${app.full_name} for the role of ${app.role_title} in the ${app.department} department at QumulusAI. Salary: ${salary}. Start date: ${startDate}. Keep it warm, professional, and concise.` }]
-
+        messages: [{ role: "user", content: `Write a professional offer letter for ${app.full_name} for the role of ${app.role_title} in the ${app.department} department. Compensation: Base Salary $${salary}, Start Date ${startDate}${bonus ? `, Annual Bonus ${bonus}` : ''}${rsu ? `, RSU Grant ${rsu}` : ''}${signOnBonus ? `, Sign-On Bonus ${signOnBonus}` : ''}${relocation ? `, Relocation Assistance ${relocation}` : ''}. Only mention compensation items that have values.` }]
+ 
       })
 
     });

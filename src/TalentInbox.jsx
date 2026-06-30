@@ -247,18 +247,18 @@ function OfferLetter({ app }) {
   async function generateLetter() {
     if (!salary || !startDate) return;
     setGenerating(true);
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json",
-      "x-api-key": import.meta.env.VITE_ANTHROPIC_KEY, 
-      "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6", max_tokens: 1000,
-        messages: [{ role: "user", content: `Write a professional offer letter from QumulusAI (the hiring company) to ${app.full_name} (the candidate) for the role of ${app.role_title} in the ${app.department} department. Always refer to the employer as "QumulusAI" — never use the candidate's name as the company name. Compensation: Base Salary $${salary}, Start Date ${startDate}${bonus ? `, Annual Bonus ${bonus}` : ''}${rsu ? `, RSU Grant ${rsu}` : ''}${signOnBonus ? `, Sign-On Bonus ${signOnBonus}` : ''}${relocation ? `, Relocation Assistance ${relocation}` : ''}. Do not include a title or heading like "OFFER LETTER" at the very start of the letter — begin directly with the company name and date. Only mention compensation items that have values provided.` }]
-      })
-    });
-    const data = await res.json();
-    setLetter(data.content?.[0]?.text || "");
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-query", {
+        body: {
+          max_tokens: 1000,
+          messages: [{ role: "user", content: `Write a professional offer letter from QumulusAI (the hiring company) to ${app.full_name} (the candidate) for the role of ${app.role_title} in the ${app.department} department. Always refer to the employer as "QumulusAI" — never use the candidate's name as the company name. Compensation: Base Salary $${salary}, Start Date ${startDate}${bonus ? `, Annual Bonus ${bonus}` : ''}${rsu ? `, RSU Grant ${rsu}` : ''}${signOnBonus ? `, Sign-On Bonus ${signOnBonus}` : ''}${relocation ? `, Relocation Assistance ${relocation}` : ''}. Do not include a title or heading like "OFFER LETTER" at the very start of the letter — begin directly with the company name and date. Only mention compensation items that have values provided.` }],
+        },
+      });
+      if (error) throw error;
+      setLetter(data?.content?.[0]?.text || "");
+    } catch (e) {
+      setLetter("Error generating letter: " + e.message);
+    }
     setGenerating(false);
   }
 

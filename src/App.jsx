@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Auth from "./Auth";
 import { supabase } from "./supabase";
+import CommandCenter from "./CommandCenter";
 import CareersPortal from "./Careers";
 import TalentInbox from "./TalentInbox";
 import Messenger from "./Messenger";
@@ -95,26 +96,14 @@ function useAI() {
     setLoading(true);
     setResponse("");
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        "x-api-key": import.meta.env.VITE_ANTHROPIC_KEY,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          system,
-          messages: [{ role: "user", content: user }],
-        }),
+      const { data, error } = await supabase.functions.invoke("ai-query", {
+        body: { system, messages: [{ role: "user", content: user }], max_tokens: 1000 },
       });
-      const data = await res.json();
-      if (data.error) {
-        setResponse("AI error: " + data.error.message);
+      if (error) throw error;
+      if (data?.error) {
+        setResponse("AI error: " + (typeof data.error === "string" ? data.error : JSON.stringify(data.error)));
       } else {
-        setResponse(data.content?.map(b => b.text || "").join("") || "No response.");
+        setResponse(data?.content?.map(b => b.text || "").join("") || "No response.");
       }
     } catch (e) {
       setResponse("Couldn't reach AI: " + e.message);
@@ -714,7 +703,7 @@ if (session && userRole === "employee") return <EmployeePortal user={session.use
  
 
   const screens = {
-    home:      <HomeScreen setActive={setActive} />,
+    home:      <CommandCenter />,
     recruit:   <RecruitingEngine />,
     onboard:   <OnboardingConcierge />,
     manager:   <ManagerCoach />,

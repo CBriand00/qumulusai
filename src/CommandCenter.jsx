@@ -143,10 +143,10 @@ export default function CommandCenter({ greeting }) {
       <Label color={C.textMuted}>Other Intelligence Modules</Label>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
         {[
-          { title: "Retention Intelligence", accent: C.rose, text: retention?.highRiskCount > 0 ? `${retention.highRiskCount} high flight-risk` : "No data yet." },
+          { title: "Retention Intelligence", accent: C.rose, text: retention?.highRiskCount > 0 ? `${retention.highRiskCount} high flight-risk • ${retention.highRiskEmployees.map(e => e.name).join(", ")}` : "No high flight-risk employees." },
           { title: "Performance Intelligence", accent: C.blue, text: performance?.totalGoals > 0 ? `${performance.completedGoals}/${performance.totalGoals} goals completed` : "No data yet." },
           { title: "Financial Intelligence", accent: C.teal, text: financial?.latestLaborCost ? `$${financial.latestLaborCost.toLocaleString()}` : "No data yet." },
-          { title: "Compliance Intelligence", accent: C.emerald, text: compliance?.missingDocuments > 0 ? `${compliance.missingDocuments} missing docs` : "No outstanding items." },
+          { title: "Compliance Intelligence", accent: C.emerald, text: compliance?.missingDocuments > 0 ? `${compliance.missingDocuments} missing docs • ${[...new Set(compliance.missingDocDetails.map(d => d.name))].join(", ")}` : "No outstanding items." },
         ].map(m => (
           <Card key={m.title}>
             <Label color={m.accent}>{m.title}</Label>

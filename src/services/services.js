@@ -68,15 +68,33 @@ export const workforceService = {
 export const retentionService = {
   id: "retention", name: "Retention Intelligence",
   async getMetrics() {
-    const { data: flightRisk } = await supabase.from("flight_risk_scores").select("risk_level");
-    const { data: engagement } = await supabase.from("engagement_scores").select("score");
+    const [{ data: flightRisk }, { data: highRisk }, { data: engagement }] = await Promise.all([
+      supabase.from("flight_risk_scores").select("risk_level"),
+      supabase.from("flight_risk_scores")
+        .select("risk_score, employees(full_name, role_title)")
+        .eq("risk_level", "high"),
+      supabase.from("engagement_scores").select("score"),
+    ]);
     const risks = flightRisk || []; const scores = engagement || [];
-    return { highRiskCount: risks.filter(r => r.risk_level === "high").length, avgEngagementScore: scores.length ? Math.round(scores.reduce((s, e) => s + e.score, 0) / scores.length) : null };
+    const highRiskEmployees = (highRisk || []).map(r => ({
+      name: r.employees?.full_name,
+      role: r.employees?.role_title,
+      risk_score: r.risk_score,
+    }));
+    return {
+      highRiskCount: risks.filter(r => r.risk_level === "high").length,
+      highRiskEmployees,
+      avgEngagementScore: scores.length ? Math.round(scores.reduce((s, e) => s + e.score, 0) / scores.length) : null,
+    };
   },
   async getSummary() {
     const m = await this.getMetrics();
     if (m.highRiskCount === 0 && m.avgEngagementScore === null) return "Retention: no data recorded yet.";
-    return `Retention: ${m.highRiskCount} employees flagged high flight-risk.${m.avgEngagementScore !== null ? ` Average engagement score ${m.avgEngagementScore}/100.` : ""}`;
+    const names = m.highRiskEmployees.map(e => `${e.name} (${e.role}, score ${e.risk_score})`).join(", ");
+    const riskLine = m.highRiskCount > 0
+      ? `${m.highRiskCount} high flight-risk employee${m.highRiskCount > 1 ? "s" : ""}: ${names}.`
+      : "No high flight-risk employees.";
+    return `Retention: ${riskLine}${m.avgEngagementScore !== null ? ` Average engagement score ${m.avgEngagementScore}/100.` : ""}`;
   },
   async getRecentActivity() { return { items: [] }; },
 };
@@ -114,16 +132,38 @@ export const financialService = {
 export const complianceService = {
   id: "compliance", name: "Compliance Intelligence",
   async getMetrics() {
-    const { data: docs } = await supabase.from("required_documents").select("status");
-    const { data: certs } = await supabase.from("certifications").select("status, expiry_date");
-    const allDocs = docs || []; const allCerts = certs || [];
+    const [{ data: missingDocs }, { data: allDocs }, { data: certs }] = await Promise.all([
+      supabase.from("required_documents")
+        .select("document_name, employees(full_name)")
+        .eq("status", "missing"),
+      supabase.from("required_documents").select("status"),
+      supabase.from("certifications").select("status, expiry_date"),
+    ]);
+    const allCerts = certs || [];
     const ninetyDays = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-    return { missingDocuments: allDocs.filter(d => d.status === "missing").length, expiringSoonCerts: allCerts.filter(c => c.expiry_date && new Date(c.expiry_date) <= ninetyDays).length };
+    const missingDocDetails = (missingDocs || []).map(d => ({
+      name: d.employees?.full_name,
+      document: d.document_name,
+    }));
+    return {
+      missingDocuments: (allDocs || []).filter(d => d.status === "missing").length,
+      missingDocDetails,
+      expiringSoonCerts: allCerts.filter(c => c.expiry_date && new Date(c.expiry_date) <= ninetyDays).length,
+    };
   },
   async getSummary() {
     const m = await this.getMetrics();
     if (m.missingDocuments === 0 && m.expiringSoonCerts === 0) return "Compliance: no outstanding items recorded yet.";
-    return `Compliance: ${m.missingDocuments} missing documents, ${m.expiringSoonCerts} certifications expiring within 90 days.`;
+    const byPerson = m.missingDocDetails.reduce((acc, d) => {
+      if (!acc[d.name]) acc[d.name] = [];
+      acc[d.name].push(d.document);
+      return acc;
+    }, {});
+    const docLine = m.missingDocuments > 0
+      ? `${m.missingDocuments} missing documents — ${Object.entries(byPerson).map(([name, docs]) => `${name} (${docs.join(", ")})`).join(", ")}.`
+      : "";
+    const certLine = m.expiringSoonCerts > 0 ? `${m.expiringSoonCerts} certifications expiring within 90 days.` : "";
+    return `Compliance: ${[docLine, certLine].filter(Boolean).join(" ")}`;
   },
   async getRecentActivity() { return { items: [] }; },
 };

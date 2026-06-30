@@ -1,5 +1,21 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
+
+function renderMarkdown(text) {
+  if (!text) return null;
+  return text.split("\n").map((line, idx) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("### ")) return <h3 key={idx} style={{ fontSize: 14, fontWeight: 700, color: "#0F172A", margin: "10px 0 3px" }}>{trimmed.slice(4)}</h3>;
+    if (trimmed.startsWith("## "))  return <h2 key={idx} style={{ fontSize: 15, fontWeight: 700, color: "#0F172A", margin: "12px 0 4px" }}>{trimmed.slice(3)}</h2>;
+    if (trimmed === "---") return <hr key={idx} style={{ border: "none", borderTop: "1px solid #E5E7EB", margin: "8px 0" }} />;
+    if (trimmed === "") return <div key={idx} style={{ height: 5 }} />;
+    const parts = trimmed.split(/(\*\*[^*]+\*\*)/g);
+    const formatted = parts.map((p, i) =>
+      p.startsWith("**") && p.endsWith("**") ? <strong key={i}>{p.slice(2, -2)}</strong> : p
+    );
+    return <p key={idx} style={{ margin: "1px 0", fontSize: 14, lineHeight: 1.65 }}>{formatted}</p>;
+  });
+}
 const STATIC_CHANNELS = [
   { id: "general",    label: "# general",    desc: "Company-wide announcements and conversation" },
   { id: "recruiting", label: "# recruiting", desc: "Hiring updates, candidate discussions" },
@@ -241,7 +257,7 @@ export default function Messenger() {
                       <span style={{ fontSize: 11, color: C.muted }}>{time}</span>
                     </div>
                   )}
-                  <div style={{ fontSize: 14, color: C.text, lineHeight: 1.6 }}>{msg.content}</div>
+                  <div style={{ fontSize: 14, color: C.text, lineHeight: 1.6 }}>{renderMarkdown(msg.content)}</div>
                 </div>
               </div>
             );

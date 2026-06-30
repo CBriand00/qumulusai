@@ -84,17 +84,25 @@ Be specific and actionable.`,
     setSourcingError("");
     try {
       const { data, error } = await supabase.functions.invoke("source-candidates", {
-        body: { role_title: roleDesc, location: location || "Atlanta", skills },
+        body: { role_title: roleDesc, location: location || "Atlanta" },
       });
-      console.log("PDL full response:", JSON.stringify(data));
-      if (error) throw new Error(typeof error === "object" ? JSON.stringify(error) : error);
-      // data = { status: <http code>, data: <pdl response> }
-      const pdl = data?.data;
-      if (data?.status && data.status !== 200) {
-        throw new Error(`PDL ${data.status}: ${pdl?.error?.message || pdl?.message || JSON.stringify(pdl).slice(0, 200)}`);
+
+      if (error) {
+        setSourcingError("Edge function error: " + error.message);
+        setSourcing(false);
+        return;
       }
-      // PDL nests the people array at data.data.data
-      const people = pdl?.data?.data || pdl?.data || pdl || [];
+
+      console.log("Full response:", JSON.stringify(data));
+
+      const people = data?.data?.data || data?.data || [];
+
+      if (!Array.isArray(people)) {
+        setSourcingError("Unexpected response format: " + JSON.stringify(data).slice(0, 300));
+        setSourcing(false);
+        return;
+      }
+
       const mapped = people.map(p => ({
         name: p.full_name,
         title: p.job_title,

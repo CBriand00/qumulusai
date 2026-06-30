@@ -88,8 +88,18 @@ Be specific and actionable.`,
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      setCandidates(data?.candidates || []);
-      if ((data?.candidates || []).length === 0) setSourcingError("No candidates found. Try a broader title or location.");
+      // PDL returns raw response: { data: [...people], total, status }
+      const people = data?.data || [];
+      const mapped = people.map(p => ({
+        name: p.full_name,
+        title: p.job_title,
+        company: p.job_company_name,
+        location: p.location_locality ? `${p.location_locality}${p.location_region ? ", " + p.location_region : ""}` : null,
+        linkedin_url: p.linkedin_url,
+        email: p.emails?.[0]?.address || null,
+      }));
+      setCandidates(mapped);
+      if (mapped.length === 0) setSourcingError("No candidates found. Try a broader title or location.");
     } catch (e) {
       setSourcingError("Sourcing unavailable: " + e.message);
     }
@@ -169,7 +179,8 @@ Be specific and actionable.`,
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{c.name}</div>
                     <div style={{ fontSize: 12, color: C.muted }}>{c.title}{c.company ? ` · ${c.company}` : ""}</div>
-                    {c.email && <div style={{ fontSize: 12, color: C.muted }}>{c.email}</div>}
+                    {c.location && <div style={{ fontSize: 12, color: C.muted }}>📍 {c.location}</div>}
+                    {c.email && <div style={{ fontSize: 12, color: C.muted }}>✉ {c.email}</div>}
                   </div>
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                     {c.linkedin_url && (

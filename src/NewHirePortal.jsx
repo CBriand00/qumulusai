@@ -253,6 +253,16 @@ export default function NewHirePortal({ token }) {
       .eq("employee_id", employee.id).ilike("document_name", "%I-9%");
     // Fire onboarding channel automation (non-blocking)
     triggerOnboardingChannel({ doc, employee, w4, dd }).catch(console.error);
+    // Create employee login account and send welcome email (non-blocking)
+    supabase.functions.invoke("create-employee-login", {
+      body: {
+        employeeId: employee.id,
+        email: employee.email,
+        fullName: employee.full_name,
+        roleTitle: employee.role_title,
+        startDate: employee.start_date,
+      },
+    }).catch(console.error);
     setSaving(false);
     setComplete(true);
   }

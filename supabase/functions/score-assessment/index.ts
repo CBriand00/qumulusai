@@ -1,43 +1,92 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const SUPABASE_URL = "https://oomdaguzvdheotrkqdxs.supabase.co";
+const ORG_ID = "00000000-0000-0000-0000-000000000001";
+
 const json = (data: unknown, status = 200) =>
-  new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json", ...CORS } });
+  new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json", ...CORS },
+  });
+
+async function restGet(path: string, anonKey: string): Promise<Record<string, unknown> | null> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: {
+      "apikey": anonKey,
+      "Authorization": `Bearer ${anonKey}`,
+      "Accept": "application/json",
+    },
+  });
+  if (!res.ok) return null;
+  const rows = await res.json();
+  return Array.isArray(rows) ? (rows[0] ?? null) : rows;
+}
+
+async function restPatch(path: string, body: unknown, anonKey: string): Promise<boolean> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method: "PATCH",
+    headers: {
+      "apikey": anonKey,
+      "Authorization": `Bearer ${anonKey}`,
+      "Content-Type": "application/json",
+      "Prefer": "return=minimal",
+    },
+    body: JSON.stringify(body),
+  });
+  return res.ok;
+}
+
+async function restInsert(table: string, body: unknown, anonKey: string): Promise<void> {
+  await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: "POST",
+    headers: {
+      "apikey": anonKey,
+      "Authorization": `Bearer ${anonKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
-  try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 
-    const { assessmentId, responses } = await req.json();
+  try {
+    // ── 1. Parse body ─────────────────────────────────────────────────────────
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch (_e) {
+      return json({ error: "Invalid JSON body" }, 400);
+    }
+
+    const { assessmentId, responses } = body as { assessmentId: string; responses: Record<string, unknown> };
     if (!assessmentId) return json({ error: "assessmentId required" }, 400);
 
-    const { data: assessment } = await supabase
-      .from("candidate_assessments")
-      .select("*")
-      .eq("id", assessmentId)
-      .single();
+    // ── 2. Load assessment ────────────────────────────────────────────────────
+    const assessment = await restGet(
+      `candidate_assessments?id=eq.${assessmentId}&select=*`,
+      anonKey
+    );
     if (!assessment) return json({ error: "Assessment not found" }, 404);
 
-    // Mark submitted immediately
-    await supabase.from("candidate_assessments").update({
-      responses,
-      status: "submitted",
-      submitted_at: new Date().toISOString(),
-    }).eq("id", assessmentId);
+    // Mark submitted immediately so candidate sees confirmation
+    await restPatch(
+      `candidate_assessments?id=eq.${assessmentId}`,
+      { responses, status: "submitted", submitted_at: new Date().toISOString() },
+      anonKey
+    );
 
-    // Format responses for AI
-    const sections: Array<{ id?: string; title?: string; questions?: Array<{ id?: string; text?: string }> }> = assessment.sections || [];
-    const formattedResponses = sections.map((sec, si) => {
+    // ── 3. Format responses for AI ────────────────────────────────────────────
+    const sections = (assessment.sections as Array<{ id?: string; title?: string; questions?: Array<{ id?: string; text?: string }> }>) || [];
+    const formatted = sections.map((sec, si) => {
       const secKey = sec.id ?? si;
       const qs = (sec.questions || []).map((q, qi) => {
         const key = `${secKey}_${q.id ?? qi}`;
@@ -47,74 +96,89 @@ Deno.serve(async (req) => {
       return `[${sec.title}]\n${qs}`;
     }).join("\n\n");
 
-    // Score with AI
+    // ── 4. Score with AI ──────────────────────────────────────────────────────
     let scoring = {
       overall_score: 50,
       dimension_scores: { role_fit: 50, problem_solving: 50, culture_values: 50, communication: 50 },
-      ai_explanation: "Score calculated based on response completeness.",
+      ai_explanation: "Score based on response completeness.",
       risk_indicators: [] as string[],
       interview_recommendations: [] as string[],
       suggested_questions: [] as string[],
     };
 
     try {
-      const aiRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/ai-query`, {
+      const aiRes = await fetch(`${SUPABASE_URL}/functions/v1/ai-query`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
-          "apikey": Deno.env.get("SUPABASE_ANON_KEY")!,
+          "Authorization": `Bearer ${anonKey}`,
+          "apikey": anonKey,
         },
         body: JSON.stringify({
-          system: `You are an expert talent assessor for QumulusAI (bare-metal GPU cloud, Atlanta, scaling fast). Score this candidate's assessment responses rigorously. Return ONLY valid JSON — no markdown, no commentary.`,
+          system: `You are an expert talent assessor for QumulusAI (bare-metal GPU cloud, Atlanta). Score this candidate rigorously. Return ONLY valid JSON — no markdown, no code fences.`,
           messages: [{
             role: "user",
             content: `Score the assessment for: ${assessment.role_title}
 Candidate: ${assessment.candidate_name}
 
 Responses:
-${formattedResponses}
+${formatted}
 
-Return ONLY this JSON (no code blocks, no markdown):
-{"overall_score":75,"dimension_scores":{"role_fit":80,"problem_solving":70,"culture_values":75,"communication":72},"ai_explanation":"2-3 sentence explanation of score and key observations.","risk_indicators":["Specific risk 1","Specific risk 2"],"interview_recommendations":["Focus area 1","Focus area 2","Focus area 3"],"suggested_questions":["Probing question 1?","Probing question 2?","Probing question 3?"]}
+Return ONLY this JSON (no code blocks):
+{"overall_score":75,"dimension_scores":{"role_fit":80,"problem_solving":70,"culture_values":75,"communication":72},"ai_explanation":"2–3 sentence explanation.","risk_indicators":["Risk 1","Risk 2"],"interview_recommendations":["Focus area 1","Focus area 2"],"suggested_questions":["Question 1?","Question 2?","Question 3?"]}
 
-Scoring guidelines: 80-100 = strong advance, 65-79 = advance with notes, 50-64 = hold/review, below 50 = pass. Be direct and specific.`
+Scoring: 80–100 = strong advance, 65–79 = advance with notes, 50–64 = hold, below 50 = pass. Be specific.`,
           }],
-          max_tokens: 1200,
+          max_tokens: 1000,
         }),
       });
 
-      const aiData = await aiRes.json();
-      const raw = aiData?.content?.[0]?.text || "";
-      const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      const parsed = JSON.parse(cleaned);
-      if (typeof parsed?.overall_score === "number") scoring = parsed;
-    } catch (_e) {
+      if (aiRes.ok) {
+        const aiData = await aiRes.json();
+        const raw: string = aiData?.content?.[0]?.text ?? "";
+        const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+        if (typeof parsed?.overall_score === "number") scoring = parsed;
+      }
+    } catch (_aiErr) {
       // Use default scoring
     }
 
-    // Update assessment with scores
-    await supabase.from("candidate_assessments").update({
-      overall_score: scoring.overall_score,
-      dimension_scores: scoring.dimension_scores,
-      ai_explanation: scoring.ai_explanation,
-      risk_indicators: scoring.risk_indicators,
-      interview_recommendations: scoring.interview_recommendations,
-      suggested_questions: scoring.suggested_questions,
-      status: "scored",
-      scored_at: new Date().toISOString(),
-    }).eq("id", assessmentId);
+    // ── 5. Update assessment with scores ──────────────────────────────────────
+    await restPatch(
+      `candidate_assessments?id=eq.${assessmentId}`,
+      {
+        overall_score: scoring.overall_score,
+        dimension_scores: scoring.dimension_scores,
+        ai_explanation: scoring.ai_explanation,
+        risk_indicators: scoring.risk_indicators,
+        interview_recommendations: scoring.interview_recommendations,
+        suggested_questions: scoring.suggested_questions,
+        status: "scored",
+        scored_at: new Date().toISOString(),
+      },
+      anonKey
+    );
 
-    // Update application status based on score
+    // ── 6. Update application status ──────────────────────────────────────────
     if (assessment.application_id) {
-      const newStatus = scoring.overall_score >= 70 ? "interview" : scoring.overall_score >= 50 ? "screening" : "review";
-      await supabase.from("applications").update({ status: newStatus }).eq("id", assessment.application_id);
+      const newStatus =
+        scoring.overall_score >= 70 ? "interview" :
+        scoring.overall_score >= 50 ? "screening" : "review";
+      await restPatch(
+        `applications?id=eq.${assessment.application_id}`,
+        { status: newStatus },
+        anonKey
+      );
     }
 
-    // HR alert
-    const tier = scoring.overall_score >= 70 ? "Strong Fit" : scoring.overall_score >= 50 ? "Potential Fit" : "Low Fit";
-    await supabase.from("hr_alerts").insert({
-      organization_id: "00000000-0000-0000-0000-000000000001",
+    // ── 7. HR alert ───────────────────────────────────────────────────────────
+    const tier =
+      scoring.overall_score >= 70 ? "Strong Fit" :
+      scoring.overall_score >= 50 ? "Potential Fit" : "Low Fit";
+
+    await restInsert("hr_alerts", {
+      organization_id: ORG_ID,
       type: "assessment_scored",
       title: `${assessment.candidate_name} scored ${scoring.overall_score}/100`,
       body: `${assessment.role_title} · ${tier}`,
@@ -124,18 +188,26 @@ Scoring guidelines: 80-100 = strong advance, 65-79 = advance with notes, 50-64 =
         candidate_name: assessment.candidate_name,
         score: scoring.overall_score,
       },
-    });
+    }, anonKey);
 
-    // Notify Messenger
-    await supabase.from("messages").insert({
-      recipient_name: "Recruiting Team",
-      content: `📋 Assessment scored: ${assessment.candidate_name} — ${scoring.overall_score}/100 for ${assessment.role_title}. ${scoring.overall_score >= 70 ? "Recommended for interview." : "Review recommended."}`,
-      sent_at: new Date().toISOString(),
-      type: "assessment_notification",
-    }).catch(() => {});
+    // ── 8. Notify Messenger ───────────────────────────────────────────────────
+    try {
+      await restInsert("messages", {
+        recipient_name: "Recruiting Team",
+        content: `📋 Assessment scored: ${assessment.candidate_name} — ${scoring.overall_score}/100 for ${assessment.role_title}. ${scoring.overall_score >= 70 ? "Recommended for interview." : "Review recommended."}`,
+        sent_at: new Date().toISOString(),
+        type: "assessment_notification",
+      }, anonKey);
+    } catch (_e) {
+      // Non-critical
+    }
 
     return json({ success: true, score: scoring.overall_score });
   } catch (err) {
-    return json({ error: (err as Error).message }, 500);
+    return json({
+      error: "Unhandled exception",
+      message: (err as Error).message,
+      stack: (err as Error).stack,
+    }, 500);
   }
 });

@@ -67,8 +67,10 @@ Deno.serve(async (req) => {
     }
 
     const { application_id, candidate_name, candidate_email, role_title, department } = body;
-    if (!application_id) return json({ error: "application_id is required" }, 400);
-    if (!candidate_email) return json({ error: "candidate_email is required" }, 400);
+
+    // Return received fields in error so caller can see exactly what arrived
+    if (!application_id) return json({ error: "Missing required field: application_id", received: Object.keys(body) }, 400);
+    if (!candidate_email) return json({ error: "Missing required field: candidate_email", received: Object.keys(body) }, 400);
 
     const resolvedName = candidate_name || "Candidate";
     const resolvedRole = role_title || "Open Role";

@@ -314,7 +314,13 @@ export default function CareersPortal() {
     // Trigger assessment non-blocking
     if (inserted?.id) {
       supabase.functions.invoke("generate-assessment", {
-        body: { applicationId: inserted.id },
+        body: {
+          application_id: inserted.id,
+          candidate_name: formData.name,
+          candidate_email: formData.email,
+          role_title: selectedRole?.title || "",
+          department: selectedRole?.dept || "",
+        },
       }).catch(console.error);
     }
 

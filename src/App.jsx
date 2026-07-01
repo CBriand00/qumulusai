@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useBreakpoint } from "./useBreakpoint";
-import Auth from "./Auth";
+import Auth, { getPreviousLogin } from "./Auth";
 import { supabase } from "./supabase";
 import CommandCenter from "./CommandCenter";
 import CareersPortal from "./Careers";
@@ -10,6 +10,7 @@ import EmployeePortal from "./EmployeePortal";
 import OfferSigning from "./OfferSigning";
 import NewHirePortal from "./NewHirePortal";
 import AISourcing from "./AISourcing";
+import SecurityActivity from "./SecurityActivity";
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -57,6 +58,7 @@ const NAV = [
   { id: "careers",   label: "Careers Portal",    icon: "◉", accent: C.emerald },
   { id: "inbox",     label: "Talent Inbox",      icon: "◎", accent: C.rose },
   { id: "messenger", label: "Messenger",         icon: "◈", accent: C.cyan },
+  { id: "security",  label: "Security",          icon: "⚔", accent: C.blue },
 ];
 
 const EMPLOYEES = [
@@ -671,6 +673,35 @@ function WorkforceIntel() {
   );
 }
 
+// ─── LOGIN BANNER ─────────────────────────────────────────────────────────────
+function LoginBanner({ onDismiss }) {
+  const prev = getPreviousLogin();
+  if (!prev) return null;
+  return (
+    <div style={{ background: "#0A1628", border: "1px solid #1E3A5F", borderRadius: 10, padding: "12px 16px", marginBottom: 20, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, boxSizing: "border-box" }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "#4B8FCC", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
+          {prev.isNewDevice ? "⚠ New Device Detected" : "✓ Last Successful Login"}
+        </div>
+        <div style={{ fontSize: 13, color: "#94A3B8", lineHeight: 1.5 }}>
+          {prev.date} at {prev.time} · {prev.browser} on {prev.os}
+          {prev.isNewDevice && (
+            <span style={{ display: "block", marginTop: 3, color: "#F59E0B", fontSize: 12 }}>
+              A new device was used to sign in. If this wasn't you, go to Security and sign out all devices.
+            </span>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        style={{ background: "none", border: "none", color: "#4B5A6E", cursor: "pointer", fontSize: 18, lineHeight: 1, flexShrink: 0, padding: "0 4px", minHeight: 28, display: "flex", alignItems: "center" }}>
+        ✕
+      </button>
+    </div>
+  );
+}
+
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
 export default function App() {
   const [active, setActive] = useState("home");
@@ -679,13 +710,28 @@ export default function App() {
   const [userRole, setUserRole] = useState(null);
   const [onboardingCount, setOnboardingCount] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showLoginBanner, setShowLoginBanner] = useState(() => {
+    // Only show the banner immediately after a fresh sign-in, not on page refresh
+    const fresh = sessionStorage.getItem("qai_fresh_login");
+    if (fresh) sessionStorage.removeItem("qai_fresh_login");
+    return fresh === "1";
+  });
   const { isMobile } = useBreakpoint();
 
   useEffect(() => {
+    // "Remember me = false" — sign out if browser was closed (sessionStorage cleared)
+    if (localStorage.getItem("qai_no_persist") === "1" && !sessionStorage.getItem("qai_active_session")) {
+      localStorage.removeItem("qai_no_persist");
+      supabase.auth.signOut().then(() => setAuthLoading(false));
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setAuthLoading(false);
     });
+
+    // onAuthStateChange handles auto-logout when token refresh fails (SIGNED_OUT event)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
@@ -733,6 +779,7 @@ export default function App() {
     careers:   <CareersPortal />,
     inbox:     <TalentInbox />,
     messenger: <Messenger />,
+    security:  <SecurityActivity user={session?.user} />,
   };
 
   const currentPageLabel = NAV.find(n => n.id === active)?.label || "QumulusAI";
@@ -821,6 +868,15 @@ export default function App() {
 
         {/* Footer */}
         <div style={{ padding: "12px 12px 4px", flexShrink: 0 }}>
+          {/* User info */}
+          <div style={{ background: "#0F1828", border: `1px solid ${C.borderDark}`, borderRadius: 8, padding: "10px 12px", marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: C.textMutedDark, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session?.user?.email}</div>
+            <button
+              onClick={() => navigate("security")}
+              style={{ background: "none", border: "none", color: C.cyan, fontSize: 11, cursor: "pointer", fontFamily: "inherit", padding: 0, fontWeight: 600, letterSpacing: "0.04em" }}>
+              ⚔ Security &amp; Activity →
+            </button>
+          </div>
           <button
             onClick={() => supabase.auth.signOut()}
             style={{ width: "100%", background: "transparent", border: `1px solid ${C.borderDark}`, borderRadius: 6, padding: "10px 0", color: C.textMutedDark, fontSize: 12, cursor: "pointer", fontFamily: "inherit", minHeight: 44 }}>
@@ -843,6 +899,9 @@ export default function App() {
       {/* ── Main content ── */}
       <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden", paddingTop: isMobile ? 56 : 0, width: "100%", boxSizing: "border-box", minWidth: 0 }}>
         <div style={{ maxWidth: isMobile ? "100%" : 940, margin: "0 auto", padding: isMobile ? "20px 16px" : "36px", boxSizing: "border-box" }}>
+          {showLoginBanner && (
+            <LoginBanner onDismiss={() => setShowLoginBanner(false)} />
+          )}
           {screens[active]}
         </div>
       </main>

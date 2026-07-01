@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
         candidate_name,
         candidate_email,
         role_title,
-        sections: questions,
+        questions: questions,
         status: "pending",
         sent_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
     }
 
     const assessment = Array.isArray(insertData) ? insertData[0] : insertData;
-    const assessToken = assessment?.token;
+    const assessToken = assessment?.assessment_token;
     const assessLink = `https://qumulusai.vercel.app?assess=${assessToken}`;
 
     // Step 3: Send email

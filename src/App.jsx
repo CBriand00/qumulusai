@@ -11,6 +11,7 @@ import OfferSigning from "./OfferSigning";
 import NewHirePortal from "./NewHirePortal";
 import AISourcing from "./AISourcing";
 import SecurityActivity from "./SecurityActivity";
+import AssessmentPortal from "./AssessmentPortal";
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -213,6 +214,144 @@ function SectionHeader({ icon, title, subtitle, accent, tag }) {
   );
 }
 
+// ─── REQUISITIONS ─────────────────────────────────────────────────────────────
+function RequisitionsTab() {
+  const [reqs, setReqs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const BLANK = { title: "", department: "", location: "", employment_type: "full_time", headcount: 1, salary_min: "", salary_max: "", description: "", requirements: "", role_category: "general", hiring_manager: "", status: "open" };
+  const [form, setForm] = useState(BLANK);
+  const { isMobile } = useBreakpoint();
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase.from("job_requisitions").select("*").order("created_at", { ascending: false });
+      setReqs(data || []);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  function startNew() { setForm(BLANK); setEditingId(null); setShowForm(true); }
+  function startEdit(r) { setForm({ ...r, salary_min: r.salary_min || "", salary_max: r.salary_max || "" }); setEditingId(r.id); setShowForm(true); }
+
+  async function handleSave() {
+    if (!form.title.trim()) return;
+    setSaving(true);
+    const payload = {
+      ...form,
+      organization_id: "00000000-0000-0000-0000-000000000001",
+      salary_min: form.salary_min ? Number(form.salary_min) : null,
+      salary_max: form.salary_max ? Number(form.salary_max) : null,
+      headcount: Number(form.headcount) || 1,
+      updated_at: new Date().toISOString(),
+    };
+    if (editingId) {
+      await supabase.from("job_requisitions").update(payload).eq("id", editingId);
+      setReqs(prev => prev.map(r => r.id === editingId ? { ...r, ...payload } : r));
+    } else {
+      const { data } = await supabase.from("job_requisitions").insert(payload).select().single();
+      if (data) setReqs(prev => [data, ...prev]);
+    }
+    setSaving(false);
+    setShowForm(false);
+  }
+
+  async function handleClose(id) {
+    await supabase.from("job_requisitions").update({ status: "closed" }).eq("id", id);
+    setReqs(prev => prev.map(r => r.id === id ? { ...r, status: "closed" } : r));
+  }
+
+  const statusColor = { open: C.emerald, closed: C.textMuted, paused: C.amber };
+  const fieldStyle = { width: "100%", boxSizing: "border-box", background: "#F8FAFC", border: `1px solid ${C.border}`, borderRadius: 8, padding: "9px 12px", fontSize: 13, color: C.textDark, fontFamily: "inherit", outline: "none" };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <Label color={C.violet}>Job Requisitions ({reqs.filter(r => r.status === "open").length} open)</Label>
+        <button onClick={startNew} style={{ background: C.violet, color: "#fff", border: "none", borderRadius: 7, padding: "8px 16px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>+ New Req</button>
+      </div>
+
+      {showForm && (
+        <Card style={{ marginBottom: 16, borderTop: `3px solid ${C.violet}` }}>
+          <Label color={C.violet}>{editingId ? "Edit Requisition" : "New Requisition"}</Label>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 10 }}>
+            <div><div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Job Title *</div><input style={fieldStyle} placeholder="e.g. Senior GPU Infrastructure Engineer" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
+            <div><div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Department</div><input style={fieldStyle} placeholder="e.g. Infrastructure" value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} /></div>
+            <div><div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Location</div><input style={fieldStyle} placeholder="e.g. Marietta, GA / Remote" value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} /></div>
+            <div><div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Hiring Manager</div><input style={fieldStyle} placeholder="Name" value={form.hiring_manager} onChange={e => setForm(f => ({ ...f, hiring_manager: e.target.value }))} /></div>
+            <div><div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Headcount</div><input style={fieldStyle} type="number" min={1} value={form.headcount} onChange={e => setForm(f => ({ ...f, headcount: e.target.value }))} /></div>
+            <div><div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Employment Type</div>
+              <select style={fieldStyle} value={form.employment_type} onChange={e => setForm(f => ({ ...f, employment_type: e.target.value }))}>
+                <option value="full_time">Full-time</option><option value="part_time">Part-time</option><option value="contract">Contract</option><option value="intern">Intern</option>
+              </select>
+            </div>
+            <div><div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Salary Min ($)</div><input style={fieldStyle} type="number" placeholder="120000" value={form.salary_min} onChange={e => setForm(f => ({ ...f, salary_min: e.target.value }))} /></div>
+            <div><div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Salary Max ($)</div><input style={fieldStyle} type="number" placeholder="160000" value={form.salary_max} onChange={e => setForm(f => ({ ...f, salary_max: e.target.value }))} /></div>
+            <div><div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Role Category</div>
+              <select style={fieldStyle} value={form.role_category} onChange={e => setForm(f => ({ ...f, role_category: e.target.value }))}>
+                {["general","technical","sales","product","finance","people","executive"].map(c => <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+              </select>
+            </div>
+            <div><div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Status</div>
+              <select style={fieldStyle} value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                <option value="open">Open</option><option value="paused">Paused</option><option value="closed">Closed</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Requirements</div>
+            <textarea style={{ ...fieldStyle, height: 70, resize: "vertical" }} placeholder="Key requirements, one per line" value={form.requirements} onChange={e => setForm(f => ({ ...f, requirements: e.target.value }))} />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>Role Description</div>
+            <textarea style={{ ...fieldStyle, height: 90, resize: "vertical" }} placeholder="Role summary and responsibilities" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={handleSave} disabled={saving || !form.title.trim()} style={{ background: C.violet, color: "#fff", border: "none", borderRadius: 7, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: saving ? "default" : "pointer", fontFamily: "inherit", opacity: saving ? 0.7 : 1 }}>
+              {saving ? "Saving…" : editingId ? "Save Changes" : "Create Requisition"}
+            </button>
+            <button onClick={() => setShowForm(false)} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: 7, padding: "9px 16px", fontSize: 13, color: C.textMuted, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+          </div>
+        </Card>
+      )}
+
+      {loading ? (
+        <div style={{ color: C.textMuted, fontSize: 13, padding: 20 }}>Loading requisitions…</div>
+      ) : reqs.length === 0 ? (
+        <Card style={{ textAlign: "center", padding: 32, color: C.textMuted, fontSize: 13 }}>No requisitions yet. Create your first one above.</Card>
+      ) : (
+        reqs.map(r => (
+          <Card key={r.id} style={{ marginBottom: 10 }}>
+            <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 800, fontSize: 14, color: C.textDark }}>{r.title}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: statusColor[r.status] || C.textMuted, background: `${statusColor[r.status] || C.textMuted}15`, borderRadius: 100, padding: "2px 9px" }}>{r.status}</span>
+                </div>
+                <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
+                  {[r.department, r.location, r.headcount > 1 ? `${r.headcount} hires` : "1 hire", r.hiring_manager && `HM: ${r.hiring_manager}`].filter(Boolean).join(" · ")}
+                </div>
+                {(r.salary_min || r.salary_max) && (
+                  <div style={{ fontSize: 12, color: C.textMid, marginTop: 3 }}>
+                    ${r.salary_min?.toLocaleString()} – ${r.salary_max?.toLocaleString()}
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <button onClick={() => startEdit(r)} style={{ background: `${C.violet}12`, border: `1px solid ${C.violet}30`, borderRadius: 6, padding: "6px 12px", fontSize: 11, color: C.violet, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>Edit</button>
+                {r.status === "open" && <button onClick={() => handleClose(r.id)} style={{ background: "#F1F5F9", border: `1px solid ${C.border}`, borderRadius: 6, padding: "6px 12px", fontSize: 11, color: C.textMuted, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>Close</button>}
+              </div>
+            </div>
+          </Card>
+        ))
+      )}
+    </div>
+  );
+}
+
 // ─── RECRUITING ENGINE ────────────────────────────────────────────────────────
 function RecruitingEngine() {
   const intake = useAI();
@@ -267,10 +406,11 @@ COMPENSATION FIT:
 Be specific. Avoid generic language.`;
 
   const tabs = [
-    { id: "intake",    label: "Intake Intelligence",   shortLabel: "Intake",    icon: "◈" },
-    { id: "sourcing",  label: "AI Sourcing",           shortLabel: "Sourcing",  icon: "◈" },
-    { id: "candidate", label: "Candidate Evaluator",   shortLabel: "Evaluate",  icon: "◎" },
-    { id: "interview", label: "Interview Intelligence", shortLabel: "Interview", icon: "◇" },
+    { id: "intake",        label: "Intake Intelligence",   shortLabel: "Intake",    icon: "◈" },
+    { id: "sourcing",      label: "AI Sourcing",           shortLabel: "Sourcing",  icon: "◈" },
+    { id: "candidate",     label: "Candidate Evaluator",   shortLabel: "Evaluate",  icon: "◎" },
+    { id: "interview",     label: "Interview Intelligence", shortLabel: "Interview", icon: "◇" },
+    { id: "requisitions",  label: "Requisitions",          shortLabel: "Reqs",      icon: "◉" },
   ];
 
   return (
@@ -371,6 +511,8 @@ Be specific. Avoid generic language.`;
               <AIBox loading={interview.loading} response={interview.response} accent={C.violet} />
             </>
           )}
+
+          {activeTab === "requisitions" && <RequisitionsTab />}
         </div>
       </Card>
     </div>
@@ -841,6 +983,8 @@ export default function App() {
   if (signingToken) return <OfferSigning token={signingToken} />;
   const onboardToken = params.get("onboard");
   if (onboardToken) return <NewHirePortal token={onboardToken} />;
+  const assessToken = params.get("assess");
+  if (assessToken) return <AssessmentPortal token={assessToken} />;
   if (session && userRole === "employee") return <EmployeePortal user={session.user} />;
 
   const screens = {

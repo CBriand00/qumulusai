@@ -197,6 +197,7 @@ function DetailPanel({ app, onUpdateStatus, updating }) {
           <p style={styles.coverLetter}>{app.cover_letter}</p>
         </Section>
       )}
+      <AssessmentResults app={app} />
       {app.status === "interview" && <ScheduleInterview app={app} />}
       {app.status === "interview" && <InterviewIntelligence app={app} />}
       {app.status === "offer" && <OfferLetter app={app} />}
@@ -258,6 +259,134 @@ function ScheduleInterview({ app }) {
       <button style={{...styles.pipeBtn, background: "#EFF6FF", color: "#2563EB", borderColor: "#2563EB"}} onClick={handleSchedule} disabled={saving}>
         {saved ? "✓ Scheduled!" : saving ? "Saving…" : "Schedule Interview"}
       </button>
+    </Section>
+  );
+}
+
+function ScoreBar({ label, value, color }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#64748B", marginBottom: 4 }}>
+        <span>{label}</span>
+        <span style={{ fontWeight: 700, color }}>{value}/100</span>
+      </div>
+      <div style={{ height: 6, background: "#F1F5F9", borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${value}%`, background: color, borderRadius: 4, transition: "width 0.4s" }} />
+      </div>
+    </div>
+  );
+}
+
+function AssessmentResults({ app }) {
+  const [assessment, setAssessment] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase
+        .from("candidate_assessments")
+        .select("*")
+        .eq("application_id", app.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      setAssessment(data || null);
+      setLoading(false);
+    }
+    load();
+  }, [app.id]);
+
+  if (loading) return (
+    <Section title="Assessment">
+      <div style={{ fontSize: 13, color: "#94A3B8" }}>Loading assessment…</div>
+    </Section>
+  );
+
+  if (!assessment) return (
+    <Section title="Assessment">
+      <div style={{ fontSize: 13, color: "#94A3B8" }}>No assessment sent yet.</div>
+    </Section>
+  );
+
+  const score = assessment.overall_score;
+  const scored = assessment.status === "scored";
+  const scoreColor = score >= 70 ? "#059669" : score >= 50 ? "#D97706" : "#DC2626";
+  const scoreBg = score >= 70 ? "#ECFDF5" : score >= 50 ? "#FFFBEB" : "#FEF2F2";
+  const scoreTier = score >= 70 ? "Strong Fit" : score >= 50 ? "Potential Fit" : "Low Fit";
+  const dims = assessment.dimension_scores || {};
+
+  return (
+    <Section title="Assessment Results">
+      {assessment.status === "pending" && (
+        <div style={{ fontSize: 13, color: "#D97706", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 8, padding: "10px 14px" }}>
+          ⏳ Assessment sent — awaiting candidate submission.
+        </div>
+      )}
+      {assessment.status === "submitted" && (
+        <div style={{ fontSize: 13, color: "#2563EB", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 8, padding: "10px 14px" }}>
+          ◈ Submitted — scoring in progress…
+        </div>
+      )}
+      {scored && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+            <div style={{ background: scoreBg, border: `2px solid ${scoreColor}`, borderRadius: 12, padding: "12px 20px", textAlign: "center", flexShrink: 0 }}>
+              <div style={{ fontSize: 28, fontWeight: 900, color: scoreColor, lineHeight: 1 }}>{score}</div>
+              <div style={{ fontSize: 10, color: scoreColor, fontWeight: 700, marginTop: 2 }}>/100</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: scoreColor }}>{scoreTier}</div>
+              {assessment.ai_explanation && (
+                <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6, marginTop: 4 }}>{assessment.ai_explanation}</div>
+              )}
+            </div>
+          </div>
+
+          {Object.keys(dims).length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              {dims.role_fit != null && <ScoreBar label="Role Fit" value={dims.role_fit} color="#7C3AED" />}
+              {dims.problem_solving != null && <ScoreBar label="Problem Solving" value={dims.problem_solving} color="#2563EB" />}
+              {dims.culture_values != null && <ScoreBar label="Culture & Values" value={dims.culture_values} color="#0D9488" />}
+              {dims.communication != null && <ScoreBar label="Communication" value={dims.communication} color="#D97706" />}
+            </div>
+          )}
+
+          {assessment.risk_indicators?.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#DC2626", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Risk Indicators</div>
+              {assessment.risk_indicators.map((r, i) => (
+                <div key={i} style={{ fontSize: 12, color: "#DC2626", padding: "4px 0", borderBottom: "1px solid #FEE2E2", display: "flex", gap: 6 }}>
+                  <span>⚠</span><span>{r}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {assessment.interview_recommendations?.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#059669", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Interview Focus</div>
+              {assessment.interview_recommendations.map((r, i) => (
+                <div key={i} style={{ fontSize: 12, color: "#334155", padding: "4px 0" }}>• {r}</div>
+              ))}
+            </div>
+          )}
+
+          {assessment.suggested_questions?.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#2563EB", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>Suggested Interview Questions</div>
+              {assessment.suggested_questions.map((q, i) => (
+                <div key={i} style={{ fontSize: 12, color: "#334155", padding: "5px 0", borderBottom: "1px solid #E2E8F0" }}>{i + 1}. {q}</div>
+              ))}
+            </div>
+          )}
+
+          {score >= 70 && (
+            <div style={{ marginTop: 12, background: "#ECFDF5", border: "1px solid #86EFAC", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#059669", fontWeight: 600 }}>
+              ✓ Recommended for interview — move to Interview stage to schedule.
+            </div>
+          )}
+        </>
+      )}
     </Section>
   );
 }

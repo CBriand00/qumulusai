@@ -123,6 +123,53 @@ const PLACEHOLDERS = {
   default:   "Ask anything about your workforce…",
 };
 
+function HRAlerts() {
+  const [alerts, setAlerts] = useState([]);
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase
+        .from("hr_alerts")
+        .select("*")
+        .is("read_at", null)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      setAlerts(data || []);
+    }
+    load();
+  }, []);
+
+  async function markRead(id) {
+    await supabase.from("hr_alerts").update({ read_at: new Date().toISOString() }).eq("id", id);
+    setAlerts(prev => prev.filter(a => a.id !== id));
+  }
+
+  if (!alerts.length) return null;
+
+  const typeIcon = { assessment_sent: "📋", assessment_scored: "◈", default: "🔔" };
+
+  return (
+    <Card style={{ marginBottom: 16, borderLeft: `3px solid ${C.rose}` }}>
+      <Label color={C.rose}>HR Alerts ({alerts.length})</Label>
+      {alerts.map(a => (
+        <div key={a.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 0", borderBottom: `1px solid ${C.border}` }}>
+          <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{typeIcon[a.type] || typeIcon.default}</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark }}>{a.title}</div>
+            {a.body && <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2, lineHeight: 1.5 }}>{a.body}</div>}
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>{new Date(a.created_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>
+          </div>
+          <button
+            onClick={() => markRead(a.id)}
+            style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px", fontSize: 11, color: C.textMuted, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+            ✓ Done
+          </button>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
 export default function CommandCenter({ greeting, userRole }) {
   const [hiring, setHiring] = useState(null);
   const [activeModal, setActiveModal] = useState(null);
@@ -202,6 +249,8 @@ export default function CommandCenter({ greeting, userRole }) {
           </div>
         )}
       </Card>
+
+      <HRAlerts />
 
       <Card style={{ marginBottom: 16, borderLeft: `3px solid ${C.violet}` }}>
         <Label color={C.violet}>Today's Briefing — AI Chief of Staff</Label>

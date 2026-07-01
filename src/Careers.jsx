@@ -273,9 +273,13 @@ function AIScreeningResult({ role, form, aiResponse, loading }) {
             <div style={{ fontSize: 9, fontWeight: 800, color: C.cyan, letterSpacing: "0.14em", marginBottom: 12 }}>✦ YOUR AI SCREENING RESULT</div>
             <div style={{ fontSize: 14, color: C.text, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{aiResponse}</div>
           </div>
-          <div style={{ background: `${C.emerald}10`, border: `1px solid ${C.emerald}25`, borderRadius: 10, padding: 16, textAlign: "left" }}>
+          <div style={{ background: `${C.emerald}10`, border: `1px solid ${C.emerald}25`, borderRadius: 10, padding: 16, textAlign: "left", marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: C.emerald, marginBottom: 6 }}>✓ What happens next</div>
             <div style={{ fontSize: 13, color: C.textMid, lineHeight: 1.7 }}>Your application has been received and scored. A member of the QumulusAI recruiting team will review your result and reach out within 2–3 business days if your background is a strong match for this role.</div>
+          </div>
+          <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: 16, textAlign: "left" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#2563EB", marginBottom: 6 }}>📋 Check your email for your skills assessment</div>
+            <div style={{ fontSize: 13, color: C.textMid, lineHeight: 1.7 }}>We've sent a short candidate assessment to {form?.email}. Completing it strengthens your application and helps us move faster. It takes about 30 minutes.</div>
           </div>
         </div>
       )}
@@ -295,17 +299,25 @@ export default function CareersPortal() {
 
   const handleApply = async (formData) => {
     setForm(formData);
-    setStep(3); 
-   await supabase.from("applications").insert([{
- full_name: formData.name,
- email: formData.email,
- phone: formData.phone,
- linkedin_url: formData.linkedin,
- role_title: selectedRole.title,
- department: selectedRole.dept,
- cover_letter: formData.why,
- status: "new",
-}]);
+    setStep(3);
+    const { data: inserted } = await supabase.from("applications").insert([{
+      full_name: formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      linkedin_url: formData.linkedin,
+      role_title: selectedRole.title,
+      department: selectedRole.dept,
+      cover_letter: formData.why,
+      status: "new",
+    }]).select().single();
+
+    // Trigger assessment non-blocking
+    if (inserted?.id) {
+      supabase.functions.invoke("generate-assessment", {
+        body: { applicationId: inserted.id },
+      }).catch(console.error);
+    }
+
     await ask(
       `You are QumulusAI's AI recruiting screener. QumulusAI is a 43-person bare-metal GPU cloud company in Atlanta, GA with $500M in financing, scaling to 300+ employees. CEO: Mike Maniscalco. Mission: universalize access to AI compute.
 

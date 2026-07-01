@@ -43,16 +43,17 @@ export const workforceService = {
   id: "workforce",
   name: "Workforce Intelligence",
   async getMetrics() {
-    const [{ data: employees }, { data: departments }] = await Promise.all([
+    const [{ data: employees }, { data: departments }, { data: pendingOnboarding }] = await Promise.all([
       supabase.from("employees").select("id, status, department_id, start_date").eq("status", "active"),
       supabase.from("departments").select("id, name"),
+      supabase.from("employee_onboarding_docs").select("id").neq("status", "complete"),
     ]);
     const allEmployees = employees || [];
     const deptMap = (departments || []).reduce((acc, d) => { acc[d.id] = d.name; return acc; }, {});
     const byDepartment = allEmployees.reduce((acc, e) => { const name = deptMap[e.department_id] || "Unassigned"; acc[name] = (acc[name] || 0) + 1; return acc; }, {});
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const newHires30d = allEmployees.filter(e => e.start_date && new Date(e.start_date) >= thirtyDaysAgo).length;
-    return { totalHeadcount: allEmployees.length, headcountByDepartment: byDepartment, newHiresLast30Days: newHires30d };
+    return { totalHeadcount: allEmployees.length, headcountByDepartment: byDepartment, newHiresLast30Days: newHires30d, onboardingCount: (pendingOnboarding || []).length };
   },
   async getSummary() {
     const m = await this.getMetrics();

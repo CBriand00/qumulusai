@@ -381,6 +381,10 @@ Be specific. Avoid generic language.`;
 function OnboardingConcierge() {
   const { ask, loading, response } = useAI();
   const { isMobile, isTablet } = useBreakpoint();
+  const [onboardEmps, setOnboardEmps] = useState([]);
+  const [loadingOnboard, setLoadingOnboard] = useState(true);
+  const [empPlans, setEmpPlans] = useState({});
+  const [generatingFor, setGeneratingFor] = useState(null);
 
   const sys = `You are QumulusAI's Onboarding Concierge. When given a new hire's details, generate a personalized onboarding plan. Include:
 
@@ -411,11 +415,92 @@ Make it specific, warm, and immediately actionable.`;
     { day: "Day 90", title: "Impact Review",        desc: "90-day review, goal alignment for Q3",                 done: false },
   ];
 
+  useEffect(() => {
+    async function loadOnboarding() {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      const { data: docs } = await supabase
+        .from("employee_onboarding_docs")
+        .select("id, status, employee_id, employees(id, full_name, role_title, start_date, email)");
+      const filtered = (docs || []).filter(d =>
+        d.status !== "complete" || (d.employees?.start_date && d.employees.start_date >= thirtyDaysAgo)
+      );
+      const seen = new Set();
+      const unique = filtered.filter(d => {
+        if (seen.has(d.employee_id)) return false;
+        seen.add(d.employee_id);
+        return true;
+      });
+      setOnboardEmps(unique);
+      setLoadingOnboard(false);
+    }
+    loadOnboarding();
+  }, []);
+
+  async function generatePlan(d) {
+    const emp = d.employees;
+    setGeneratingFor(d.employee_id);
+    const { data } = await supabase.functions.invoke("ai-query", {
+      body: {
+        max_tokens: 800,
+        system: sys,
+        messages: [{ role: "user", content: `New hire: ${emp?.full_name}, ${emp?.role_title}, starting ${emp?.start_date || "soon"} at QumulusAI (GPU AI infrastructure company, Atlanta GA).` }],
+      },
+    });
+    const text = data?.content?.[0]?.text || "Could not generate plan.";
+    setEmpPlans(prev => ({ ...prev, [d.employee_id]: text }));
+    setGeneratingFor(null);
+  }
+
   const gridCols = isMobile ? "1fr" : isTablet ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))";
 
   return (
     <div>
       <SectionHeader icon="◎" accent={C.teal} tag="Pillar Two" title="AI Onboarding Concierge" subtitle="Personalized onboarding journeys from offer accept through the first 90 days — automatically." />
+
+      {/* Live employee onboarding list */}
+      <Card style={{ marginBottom: 14 }}>
+        <Label color={C.teal}>Currently Onboarding</Label>
+        {loadingOnboard ? (
+          <div style={{ fontSize: 13, color: C.teal, fontWeight: 600 }}>◎ Loading employees…</div>
+        ) : onboardEmps.length === 0 ? (
+          <div style={{ fontSize: 13, color: C.textMuted }}>No employees currently onboarding.</div>
+        ) : (
+          onboardEmps.map((d, idx) => {
+            const emp = d.employees;
+            const plan = empPlans[d.employee_id];
+            const isGenerating = generatingFor === d.employee_id;
+            const isLast = idx === onboardEmps.length - 1;
+            return (
+              <div key={d.employee_id} style={{ borderBottom: isLast ? "none" : `1px solid ${C.border}`, paddingBottom: isLast ? 0 : 14, marginBottom: isLast ? 0 : 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.textDark }}>{emp?.full_name || "Unknown"}</div>
+                    <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
+                      {emp?.role_title || "—"} · Start: {emp?.start_date || "—"}
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, background: d.status === "complete" ? "#05966910" : "#D9770610", color: d.status === "complete" ? C.emerald : C.amber, borderRadius: 5, padding: "2px 8px" }}>
+                        Docs: {d.status === "complete" ? "Complete" : "Pending"}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => generatePlan(d)}
+                    disabled={isGenerating}
+                    style={{ background: C.teal, color: "#fff", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: isGenerating ? "default" : "pointer", opacity: isGenerating ? 0.6 : 1, fontFamily: "inherit", minHeight: 36, flexShrink: 0 }}>
+                    {isGenerating ? "◎ Generating…" : "✦ Generate 30-60-90 Plan"}
+                  </button>
+                </div>
+                {plan && (
+                  <div style={{ background: `${C.teal}08`, border: `1px solid ${C.teal}25`, borderLeft: `3px solid ${C.teal}`, borderRadius: 8, padding: 14, marginTop: 10, fontSize: 13, lineHeight: 1.75, color: C.textDark, whiteSpace: "pre-wrap" }}>
+                    {plan}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 14, marginBottom: 14 }}>
         <Card>
@@ -565,6 +650,62 @@ function EmployeeHub() {
   const { ask, loading, response } = useAI();
   const { isMobile, isTablet } = useBreakpoint();
 
+  // Performance Review state
+  const [perfEmployees, setPerfEmployees] = useState([]);
+  const [selectedEmp, setSelectedEmp] = useState(null);
+  const [goals, setGoals] = useState([]);
+  const [loadingGoals, setLoadingGoals] = useState(false);
+  const [newGoalText, setNewGoalText] = useState("");
+  const [addingGoal, setAddingGoal] = useState(false);
+  const [perfNote, setPerfNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
+
+  useEffect(() => {
+    supabase.from("employees").select("id, full_name, role_title").eq("status", "active").order("full_name")
+      .then(({ data }) => setPerfEmployees(data || []));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedEmp) { setGoals([]); return; }
+    setLoadingGoals(true);
+    supabase.from("goals").select("id, title, status").eq("employee_id", selectedEmp.id)
+      .then(({ data }) => { setGoals(data || []); setLoadingGoals(false); });
+  }, [selectedEmp]);
+
+  async function toggleGoal(goal) {
+    const newStatus = goal.status === "completed" ? "in_progress" : "completed";
+    await supabase.from("goals").update({ status: newStatus }).eq("id", goal.id);
+    setGoals(prev => prev.map(g => g.id === goal.id ? { ...g, status: newStatus } : g));
+  }
+
+  async function addGoal() {
+    if (!newGoalText.trim() || !selectedEmp) return;
+    setAddingGoal(true);
+    const { data } = await supabase.from("goals").insert({
+      employee_id: selectedEmp.id,
+      title: newGoalText.trim(),
+      status: "in_progress",
+    }).select("id, title, status").single();
+    if (data) setGoals(prev => [...prev, data]);
+    setNewGoalText("");
+    setAddingGoal(false);
+  }
+
+  async function saveNote() {
+    if (!perfNote.trim() || !selectedEmp) return;
+    setSavingNote(true);
+    await supabase.from("performance_reviews").insert({
+      employee_id: selectedEmp.id,
+      notes: perfNote.trim(),
+      reviewed_at: new Date().toISOString(),
+    });
+    setSavingNote(false);
+    setNoteSaved(true);
+    setTimeout(() => setNoteSaved(false), 2000);
+    setPerfNote("");
+  }
+
   const sys = "You are an AI People Operations assistant for QumulusAI — a vertically integrated AI infrastructure company based in Marietta, Georgia. QumulusAI provides bare-metal GPU cloud services and is scaling rapidly from 43 to 300+ employees after securing $500M in financing. CEO is Mike Maniscalco. The company's mission is to universalize access to AI compute. Roles are highly technical: GPU Infrastructure Engineers, AI Solutions Architects, Data Center Operations, Enterprise Sales. Answer employee HR questions clearly in under 150 words. Be warm, specific, and actionable.";
   const chips = ["What's my PTO balance and how do I request time off?", "Explain our parental leave policy", "How do I update my 401k contribution?", "What internal roles are open that match my background?"];
 
@@ -573,6 +714,85 @@ function EmployeeHub() {
   return (
     <div>
       <SectionHeader icon="○" accent={C.blueLight} tag="Pillar Four" title="Employee Support Hub" subtitle="Instant answers to any HR question — benefits, payroll, policies, career development, and more." />
+
+      {/* Performance Reviews */}
+      <Card style={{ marginBottom: 14 }}>
+        <Label color={C.blue}>Performance Reviews</Label>
+        <select
+          value={selectedEmp?.id || ""}
+          onChange={e => {
+            const emp = perfEmployees.find(p => p.id === e.target.value) || null;
+            setSelectedEmp(emp);
+            setPerfNote("");
+            setNoteSaved(false);
+          }}
+          style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 12px", color: selectedEmp ? C.textDark : C.textMuted, fontSize: 13, outline: "none", fontFamily: "inherit", minHeight: 44, cursor: "pointer" }}>
+          <option value="">Select an employee…</option>
+          {perfEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name} — {e.role_title}</option>)}
+        </select>
+
+        {selectedEmp && (
+          <>
+            {/* Goals list */}
+            <div style={{ marginTop: 18 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Goals</div>
+              {loadingGoals ? (
+                <div style={{ fontSize: 13, color: C.textMuted }}>Loading goals…</div>
+              ) : goals.length === 0 ? (
+                <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 10 }}>No goals yet.</div>
+              ) : (
+                goals.map(g => (
+                  <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderBottom: `1px solid ${C.border}` }}>
+                    <button
+                      onClick={() => toggleGoal(g)}
+                      style={{ width: 22, height: 22, borderRadius: "50%", background: g.status === "completed" ? C.emerald : "transparent", border: `2px solid ${g.status === "completed" ? C.emerald : C.border}`, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}>
+                      {g.status === "completed" && <span style={{ color: "#fff", fontSize: 11, lineHeight: 1 }}>✓</span>}
+                    </button>
+                    <span style={{ fontSize: 13, color: g.status === "completed" ? C.textMuted : C.textDark, textDecoration: g.status === "completed" ? "line-through" : "none", flex: 1 }}>
+                      {g.title}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: g.status === "completed" ? C.emerald : C.amber, flexShrink: 0 }}>
+                      {g.status === "completed" ? "Complete" : "In Progress"}
+                    </span>
+                  </div>
+                ))
+              )}
+              {/* Add goal row */}
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <input
+                  value={newGoalText}
+                  onChange={e => setNewGoalText(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && addGoal()}
+                  placeholder="Add a new goal…"
+                  style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, padding: "9px 12px", fontSize: 13, color: C.textDark, outline: "none", fontFamily: "inherit", minHeight: 40 }} />
+                <button
+                  onClick={addGoal}
+                  disabled={addingGoal || !newGoalText.trim()}
+                  style={{ background: C.blue, color: "#fff", border: "none", borderRadius: 7, padding: "9px 16px", fontSize: 13, fontWeight: 700, cursor: (addingGoal || !newGoalText.trim()) ? "default" : "pointer", opacity: (addingGoal || !newGoalText.trim()) ? 0.5 : 1, fontFamily: "inherit", minHeight: 40, flexShrink: 0 }}>
+                  {addingGoal ? "…" : "Add"}
+                </button>
+              </div>
+            </div>
+
+            {/* Performance note */}
+            <div style={{ marginTop: 18 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Performance Note</div>
+              <textarea
+                value={perfNote}
+                onChange={e => setPerfNote(e.target.value)}
+                rows={4}
+                placeholder="Write a performance note or review summary for this employee…"
+                style={{ width: "100%", boxSizing: "border-box", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "11px 14px", color: C.textDark, fontSize: 13, lineHeight: 1.6, outline: "none", resize: "vertical", fontFamily: "inherit" }} />
+              <button
+                onClick={saveNote}
+                disabled={savingNote || noteSaved || !perfNote.trim()}
+                style={{ marginTop: 8, background: noteSaved ? C.emerald : C.blue, color: "#fff", border: "none", borderRadius: 8, padding: "10px 22px", fontSize: 13, fontWeight: 700, cursor: (savingNote || noteSaved || !perfNote.trim()) ? "default" : "pointer", opacity: savingNote ? 0.7 : 1, fontFamily: "inherit", minHeight: 40 }}>
+                {noteSaved ? "✓ Saved" : savingNote ? "Saving…" : "Save Note"}
+              </button>
+            </div>
+          </>
+        )}
+      </Card>
 
       <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 12, marginBottom: 14 }}>
         <Card>

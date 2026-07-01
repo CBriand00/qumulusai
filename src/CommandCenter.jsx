@@ -198,6 +198,8 @@ export default function CommandCenter({ greeting }) {
         <Widget label="Total Headcount" value={loadingMetrics ? "—" : workforce?.totalHeadcount} accent={C.amber} />
         <Widget label="New Hires (30d)" value={loadingMetrics ? "—" : workforce?.newHiresLast30Days} accent={C.amber} />
         <Widget label="Departments" value={loadingMetrics ? "—" : Object.keys(workforce?.headcountByDepartment || {}).length} accent={C.amber} />
+        <Widget label="Onboarding" value={loadingMetrics ? "—" : (workforce?.onboardingCount ?? "—")} accent={C.teal} />
+        <Widget label="Avg Engagement" value={loadingMetrics ? "—" : (retention?.avgEngagementScore != null ? `${retention.avgEngagementScore}` : "—")} accent={C.emerald} />
       </div>
 
       <Label color={C.textMuted}>Other Intelligence Modules</Label>

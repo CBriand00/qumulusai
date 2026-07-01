@@ -40,10 +40,11 @@ function Label({ children, color }) {
 }
 
 function Widget({ label, value, accent }) {
+  const a = accent || C.cyan;
   return (
-    <Card style={{ padding: 18 }}>
-      <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 900, color: C.textDark, letterSpacing: "-0.02em" }}>{value}</div>
+    <Card style={{ padding: 16, borderTop: `3px solid ${a}` }}>
+      <div style={{ fontSize: 9, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 900, color: C.textDark, letterSpacing: "-0.02em" }}>{value}</div>
     </Card>
   );
 }
@@ -184,23 +185,23 @@ export default function CommandCenter({ greeting }) {
       </Card>
 
       <Label color={C.violet}>Hiring Intelligence</Label>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
-        <Widget label="Applications" value={loadingMetrics ? "—" : hiring?.totalApplications} />
-        <Widget label="Open Reqs" value={loadingMetrics ? "—" : hiring?.openRequisitions} />
-        <Widget label="Offers Extended" value={loadingMetrics ? "—" : hiring?.totalOffers} />
-        <Widget label="Offer Accept Rate" value={loadingMetrics ? "—" : (hiring?.offerAcceptRate !== null ? `${hiring?.offerAcceptRate}%` : "—")} />
-        <Widget label="Upcoming Interviews" value={loadingMetrics ? "—" : hiring?.upcomingInterviews} />
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
+        <Widget label="Applications" value={loadingMetrics ? "—" : hiring?.totalApplications} accent={C.violet} />
+        <Widget label="Open Reqs" value={loadingMetrics ? "—" : hiring?.openRequisitions} accent={C.violet} />
+        <Widget label="Offers Extended" value={loadingMetrics ? "—" : hiring?.totalOffers} accent={C.violet} />
+        <Widget label="Offer Accept Rate" value={loadingMetrics ? "—" : (hiring?.offerAcceptRate !== null ? `${hiring?.offerAcceptRate}%` : "—")} accent={C.violet} />
+        <Widget label="Upcoming Interviews" value={loadingMetrics ? "—" : hiring?.upcomingInterviews} accent={C.violet} />
       </div>
 
       <Label color={C.amber}>Workforce Intelligence</Label>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
-        <Widget label="Total Headcount" value={loadingMetrics ? "—" : workforce?.totalHeadcount} />
-        <Widget label="New Hires (30d)" value={loadingMetrics ? "—" : workforce?.newHiresLast30Days} />
-        <Widget label="Departments" value={loadingMetrics ? "—" : Object.keys(workforce?.headcountByDepartment || {}).length} />
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
+        <Widget label="Total Headcount" value={loadingMetrics ? "—" : workforce?.totalHeadcount} accent={C.amber} />
+        <Widget label="New Hires (30d)" value={loadingMetrics ? "—" : workforce?.newHiresLast30Days} accent={C.amber} />
+        <Widget label="Departments" value={loadingMetrics ? "—" : Object.keys(workforce?.headcountByDepartment || {}).length} accent={C.amber} />
       </div>
 
       <Label color={C.textMuted}>Other Intelligence Modules</Label>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
         {/* Retention card — clickable employee names */}
         <Card>
           <Label color={C.rose}>Retention Intelligence</Label>

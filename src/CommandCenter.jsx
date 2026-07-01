@@ -156,10 +156,10 @@ export default function CommandCenter({ greeting }) {
   }
 
   return (
-    <div>
+    <div style={{ overflowX: "hidden", width: "100%", boxSizing: "border-box" }}>
       <div style={{ marginBottom: 28 }}>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: `${C.cyan}15`, border: `1px solid ${C.cyan}40`, borderRadius: 100, padding: "5px 18px", marginBottom: 16, fontSize: 10, fontWeight: 800, color: C.cyan, letterSpacing: "0.14em", textTransform: "uppercase" }}>✦ AI Command Center</div>
-        <h1 style={{ fontSize: 28, fontWeight: 900, color: C.textDark, margin: "0 0 6px", letterSpacing: "-0.02em" }}>{greeting || "Good day. Here's what's happening."}</h1>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: `${C.cyan}15`, border: `1px solid ${C.cyan}40`, borderRadius: 100, padding: "5px 18px", marginBottom: 16, fontSize: 10, fontWeight: 800, color: C.cyan, letterSpacing: "0.14em", textTransform: "uppercase", maxWidth: "100%", boxSizing: "border-box" }}>✦ AI Command Center</div>
+        <h1 style={{ fontSize: isMobile ? 22 : 28, fontWeight: 900, color: C.textDark, margin: "0 0 6px", letterSpacing: "-0.02em" }}>{greeting || "Good day. Here's what's happening."}</h1>
         <p style={{ color: C.textMuted, fontSize: 14, margin: 0 }}>Live data from every connected module, orchestrated by your AI Chief of Staff.</p>
       </div>
 
@@ -189,7 +189,7 @@ export default function CommandCenter({ greeting }) {
       </Card>
 
       <Label color={C.violet}>Hiring Intelligence</Label>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
         <Widget label="Applications" value={loadingMetrics ? "—" : hiring?.totalApplications} />
         <Widget label="Open Reqs" value={loadingMetrics ? "—" : hiring?.openRequisitions} />
         <Widget label="Offers Extended" value={loadingMetrics ? "—" : hiring?.totalOffers} />
@@ -198,7 +198,7 @@ export default function CommandCenter({ greeting }) {
       </div>
 
       <Label color={C.amber}>Workforce Intelligence</Label>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
         <Widget label="Total Headcount" value={loadingMetrics ? "—" : workforce?.totalHeadcount} />
         <Widget label="New Hires (30d)" value={loadingMetrics ? "—" : workforce?.newHiresLast30Days} />
         <Widget label="Departments" value={loadingMetrics ? "—" : Object.keys(workforce?.headcountByDepartment || {}).length} />

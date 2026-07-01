@@ -737,13 +737,29 @@ if (session && userRole === "employee") return <EmployeePortal user={session.use
     executive: <WorkforceIntel />,careers: <CareersPortal />, inbox: <TalentInbox />, messenger: <Messenger />,
   };
 
-  return (
-    <div style={{ minHeight: "100vh", display: isMobile ? "block" : "flex", fontFamily: "'Inter', -apple-system, sans-serif", background: C.bg }}>
+  const currentPageLabel = NAV.find(n => n.id === active)?.label || "QumulusAI";
 
-      {/* Sidebar — full-screen overlay on mobile, sticky column on desktop */}
-      <aside style={{ width: isMobile ? "100%" : 224, background: C.bgSidebar, display: isMobile ? (sidebarOpen ? "flex" : "none") : "flex", flexDirection: "column", flexShrink: 0, position: isMobile ? "fixed" : "sticky", top: 0, left: 0, height: "100vh", zIndex: isMobile ? 1000 : "auto" }}>
-        {/* Logo + close button */}
-        <div style={{ padding: "22px 20px 18px", borderBottom: `1px solid ${C.borderDark}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+  return (
+    <div style={{ minHeight: "100vh", display: isMobile ? "block" : "flex", fontFamily: "'Inter', -apple-system, sans-serif", background: C.bg, overflowX: "hidden" }}>
+
+      {/* ── MOBILE: Fixed top header bar ── */}
+      {isMobile && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 56, background: C.bgSidebar, display: "flex", alignItems: "center", padding: "0 16px", zIndex: 200, gap: 12, borderBottom: `1px solid ${C.borderDark}`, boxSizing: "border-box" }}>
+          <button onClick={() => setSidebarOpen(true)} style={{ background: "none", border: "none", color: C.textOnDark, fontSize: 22, cursor: "pointer", minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>☰</button>
+          <span style={{ fontSize: 15, fontWeight: 700, color: C.textOnDark, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{currentPageLabel}</span>
+          <span style={{ fontWeight: 900, fontSize: 15, color: C.textOnDark, letterSpacing: "-0.02em", flexShrink: 0 }}><span style={{ color: C.cyan }}>Q</span>AI</span>
+        </div>
+      )}
+
+      {/* ── MOBILE: Drawer backdrop ── */}
+      {isMobile && sidebarOpen && (
+        <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 300 }} />
+      )}
+
+      {/* ── Sidebar / Slide-out drawer ── */}
+      <aside style={{ width: isMobile ? 280 : 224, background: C.bgSidebar, display: "flex", flexDirection: "column", flexShrink: 0, position: isMobile ? "fixed" : "sticky", top: 0, left: 0, height: "100vh", zIndex: isMobile ? 400 : "auto", transform: isMobile ? (sidebarOpen ? "translateX(0)" : "translateX(-100%)") : "none", transition: isMobile ? "transform 0.25s cubic-bezier(0.4,0,0.2,1)" : "none" }}>
+        {/* Logo + close */}
+        <div style={{ padding: "22px 20px 18px", borderBottom: `1px solid ${C.borderDark}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div>
             <div style={{ fontWeight: 900, fontSize: 16, color: C.textOnDark, letterSpacing: "-0.02em" }}>
               <span style={{ color: C.cyan }}>Q</span>umulus<span style={{ color: C.cyan }}>AI</span>
@@ -751,7 +767,7 @@ if (session && userRole === "employee") return <EmployeePortal user={session.use
             <div style={{ fontSize: 9, color: C.textMutedDark, marginTop: 3, letterSpacing: "0.1em", textTransform: "uppercase" }}>People Operating System</div>
           </div>
           {isMobile && (
-            <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", color: C.textMutedDark, fontSize: 26, cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}>✕</button>
+            <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", color: C.textMutedDark, fontSize: 22, cursor: "pointer", minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
           )}
         </div>
 
@@ -775,7 +791,7 @@ if (session && userRole === "employee") return <EmployeePortal user={session.use
           Sign Out
         </button>
         {/* Demo badge */}
-        <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.borderDark}` }}>
+        <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.borderDark}`, flexShrink: 0 }}>
           <div style={{ background: `${C.cyan}15`, border: `1px solid ${C.cyan}30`, borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
             <div style={{ fontSize: 9, fontWeight: 800, color: C.cyan, letterSpacing: "0.1em", marginBottom: 2 }}>LIVE DEMO</div>
             <div style={{ fontSize: 10, color: C.textMutedDark, lineHeight: 1.5 }}>All AI responses are live. Powered by Claude.</div>
@@ -788,18 +804,9 @@ if (session && userRole === "employee") return <EmployeePortal user={session.use
         </div>
       </aside>
 
-      {/* Hamburger button — only on mobile */}
-      {isMobile && (
-        <button
-          onClick={() => setSidebarOpen(true)}
-          style={{ position: "fixed", top: 16, left: 16, zIndex: 999, background: C.navy, border: "none", color: "#fff", borderRadius: 8, padding: "8px 12px", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>
-          ☰
-        </button>
-      )}
-
-      {/* Main */}
-      <main style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "36px", width: isMobile ? "100%" : "auto" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto", paddingTop: isMobile ? "52px" : 0 }}>
+      {/* ── Main content ── */}
+      <main style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: 0, paddingTop: isMobile ? "56px" : 0, width: "100%", boxSizing: "border-box", minWidth: 0 }}>
+        <div style={{ maxWidth: isMobile ? "100%" : 900, margin: "0 auto", padding: isMobile ? "16px" : "36px", boxSizing: "border-box" }}>
           {screens[active]}
         </div>
       </main>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useBreakpoint } from "./useBreakpoint";
 import { supabase } from "./supabase";
 
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -69,13 +70,7 @@ export default function NewHirePortal({ token }) {
   const [error, setError]     = useState("");
   const [complete, setComplete] = useState(false);
   const [valErr, setValErr]   = useState("");
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
+  const { isMobile } = useBreakpoint();
 
   const [w4, setW4] = useState({
     filing_status: "single", multiple_jobs: false,

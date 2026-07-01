@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useBreakpoint } from "./useBreakpoint";
 import { ensureModulesRegistered, hiringService, workforceService, retentionService, performanceService, financialService, complianceService } from "./services/registerModules";
 import { askIntelligenceEngine, getChiefOfStaffBriefing } from "./services/intelligenceEngine";
 import { supabase } from "./supabase";
@@ -116,13 +117,7 @@ export default function CommandCenter({ greeting }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [asking, setAsking] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
+  const { isMobile } = useBreakpoint();
 
   useEffect(() => {
     async function loadAll() {

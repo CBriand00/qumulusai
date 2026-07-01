@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useBreakpoint } from "./useBreakpoint";
 import { supabase } from "./supabase";
 function renderMarkdown(text) {
  if (!text) return null;
@@ -77,12 +78,7 @@ export default function OfferSigning({ token }) {
  const [signed, setSigned] = useState(false);
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState("");
- const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
- useEffect(() => {
-   const handler = () => setIsMobile(window.innerWidth < 768);
-   window.addEventListener('resize', handler);
-   return () => window.removeEventListener('resize', handler);
- }, []);
+ const { isMobile } = useBreakpoint();
  useEffect(() => {
    async function loadOffer() {
      const { data, error } = await supabase

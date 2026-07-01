@@ -844,7 +844,7 @@ export default function App() {
   if (session && userRole === "employee") return <EmployeePortal user={session.user} />;
 
   const screens = {
-    home:      <CommandCenter greeting={userRole === "ceo" || userRole === "executive" ? "Good day, Executive. Here's your workforce at a glance." : undefined} />,
+    home:      <CommandCenter userRole={userRole} />,
     recruit:   <RecruitingEngine />,
     onboard:   <OnboardingConcierge />,
     manager:   <ManagerCoach />,

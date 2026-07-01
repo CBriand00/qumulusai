@@ -104,7 +104,26 @@ function ClickableName({ name, onClick }) {
   );
 }
 
-export default function CommandCenter({ greeting }) {
+const GREETINGS = {
+  ceo:       "Good day. Here's your workforce at a glance.",
+  executive: "Good day. Here's your workforce at a glance.",
+  chro:      "Good day. Here's your people intelligence briefing.",
+  hr:        "Good day. Here's your people intelligence briefing.",
+  recruiter: "Good day. Here's your recruiting pipeline.",
+  manager:   "Good day. Here's your team briefing.",
+};
+
+const PLACEHOLDERS = {
+  ceo:       "Ask about workforce costs, headcount, flight risk, hiring strategy…",
+  executive: "Ask about workforce costs, headcount, flight risk, hiring strategy…",
+  chro:      "Ask about retention, compliance, engagement, recruiting…",
+  hr:        "Ask about retention, compliance, engagement, recruiting…",
+  recruiter: "Ask about pipeline, candidates, interviews, offers…",
+  manager:   "Ask about my team, goals, performance, 1:1 prep…",
+  default:   "Ask anything about your workforce…",
+};
+
+export default function CommandCenter({ greeting, userRole }) {
   const [hiring, setHiring] = useState(null);
   const [activeModal, setActiveModal] = useState(null);
   const [workforce, setWorkforce] = useState(null);
@@ -136,12 +155,12 @@ export default function CommandCenter({ greeting }) {
 
   useEffect(() => {
     async function loadBriefing() {
-      try { setBriefing(await getChiefOfStaffBriefing()); }
+      try { setBriefing(await getChiefOfStaffBriefing(userRole || "executive")); }
       catch (e) { setBriefing("Couldn't generate briefing: " + e.message); }
       setBriefingLoading(false);
     }
     loadBriefing();
-  }, []);
+  }, [userRole]);
 
   async function handleAsk() {
     if (!question.trim()) return;
@@ -151,11 +170,18 @@ export default function CommandCenter({ greeting }) {
     setAsking(false);
   }
 
+  const role = userRole || "default";
+  const resolvedGreeting = GREETINGS[role] || greeting || "Good day. Here's what's happening.";
+  const placeholder = PLACEHOLDERS[role] || PLACEHOLDERS.default;
+  const showFinancial = !["chro", "hr"].includes(role);
+  const isRecruiter = role === "recruiter";
+  const otherLabel = role === "manager" ? "Your Team Intelligence" : "Other Intelligence Modules";
+
   return (
     <div style={{ overflowX: "hidden", width: "100%", boxSizing: "border-box" }}>
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: `${C.cyan}15`, border: `1px solid ${C.cyan}40`, borderRadius: 100, padding: "5px 18px", marginBottom: 16, fontSize: 10, fontWeight: 800, color: C.cyan, letterSpacing: "0.14em", textTransform: "uppercase", maxWidth: "100%", boxSizing: "border-box" }}>✦ AI Command Center</div>
-        <h1 style={{ fontSize: isMobile ? 22 : 28, fontWeight: 900, color: C.textDark, margin: "0 0 6px", letterSpacing: "-0.02em" }}>{greeting || "Good day. Here's what's happening."}</h1>
+        <h1 style={{ fontSize: isMobile ? 22 : 28, fontWeight: 900, color: C.textDark, margin: "0 0 6px", letterSpacing: "-0.02em" }}>{resolvedGreeting}</h1>
         <p style={{ color: C.textMuted, fontSize: 14, margin: 0 }}>Live data from every connected module, orchestrated by your AI Chief of Staff.</p>
       </div>
 
@@ -163,7 +189,7 @@ export default function CommandCenter({ greeting }) {
         <Label color={C.cyan}>Ask Your Chief of Staff</Label>
         <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8 }}>
           <input value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && question.trim()) handleAsk(); }}
-            placeholder="e.g. Who's at risk of leaving? Summarize our hiring pipeline. What should I focus on today?"
+            placeholder={placeholder}
             style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "11px 14px", color: C.textDark, fontSize: 14, outline: "none", fontFamily: "inherit", minHeight: 44 }} />
           <button onClick={handleAsk} disabled={asking || !question.trim()}
             style={{ background: C.cyan, color: C.navy, border: "none", borderRadius: 8, padding: "11px 24px", fontSize: 13, fontWeight: 800, cursor: asking ? "default" : "pointer", opacity: asking ? 0.6 : 1, fontFamily: "inherit", minHeight: 44, width: isMobile ? "100%" : "auto" }}>
@@ -193,18 +219,31 @@ export default function CommandCenter({ greeting }) {
         <Widget label="Upcoming Interviews" value={loadingMetrics ? "—" : hiring?.upcomingInterviews} accent={C.violet} />
       </div>
 
-      <Label color={C.amber}>Workforce Intelligence</Label>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
-        <Widget label="Total Headcount" value={loadingMetrics ? "—" : workforce?.totalHeadcount} accent={C.amber} />
-        <Widget label="New Hires (30d)" value={loadingMetrics ? "—" : workforce?.newHiresLast30Days} accent={C.amber} />
-        <Widget label="Departments" value={loadingMetrics ? "—" : Object.keys(workforce?.headcountByDepartment || {}).length} accent={C.amber} />
-        <Widget label="Onboarding" value={loadingMetrics ? "—" : (workforce?.onboardingCount ?? "—")} accent={C.teal} />
-        <Widget label="Avg Engagement" value={loadingMetrics ? "—" : (retention?.avgEngagementScore != null ? `${retention.avgEngagementScore}` : "—")} accent={C.emerald} />
-      </div>
+      {!isRecruiter && (
+        <>
+          <Label color={C.amber}>Workforce Intelligence</Label>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
+            <Widget label="Total Headcount" value={loadingMetrics ? "—" : workforce?.totalHeadcount} accent={C.amber} />
+            <Widget label="New Hires (30d)" value={loadingMetrics ? "—" : workforce?.newHiresLast30Days} accent={C.amber} />
+            <Widget label="Departments" value={loadingMetrics ? "—" : Object.keys(workforce?.headcountByDepartment || {}).length} accent={C.amber} />
+            <Widget label="Onboarding" value={loadingMetrics ? "—" : (workforce?.onboardingCount ?? "—")} accent={C.teal} />
+            <Widget label="Avg Engagement" value={loadingMetrics ? "—" : (retention?.avgEngagementScore != null ? `${retention.avgEngagementScore}` : "—")} accent={C.emerald} />
+          </div>
+        </>
+      )}
 
-      <Label color={C.textMuted}>Other Intelligence Modules</Label>
+      {isRecruiter && (
+        <>
+          <Label color={C.amber}>Workforce Snapshot</Label>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
+            <Widget label="Total Headcount" value={loadingMetrics ? "—" : workforce?.totalHeadcount} accent={C.amber} />
+            <Widget label="Onboarding" value={loadingMetrics ? "—" : (workforce?.onboardingCount ?? "—")} accent={C.teal} />
+          </div>
+        </>
+      )}
+
+      <Label color={C.textMuted}>{otherLabel}</Label>
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-        {/* Retention card — clickable employee names */}
         <Card>
           <Label color={C.rose}>Retention Intelligence</Label>
           <div style={{ fontSize: 13, color: C.textMid }}>
@@ -236,14 +275,15 @@ export default function CommandCenter({ greeting }) {
           </div>
         </Card>
 
-        <Card>
-          <Label color={C.teal}>Financial Intelligence</Label>
-          <div style={{ fontSize: 13, color: C.textMid }}>
-            {financial?.latestLaborCost ? `$${financial.latestLaborCost.toLocaleString()}` : "No data yet."}
-          </div>
-        </Card>
+        {showFinancial && (
+          <Card>
+            <Label color={C.teal}>Financial Intelligence</Label>
+            <div style={{ fontSize: 13, color: C.textMid }}>
+              {financial?.latestLaborCost ? `$${financial.latestLaborCost.toLocaleString()}` : "No data yet."}
+            </div>
+          </Card>
+        )}
 
-        {/* Compliance card — clickable employee names */}
         <Card>
           <Label color={C.emerald}>Compliance Intelligence</Label>
           <div style={{ fontSize: 13, color: C.textMid }}>

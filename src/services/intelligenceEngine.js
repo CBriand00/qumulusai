@@ -38,7 +38,17 @@ export async function askIntelligenceEngine(question) {
   });
 }
 
-export async function getChiefOfStaffBriefing() {
+const ROLE_PROMPTS = {
+  ceo:       "Focus on: workforce costs, headcount growth, flight risk, executive hiring, and strategic risks. Skip operational details.",
+  executive: "Focus on: workforce costs, headcount growth, flight risk, executive hiring, and strategic risks. Skip operational details.",
+  chro:      "Focus on: recruiting pipeline, retention risks, compliance alerts, engagement scores, and people strategy.",
+  hr:        "Focus on: recruiting pipeline, retention risks, compliance alerts, engagement scores, and people strategy.",
+  recruiter: "Focus on: open requisitions, candidates by stage, interviews scheduled today, offers pending, and time-to-fill trends.",
+  manager:   "Focus on: team health, direct report flight risk, goal completion, upcoming interviews for open roles, and any performance alerts.",
+  default:   "Give a comprehensive executive briefing covering all modules.",
+};
+
+export async function getChiefOfStaffBriefing(userRole = "executive") {
   const context = await buildContext();
   const recentActivity = await Promise.all(
     registry.map(async (m) => {
@@ -47,9 +57,10 @@ export async function getChiefOfStaffBriefing() {
       catch (e) { return null; }
     })
   );
+  const roleContext = ROLE_PROMPTS[userRole] || ROLE_PROMPTS.default;
   return callAI({
-    system: `${BASE_SYSTEM}\n\nLive data:\n\n${context}\n\nLast 24h:\n\n${recentActivity.filter(Boolean).join("\n\n") || "No recent activity."}`,
-    messages: [{ role: "user", content: "Give me a brief executive update: what changed since yesterday, what needs my attention today, and any risks or opportunities you notice." }],
+    system: `${BASE_SYSTEM}\n\nYou are briefing a ${userRole.toUpperCase()}.\n${roleContext}\n\nLive data:\n\n${context}\n\nLast 24h:\n\n${recentActivity.filter(Boolean).join("\n\n") || "No recent activity."}`,
+    messages: [{ role: "user", content: "Give me my personalized briefing. What changed since yesterday, what needs my attention today, and what risks or opportunities should I know about?" }],
   });
 }
 

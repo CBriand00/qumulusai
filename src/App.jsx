@@ -738,21 +738,21 @@ if (session && userRole === "employee") return <EmployeePortal user={session.use
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", fontFamily: "'Inter', -apple-system, sans-serif", background: C.bg }}>
+    <div style={{ minHeight: "100vh", display: isMobile ? "block" : "flex", fontFamily: "'Inter', -apple-system, sans-serif", background: C.bg }}>
 
-      {/* Mobile backdrop */}
-      {isMobile && sidebarOpen && (
-        <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 40 }} />
-      )}
-
-      {/* Sidebar */}
-      <aside style={{ width: 224, background: C.bgSidebar, display: "flex", flexDirection: "column", flexShrink: 0, position: isMobile ? "fixed" : "sticky", top: 0, height: "100vh", zIndex: isMobile ? 50 : "auto", transform: isMobile ? (sidebarOpen ? "translateX(0)" : "translateX(-100%)") : "none", transition: "transform 0.25s ease", left: 0 }}>
-        {/* Logo */}
-        <div style={{ padding: "22px 20px 18px", borderBottom: `1px solid ${C.borderDark}` }}>
-          <div style={{ fontWeight: 900, fontSize: 16, color: C.textOnDark, letterSpacing: "-0.02em" }}>
-            <span style={{ color: C.cyan }}>Q</span>umulus<span style={{ color: C.cyan }}>AI</span>
+      {/* Sidebar — full-screen overlay on mobile, sticky column on desktop */}
+      <aside style={{ width: isMobile ? "100%" : 224, background: C.bgSidebar, display: isMobile ? (sidebarOpen ? "flex" : "none") : "flex", flexDirection: "column", flexShrink: 0, position: isMobile ? "fixed" : "sticky", top: 0, left: 0, height: "100vh", zIndex: isMobile ? 1000 : "auto" }}>
+        {/* Logo + close button */}
+        <div style={{ padding: "22px 20px 18px", borderBottom: `1px solid ${C.borderDark}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 16, color: C.textOnDark, letterSpacing: "-0.02em" }}>
+              <span style={{ color: C.cyan }}>Q</span>umulus<span style={{ color: C.cyan }}>AI</span>
+            </div>
+            <div style={{ fontSize: 9, color: C.textMutedDark, marginTop: 3, letterSpacing: "0.1em", textTransform: "uppercase" }}>People Operating System</div>
           </div>
-          <div style={{ fontSize: 9, color: C.textMutedDark, marginTop: 3, letterSpacing: "0.1em", textTransform: "uppercase" }}>People Operating System</div>
+          {isMobile && (
+            <button onClick={() => setSidebarOpen(false)} style={{ background: "none", border: "none", color: C.textMutedDark, fontSize: 26, cursor: "pointer", padding: "4px 8px", lineHeight: 1 }}>✕</button>
+          )}
         </div>
 
         {/* Nav */}
@@ -788,15 +788,17 @@ if (session && userRole === "employee") return <EmployeePortal user={session.use
         </div>
       </aside>
 
+      {/* Hamburger button — only on mobile */}
+      {isMobile && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          style={{ position: "fixed", top: 16, left: 16, zIndex: 999, background: C.navy, border: "none", color: "#fff", borderRadius: 8, padding: "8px 12px", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>
+          ☰
+        </button>
+      )}
+
       {/* Main */}
-      <main style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "36px" }}>
-        {isMobile && (
-          <button
-            onClick={() => setSidebarOpen(true)}
-            style={{ position: "fixed", top: 12, left: 12, zIndex: 30, background: C.bgSidebar, border: "none", color: C.textOnDark, fontSize: 18, width: 44, height: 44, borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,0.3)" }}>
-            ☰
-          </button>
-        )}
+      <main style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "36px", width: isMobile ? "100%" : "auto" }}>
         <div style={{ maxWidth: 900, margin: "0 auto", paddingTop: isMobile ? "52px" : 0 }}>
           {screens[active]}
         </div>

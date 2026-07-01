@@ -77,6 +77,12 @@ export default function OfferSigning({ token }) {
  const [signed, setSigned] = useState(false);
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState("");
+ const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+ useEffect(() => {
+   const handler = () => setIsMobile(window.innerWidth < 768);
+   window.addEventListener('resize', handler);
+   return () => window.removeEventListener('resize', handler);
+ }, []);
  useEffect(() => {
    async function loadOffer() {
      const { data, error } = await supabase
@@ -148,12 +154,12 @@ export default function OfferSigning({ token }) {
  ].filter(row => row.value);
  return (
 <div style={styles.shell}>
-<div style={styles.header}>
+<div style={{...styles.header, padding: isMobile ? "16px" : "24px 32px"}}>
 <h1 style={styles.wordmark}>Qumulus<span style={styles.ai}>AI</span></h1>
 <p style={styles.subtitle}>Offer Letter</p>
 </div>
-<div style={styles.content}>
-<div style={styles.card}>
+<div style={{...styles.content, padding: isMobile ? "20px 16px" : "40px 32px"}}>
+<div style={{...styles.card, padding: isMobile ? 16 : 28}}>
 <h2 style={styles.name}>{offer.candidate_name}</h2>
 <p style={styles.role}>{offer.role} · {offer.department}</p>
 <div style={styles.details}>
@@ -173,11 +179,11 @@ export default function OfferSigning({ token }) {
 </div>
 </div>
 </div>
-<div style={styles.card}>
+<div style={{...styles.card, padding: isMobile ? 16 : 28}}>
 <h3 style={styles.cardTitle}>Offer Letter</h3>
 <div style={styles.letter}>{renderMarkdown(offer.letter)}</div>
 </div>
-<div style={styles.card}>
+<div style={{...styles.card, padding: isMobile ? 16 : 28}}>
 <h3 style={styles.cardTitle}>Sign Your Offer</h3>
 <p style={styles.signNote}>By typing your full name below you are electronically signing this offer letter.</p>
 <input

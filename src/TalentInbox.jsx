@@ -19,6 +19,8 @@ export default function TalentInbox() {
   const [filter, setFilter]     = useState("all");
   const [search, setSearch]     = useState("");
   const [updating, setUpdating] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [mobilePanel, setMobilePanel] = useState("list");
 
   const fetchApps = useCallback(async () => {
     setLoading(true);
@@ -46,6 +48,12 @@ export default function TalentInbox() {
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
   }, []);
 
   async function updateStatus(id, newStatus) {
@@ -78,28 +86,34 @@ export default function TalentInbox() {
 
   const counts = STATUSES.reduce((acc, s) => { acc[s] = apps.filter((a) => a.status === s).length; return acc; }, {});
 
-  return (
-    <div style={styles.shell}>
-      <aside style={styles.sidebar}>
-        <div style={styles.sidebarHeader}>
-          <span style={styles.wordmark}>Qumulus<span style={styles.ai}>AI</span></span>
-          <span style={styles.inboxLabel}>TALENT INBOX</span>
-        </div>
-        <div style={styles.searchWrap}>
-          <input style={styles.search} placeholder="Search applicants…" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        <nav style={styles.nav}>
-          <NavItem label="All" count={apps.length} active={filter === "all"} onClick={() => setFilter("all")} color="#7C3AED" />
-          {STATUSES.map((s) => (
-            <NavItem key={s} label={STATUS_META[s].label} count={counts[s]} active={filter === s} onClick={() => setFilter(s)} color={STATUS_META[s].color} />
-          ))}
-        </nav>
-      </aside>
+  const mobileShell = { display: "flex", flexDirection: "column", height: "100vh", background: C.bg, color: C.text, fontFamily: "'Inter', 'Helvetica Neue', sans-serif", overflow: "hidden" };
 
-      <main style={styles.list}>
+  return (
+    <div style={isMobile ? mobileShell : styles.shell}>
+      {/* Sidebar — hidden on mobile */}
+      {!isMobile && (
+        <aside style={styles.sidebar}>
+          <div style={styles.sidebarHeader}>
+            <span style={styles.wordmark}>Qumulus<span style={styles.ai}>AI</span></span>
+            <span style={styles.inboxLabel}>TALENT INBOX</span>
+          </div>
+          <div style={styles.searchWrap}>
+            <input style={styles.search} placeholder="Search applicants…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <nav style={styles.nav}>
+            <NavItem label="All" count={apps.length} active={filter === "all"} onClick={() => setFilter("all")} color="#7C3AED" />
+            {STATUSES.map((s) => (
+              <NavItem key={s} label={STATUS_META[s].label} count={counts[s]} active={filter === s} onClick={() => setFilter(s)} color={STATUS_META[s].color} />
+            ))}
+          </nav>
+        </aside>
+      )}
+
+      {/* List panel */}
+      <main style={{ ...styles.list, ...(isMobile ? { display: mobilePanel === "detail" ? "none" : "flex", flex: 1 } : {}) }}>
         <div style={styles.listHeader}>
           <span style={styles.listCount}>{loading ? "Loading…" : `${visible.length} application${visible.length !== 1 ? "s" : ""}`}</span>
-          <button style={styles.refreshBtn} onClick={fetchApps}>↻ Refresh</button>
+          <button style={{ ...styles.refreshBtn, minHeight: 44 }} onClick={fetchApps}>↻ Refresh</button>
         </div>
         {!loading && visible.length === 0 && (
           <div style={styles.empty}>
@@ -108,11 +122,19 @@ export default function TalentInbox() {
           </div>
         )}
         {visible.map((app) => (
-          <ApplicationRow key={app.id} app={app} selected={selected?.id === app.id} onClick={() => setSelected(app)} />
+          <ApplicationRow key={app.id} app={app} selected={selected?.id === app.id} onClick={() => { setSelected(app); if (isMobile) setMobilePanel("detail"); }} />
         ))}
       </main>
 
-      <aside style={styles.detail}>
+      {/* Detail panel */}
+      <aside style={{ ...styles.detail, ...(isMobile ? { display: mobilePanel === "list" ? "none" : "block", flex: 1, overflowY: "auto" } : {}) }}>
+        {isMobile && mobilePanel === "detail" && (
+          <button
+            onClick={() => setMobilePanel("list")}
+            style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#7C3AED", fontSize: 14, fontWeight: 600, cursor: "pointer", padding: "12px 20px", fontFamily: "inherit", minHeight: 44 }}>
+            ← Back to list
+          </button>
+        )}
         {!selected ? (
           <div style={styles.empty}>
             <p style={styles.emptyIcon}>→</p>

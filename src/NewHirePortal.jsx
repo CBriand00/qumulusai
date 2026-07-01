@@ -69,6 +69,13 @@ export default function NewHirePortal({ token }) {
   const [error, setError]     = useState("");
   const [complete, setComplete] = useState(false);
   const [valErr, setValErr]   = useState("");
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   const [w4, setW4] = useState({
     filing_status: "single", multiple_jobs: false,
@@ -274,22 +281,22 @@ export default function NewHirePortal({ token }) {
 
   return (
     <div style={S.shell}>
-      <div style={S.header}>
+      <div style={{...S.header, padding: isMobile ? "14px 16px" : "24px 32px", flexWrap: "wrap", gap: 8}}>
         <div>
           <h1 style={S.wordmark}>Qumulus<span style={S.ai}>AI</span></h1>
           <p style={S.subtitle}>New Hire Document Portal</p>
         </div>
         <div style={{ marginLeft: "auto", fontSize: 13, color: "#64748B" }}>
-          Welcome, <strong style={{ color: "#0A2540" }}>{employee?.full_name}</strong> · {employee?.role_title}
+          Welcome, <strong style={{ color: "#0A2540" }}>{employee?.full_name}</strong>
         </div>
       </div>
 
-      <div style={S.content}>
-        <div style={S.card}><StepBar current={step} /></div>
+      <div style={{...S.content, padding: isMobile ? "16px" : "40px 32px"}}>
+        <div style={{...S.card, padding: isMobile ? 16 : 28}}><StepBar current={step} /></div>
 
         {/* ── STEP 1: W-4 ── */}
         {step === 1 && (
-          <div style={S.card}>
+          <div style={{...S.card, padding: isMobile ? 16 : 28}}>
             <h2 style={S.cardTitle}>Step 1 of 3 — W-4 Federal Tax Withholding</h2>
             <p style={S.cardSub}>Tell QumulusAI how much federal income tax to withhold from each paycheck. You can update this any time through People & Culture.</p>
 
@@ -312,7 +319,7 @@ export default function NewHirePortal({ token }) {
               </label>
             </div>
 
-            <div style={S.row2}>
+            <div style={{...S.row2, gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr"}}>
               <Field label="Step 3 — Claim Dependents ($)">
                 <input style={S.input} type="number" min="0" placeholder="0.00" value={w4.dependents}
                   onChange={e => setW4(p => ({ ...p, dependents: e.target.value }))} />
@@ -351,7 +358,7 @@ export default function NewHirePortal({ token }) {
 
         {/* ── STEP 2: DIRECT DEPOSIT ── */}
         {step === 2 && (
-          <div style={S.card}>
+          <div style={{...S.card, padding: isMobile ? 16 : 28}}>
             <h2 style={S.cardTitle}>Step 2 of 3 — Direct Deposit Authorization</h2>
             <p style={S.cardSub}>Authorize QumulusAI to deposit your net pay directly to your bank account each pay period.</p>
 
@@ -381,7 +388,7 @@ export default function NewHirePortal({ token }) {
                 <p style={S.errMsg}>Must be exactly 9 digits ({dd.routing_number.length}/9)</p>}
             </Field>
 
-            <div style={S.row2}>
+            <div style={{...S.row2, gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr"}}>
               <Field label="Account Number">
                 <input style={S.input} type="password" placeholder="Account number"
                   value={dd.account_number} onChange={e => setDd(p => ({ ...p, account_number: e.target.value }))} />
@@ -416,11 +423,11 @@ export default function NewHirePortal({ token }) {
 
         {/* ── STEP 3: I-9 ── */}
         {step === 3 && (
-          <div style={S.card}>
+          <div style={{...S.card, padding: isMobile ? 16 : 28}}>
             <h2 style={S.cardTitle}>Step 3 of 3 — I-9 Employment Eligibility Verification</h2>
             <p style={S.cardSub}>Section 1 — Employee Information and Attestation. Must be completed on or before your first day of employment.</p>
 
-            <div style={S.row2}>
+            <div style={{...S.row2, gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr"}}>
               <Field label="Legal Name">
                 <input style={S.inputRo} value={employee?.full_name || ""} readOnly />
               </Field>
@@ -435,7 +442,7 @@ export default function NewHirePortal({ token }) {
                 value={i9.address} onChange={e => setI9(p => ({ ...p, address: e.target.value }))} />
             </Field>
 
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "2fr 1fr 1fr", gap: 16 }}>
               <Field label="City">
                 <input style={S.input} placeholder="Atlanta"
                   value={i9.city} onChange={e => setI9(p => ({ ...p, city: e.target.value }))} />
@@ -450,7 +457,7 @@ export default function NewHirePortal({ token }) {
               </Field>
             </div>
 
-            <div style={S.row2}>
+            <div style={{...S.row2, gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr"}}>
               <Field label="Date of Birth">
                 <input style={S.input} type="date" value={i9.dob}
                   onChange={e => setI9(p => ({ ...p, dob: e.target.value }))} />

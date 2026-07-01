@@ -116,6 +116,13 @@ export default function CommandCenter({ greeting }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [asking, setAsking] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
   useEffect(() => {
     async function loadAll() {
@@ -158,12 +165,12 @@ export default function CommandCenter({ greeting }) {
 
       <Card style={{ marginBottom: 16 }}>
         <Label color={C.cyan}>Ask Your Chief of Staff</Label>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8 }}>
           <input value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && question.trim()) handleAsk(); }}
             placeholder="e.g. Who's at risk of leaving? Summarize our hiring pipeline. What should I focus on today?"
-            style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "11px 14px", color: C.textDark, fontSize: 14, outline: "none", fontFamily: "inherit" }} />
+            style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "11px 14px", color: C.textDark, fontSize: 14, outline: "none", fontFamily: "inherit", minHeight: 44 }} />
           <button onClick={handleAsk} disabled={asking || !question.trim()}
-            style={{ background: C.cyan, color: C.navy, border: "none", borderRadius: 8, padding: "11px 24px", fontSize: 13, fontWeight: 800, cursor: asking ? "default" : "pointer", opacity: asking ? 0.6 : 1, fontFamily: "inherit" }}>
+            style={{ background: C.cyan, color: C.navy, border: "none", borderRadius: 8, padding: "11px 24px", fontSize: 13, fontWeight: 800, cursor: asking ? "default" : "pointer", opacity: asking ? 0.6 : 1, fontFamily: "inherit", minHeight: 44, width: isMobile ? "100%" : "auto" }}>
             {asking ? "…" : "Ask"}
           </button>
         </div>
@@ -182,7 +189,7 @@ export default function CommandCenter({ greeting }) {
       </Card>
 
       <Label color={C.violet}>Hiring Intelligence</Label>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
         <Widget label="Applications" value={loadingMetrics ? "—" : hiring?.totalApplications} />
         <Widget label="Open Reqs" value={loadingMetrics ? "—" : hiring?.openRequisitions} />
         <Widget label="Offers Extended" value={loadingMetrics ? "—" : hiring?.totalOffers} />
@@ -191,14 +198,14 @@ export default function CommandCenter({ greeting }) {
       </div>
 
       <Label color={C.amber}>Workforce Intelligence</Label>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 24 }}>
         <Widget label="Total Headcount" value={loadingMetrics ? "—" : workforce?.totalHeadcount} />
         <Widget label="New Hires (30d)" value={loadingMetrics ? "—" : workforce?.newHiresLast30Days} />
         <Widget label="Departments" value={loadingMetrics ? "—" : Object.keys(workforce?.headcountByDepartment || {}).length} />
       </div>
 
       <Label color={C.textMuted}>Other Intelligence Modules</Label>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
         {/* Retention card — clickable employee names */}
         <Card>
           <Label color={C.rose}>Retention Intelligence</Label>

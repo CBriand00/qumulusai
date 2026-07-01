@@ -72,8 +72,19 @@ Deno.serve(async (req) => {
     const insertData = await insertRes.json();
 
     if (!insertRes.ok) {
-      return new Response(JSON.stringify({ error: "DB insert failed", details: insertData }),
-        { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }});
+      return new Response(JSON.stringify({
+        error: "DB insert failed",
+        status: insertRes.status,
+        details: insertData,
+        insertBody: {
+          application_id,
+          candidate_name,
+          candidate_email,
+          role_title,
+          questions: `array of ${questions.length} items`,
+          status: "pending",
+        }
+      }), { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }});
     }
 
     const assessment = Array.isArray(insertData) ? insertData[0] : insertData;

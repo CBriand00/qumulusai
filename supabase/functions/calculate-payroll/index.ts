@@ -22,8 +22,8 @@ async function dbPost(table: string, body: unknown) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: "POST",
     headers: {
-      apikey: ANON_KEY!,
-      Authorization: `Bearer ${ANON_KEY}`,
+      apikey: SERVICE_KEY!,
+      Authorization: `Bearer ${SERVICE_KEY}`,
       "Content-Type": "application/json",
       Prefer: "return=representation",
     },

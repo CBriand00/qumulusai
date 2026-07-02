@@ -12,6 +12,7 @@ import NewHirePortal from "./NewHirePortal";
 import AISourcing from "./AISourcing";
 import SecurityActivity from "./SecurityActivity";
 import AssessmentPortal from "./AssessmentPortal";
+import Payroll from "./Payroll";
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -80,6 +81,7 @@ const NAV_GROUPS = [
     id: "operations",
     label: "Operations",
     items: [
+      { id: "payroll",   label: "Payroll",             icon: "◈", accent: C.teal },
       { id: "security",  label: "Security Center",     icon: "⚔", accent: C.blue },
     ],
   },
@@ -1030,6 +1032,7 @@ export default function App() {
     careers:   <CareersPortal />,
     inbox:     <TalentInbox />,
     messenger: <Messenger />,
+    payroll:   <Payroll />,
     security:  <SecurityActivity user={session?.user} />,
   };
 

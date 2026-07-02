@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const SUPABASE_URL = "https://oomdaguzvdheotrkqdxs.supabase.co";
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -13,7 +13,7 @@ const JSON_HEADERS = { "Content-Type": "application/json", ...CORS };
 // ── Supabase REST helper ───────────────────────────────────────────────────────
 async function dbGet(path: string) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    headers: { apikey: ANON_KEY!, Authorization: `Bearer ${ANON_KEY}` },
+    headers: { apikey: SERVICE_KEY!, Authorization: `Bearer ${SERVICE_KEY}` },
   });
   return res.json();
 }

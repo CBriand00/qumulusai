@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const SUPABASE_URL = "https://oomdaguzvdheotrkqdxs.supabase.co";
 
 const CORS = {
@@ -13,8 +13,8 @@ async function dbPatch(table: string, query: string, body: unknown) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
     method: "PATCH",
     headers: {
-      apikey: ANON_KEY!,
-      Authorization: `Bearer ${ANON_KEY}`,
+      apikey: SERVICE_KEY!,
+      Authorization: `Bearer ${SERVICE_KEY}`,
       "Content-Type": "application/json",
       Prefer: "return=representation",
     },

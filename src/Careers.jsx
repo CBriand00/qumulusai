@@ -103,24 +103,14 @@ function useAI() {
     setLoading(true);
     setResponse("");
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": "proxy",
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 800,
-          system,
-          messages: [{ role: "user", content: user }],
-        }),
+      const { data, error } = await supabase.functions.invoke("ai-query", {
+        body: { system, messages: [{ role: "user", content: user }], max_tokens: 800 },
       });
-      const data = await res.json();
-      setResponse(data.content?.map(b => b.text || "").join("") || "");
-    } catch { setResponse(""); }
+      if (error) throw error;
+      setResponse(data?.content?.map(b => b.text || "").join("") || "");
+    } catch (e) {
+      setResponse("AI screening unavailable: " + e.message);
+    }
     setLoading(false);
   };
 

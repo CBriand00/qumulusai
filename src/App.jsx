@@ -49,18 +49,50 @@ const C = {
   emeraldLight: "#10B981",
 };
 
-const NAV = [
-  { id: "home",      label: "Command Center",    icon: "❖", accent: C.cyan },
-  { id: "recruit",   label: "Recruiting Engine", icon: "◈", accent: C.violet },
-  { id: "onboard",   label: "Onboarding",        icon: "◎", accent: C.teal },
-  { id: "manager",   label: "Manager Coach",     icon: "◇", accent: C.blue },
-  { id: "employee",  label: "Employee Hub",      icon: "○", accent: C.blueLight },
-  { id: "executive", label: "Workforce Intel",   icon: "◆", accent: C.amber },
-  { id: "careers",   label: "Careers Portal",    icon: "◉", accent: C.emerald },
-  { id: "inbox",     label: "Talent Inbox",      icon: "◎", accent: C.rose },
-  { id: "messenger", label: "Messenger",         icon: "◈", accent: C.cyan },
-  { id: "security",  label: "Security",          icon: "⚔", accent: C.blue },
+const NAV_GROUPS = [
+  {
+    id: "executive",
+    label: "Executive",
+    items: [
+      { id: "home",      label: "Command Center",      icon: "❖", accent: C.cyan },
+      { id: "executive", label: "Workforce Intelligence", icon: "◆", accent: C.amber },
+    ],
+  },
+  {
+    id: "talent",
+    label: "Talent",
+    items: [
+      { id: "recruit",   label: "Recruiting",          icon: "◈", accent: C.violet },
+      { id: "careers",   label: "Careers",             icon: "◉", accent: C.emerald },
+      { id: "inbox",     label: "Talent Inbox",        icon: "◎", accent: C.rose },
+    ],
+  },
+  {
+    id: "people",
+    label: "People",
+    items: [
+      { id: "employee",  label: "Employee Hub",        icon: "○", accent: C.blueLight },
+      { id: "onboard",   label: "Onboarding",          icon: "◎", accent: C.teal },
+      { id: "manager",   label: "Manager Coach",       icon: "◇", accent: C.blue },
+    ],
+  },
+  {
+    id: "operations",
+    label: "Operations",
+    items: [
+      { id: "security",  label: "Security Center",     icon: "⚔", accent: C.blue },
+    ],
+  },
+  {
+    id: "communication",
+    label: "Communication",
+    items: [
+      { id: "messenger", label: "Messenger",           icon: "◈", accent: C.cyan },
+    ],
+  },
 ];
+
+const NAV = NAV_GROUPS.flatMap(g => g.items);
 
 const EMPLOYEES = [
   { name: "Ryan Callahan", role: "GPU Infrastructure Engineer",  dept: "Infrastructure", tenure: "1.8 yrs", sentiment: 78, risk: "medium" },
@@ -925,6 +957,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
   const [onboardingCount, setOnboardingCount] = useState(0);
+  const [groupsOpen, setGroupsOpen] = useState({ executive: true, talent: true, people: true, operations: true, communication: true });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showLoginBanner, setShowLoginBanner] = useState(() => {
     // Only show the banner immediately after a fresh sign-in, not on page refresh
@@ -1067,21 +1100,35 @@ export default function App() {
 
         {/* Nav items */}
         <nav style={{ flex: 1, padding: "12px 10px" }}>
-          {NAV.map(n => (
-            <button
-              key={n.id}
-              onClick={() => navigate(n.id)}
-              style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "11px 12px", borderRadius: 7, marginBottom: 2, background: active === n.id ? C.bgActive : "transparent", border: "none", color: active === n.id ? C.textOnDark : C.textMutedDark, fontSize: 13, fontWeight: active === n.id ? 600 : 400, cursor: "pointer", fontFamily: "inherit", textAlign: "left", transition: "all 0.1s", minHeight: 44 }}
-              onMouseEnter={e => { if (active !== n.id) { e.currentTarget.style.background = C.bgSidebarHov; e.currentTarget.style.color = C.textOnDark; } }}
-              onMouseLeave={e => { if (active !== n.id) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.textMutedDark; } }}
-            >
-              <span style={{ fontSize: 13, color: active === n.id ? n.accent : "inherit", flexShrink: 0 }}>{n.icon}</span>
-              <span style={{ flex: 1 }}>{n.label}</span>
-              {n.id === "messenger" && onboardingCount > 0 && (
-                <span style={{ marginLeft: "auto", background: "#16A34A", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "1px 6px", lineHeight: 1.6 }}>{onboardingCount}</span>
-              )}
-            </button>
-          ))}
+          {NAV_GROUPS.map(group => {
+            const open = groupsOpen[group.id] !== false;
+            return (
+              <div key={group.id} style={{ marginBottom: 4 }}>
+                <button
+                  onClick={() => setGroupsOpen(prev => ({ ...prev, [group.id]: !open }))}
+                  style={{ display: "flex", alignItems: "center", width: "100%", padding: "6px 12px", background: "transparent", border: "none", color: C.textMutedDark, fontSize: 9, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: "inherit", userSelect: "none", opacity: 0.7 }}
+                >
+                  <span style={{ flex: 1, textAlign: "left" }}>{group.label}</span>
+                  <span style={{ fontSize: 8, opacity: 0.6, transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }}>▾</span>
+                </button>
+                {open && group.items.map(n => (
+                  <button
+                    key={n.id}
+                    onClick={() => navigate(n.id)}
+                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 12px", borderRadius: 7, marginBottom: 1, background: active === n.id ? C.bgActive : "transparent", border: "none", color: active === n.id ? C.textOnDark : C.textMutedDark, fontSize: 13, fontWeight: active === n.id ? 600 : 400, cursor: "pointer", fontFamily: "inherit", textAlign: "left", transition: "all 0.1s", minHeight: 40 }}
+                    onMouseEnter={e => { if (active !== n.id) { e.currentTarget.style.background = C.bgSidebarHov; e.currentTarget.style.color = C.textOnDark; } }}
+                    onMouseLeave={e => { if (active !== n.id) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.textMutedDark; } }}
+                  >
+                    <span style={{ fontSize: 13, color: active === n.id ? n.accent : "inherit", flexShrink: 0 }}>{n.icon}</span>
+                    <span style={{ flex: 1 }}>{n.label}</span>
+                    {n.id === "messenger" && onboardingCount > 0 && (
+                      <span style={{ background: "#16A34A", color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 10, padding: "1px 6px", lineHeight: 1.6 }}>{onboardingCount}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
         </nav>
 
         {/* Footer */}
@@ -1099,17 +1146,6 @@ export default function App() {
             onClick={() => supabase.auth.signOut()}
             style={{ width: "100%", background: "transparent", border: `1px solid ${C.borderDark}`, borderRadius: 6, padding: "10px 0", color: C.textMutedDark, fontSize: 12, cursor: "pointer", fontFamily: "inherit", minHeight: 44 }}>
             Sign Out
-          </button>
-        </div>
-        <div style={{ padding: "12px 20px 20px", borderTop: `1px solid ${C.borderDark}`, flexShrink: 0 }}>
-          <div style={{ background: `${C.cyan}15`, border: `1px solid ${C.cyan}30`, borderRadius: 6, padding: "8px 10px", marginBottom: 8 }}>
-            <div style={{ fontSize: 9, fontWeight: 800, color: C.cyan, letterSpacing: "0.1em", marginBottom: 2 }}>LIVE DEMO</div>
-            <div style={{ fontSize: 10, color: C.textMutedDark, lineHeight: 1.5 }}>All AI responses are live. Powered by Claude.</div>
-          </div>
-          <button
-            onClick={() => window.location.href = "?onboard=test"}
-            style={{ width: "100%", background: "transparent", border: `1px solid ${C.cyan}40`, borderRadius: 6, padding: "10px 0", color: C.cyan, fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.06em", minHeight: 44 }}>
-            ◎ Test Onboarding Portal
           </button>
         </div>
       </aside>

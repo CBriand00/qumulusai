@@ -1494,6 +1494,26 @@ function Diversity({ onNavigate }) {
     return Object.entries(m).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
   })();
 
+  // Voluntary self-identification (EEO) breakdowns, from employee records.
+  function tallyLabeled(field, labels) {
+    const m = {};
+    employees.forEach(e => { const v = e[field]; if (!v) return; const label = labels[v] || v; m[label] = (m[label] || 0) + 1; });
+    return Object.entries(m).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
+  }
+  const genderLabels = { female: "Female", male: "Male", non_binary: "Non-binary", other: "Another identity", decline: "Declined" };
+  const ethLabels = { hispanic_latino: "Hispanic or Latino", white: "White", black: "Black or African American", asian: "Asian", native_american: "American Indian / Alaska Native", pacific_islander: "Native Hawaiian / Pacific Islander", two_or_more: "Two or more races", decline: "Declined" };
+  const vetLabels = { veteran: "Protected Veteran", not_veteran: "Not a Veteran", decline: "Declined" };
+  const disLabels = { yes: "Has a Disability", no: "No Disability", decline: "Declined" };
+  const byGender = tallyLabeled("gender", genderLabels);
+  const byEthnicity = tallyLabeled("ethnicity", ethLabels);
+  const byVeteran = tallyLabeled("veteran_status", vetLabels);
+  const byDisability = tallyLabeled("disability_status", disLabels);
+  const withGender = employees.filter(e => e.gender).length;
+  const withEth = employees.filter(e => e.ethnicity).length;
+  const withVet = employees.filter(e => e.veteran_status).length;
+  const withDis = employees.filter(e => e.disability_status).length;
+  const anySelfId = withGender + withEth + withVet + withDis > 0;
+
   // Pay equity: average base salary by department (only where salary exists)
   const payByDept = (() => {
     const sums = {};
@@ -1528,6 +1548,24 @@ function Diversity({ onNavigate }) {
               note={withAuth.length < total ? "Attestation is captured on I-9 during onboarding." : null} />
           </div>
 
+          {anySelfId && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.textMuted, letterSpacing: "0.12em", textTransform: "uppercase", margin: "6px 2px 12px" }}>
+                Voluntary Self-Identification (EEO)
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
+                <BreakdownCard title={`Gender · ${withGender} of ${total} reporting`} accent={C.violet} data={byGender} total={withGender} isMobile={isMobile}
+                  note={withGender < total ? "Self-reported and voluntary; not all employees have responded." : null} />
+                <BreakdownCard title={`Race / Ethnicity · ${withEth} of ${total} reporting`} accent={C.blue} data={byEthnicity} total={withEth} isMobile={isMobile}
+                  note={withEth < total ? "Self-reported and voluntary." : null} />
+                <BreakdownCard title={`Veteran Status · ${withVet} of ${total} reporting`} accent={C.emerald} data={byVeteran} total={withVet} isMobile={isMobile}
+                  note={withVet < total ? "Self-reported and voluntary." : null} />
+                <BreakdownCard title={`Disability Status · ${withDis} of ${total} reporting`} accent={C.amber} data={byDisability} total={withDis} isMobile={isMobile}
+                  note={withDis < total ? "Self-reported and voluntary." : null} />
+              </div>
+            </>
+          )}
+
           {payByDept.length > 0 && (
             <Card style={{ marginBottom: 14 }}>
               <Label color={C.rose}>Pay Equity — Avg Base Salary by Department</Label>
@@ -1548,7 +1586,7 @@ function Diversity({ onNavigate }) {
           <Card>
             <Label color={C.textMuted}>A note on EEO reporting</Label>
             <p style={{ fontSize: 13, color: C.textMid, lineHeight: 1.7, margin: 0 }}>
-              QumulusAI does not currently collect protected-class demographic data (gender, race/ethnicity, veteran or disability status). The breakdowns above reflect organizational composition from HR records. To enable full EEO-1 / diversity reporting, add voluntary self-identification fields to the onboarding flow.
+              Protected-class data (gender, race/ethnicity, veteran and disability status) is collected through <strong>voluntary self-identification</strong> during onboarding. Responses are optional, confidential, and stored separately from hiring and performance decisions. Breakdowns show only employees who chose to respond, so totals may be partial while onboarding completes across the company.
             </p>
           </Card>
         </>

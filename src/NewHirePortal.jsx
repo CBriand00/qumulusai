@@ -3,7 +3,7 @@ import { useBreakpoint } from "./useBreakpoint";
 import { supabase } from "./supabase";
 
 const TODAY = new Date().toISOString().slice(0, 10);
-const STEPS = ["W-4 Tax Withholding", "Direct Deposit", "I-9 Eligibility"];
+const STEPS = ["W-4 Tax Withholding", "Direct Deposit", "I-9 Eligibility", "Voluntary Self-ID"];
 
 const S = {
   shell:     { minHeight: "100vh", background: "#F7F8FA", color: "#0F172A", fontFamily: "'Inter', -apple-system, sans-serif" },
@@ -86,6 +86,9 @@ export default function NewHirePortal({ token }) {
     other_names: "", address: "", city: "", state: "", zip: "",
     dob: "", ssn: "", email: "", phone: "", attestation: "citizen",
     signature: "", date: TODAY,
+  });
+  const [selfId, setSelfId] = useState({
+    gender: "", ethnicity: "", veteran_status: "", disability_status: "",
   });
 
   useEffect(() => {
@@ -246,11 +249,29 @@ export default function NewHirePortal({ token }) {
       i9_attestation: i9.attestation,
       i9_signature: i9.signature,
       i9_signed_at: new Date().toISOString(),
-      status: "complete",
+      status: "partial",
     }).eq("id", doc.id);
     await supabase.from("required_documents")
       .update({ status: "verified", submitted_at: new Date().toISOString() })
       .eq("employee_id", employee.id).ilike("document_name", "%I-9%");
+    setSaving(false);
+    setStep(4);
+  }
+
+  // Final step: optionally save voluntary self-ID, then complete onboarding.
+  async function finalizeOnboarding(withSelfId) {
+    setSaving(true);
+    if (withSelfId) {
+      const payload = {};
+      if (selfId.gender)            payload.gender = selfId.gender;
+      if (selfId.ethnicity)         payload.ethnicity = selfId.ethnicity;
+      if (selfId.veteran_status)    payload.veteran_status = selfId.veteran_status;
+      if (selfId.disability_status) payload.disability_status = selfId.disability_status;
+      if (Object.keys(payload).length > 0) {
+        await supabase.from("employees").update(payload).eq("id", employee.id);
+      }
+    }
+    await supabase.from("employee_onboarding_docs").update({ status: "complete" }).eq("id", doc.id);
     // Fire onboarding channel automation (non-blocking)
     triggerOnboardingChannel({ doc, employee, w4, dd }).catch(console.error);
     // Create employee login account and send welcome email (non-blocking)
@@ -429,7 +450,7 @@ export default function NewHirePortal({ token }) {
         {/* ── STEP 3: I-9 ── */}
         {step === 3 && (
           <div style={{...S.card, padding: isMobile ? 16 : 28}}>
-            <h2 style={S.cardTitle}>Step 3 of 3 — I-9 Employment Eligibility Verification</h2>
+            <h2 style={S.cardTitle}>Step 3 of 4 — I-9 Employment Eligibility Verification</h2>
             <p style={S.cardSub}>Section 1 — Employee Information and Attestation. Must be completed on or before your first day of employment.</p>
 
             <div style={{...S.row2, gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr"}}>
@@ -513,7 +534,71 @@ export default function NewHirePortal({ token }) {
             {valErr && <p style={S.errMsg}>{valErr}</p>}
             <button style={{ ...S.btn, opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}
               onClick={saveI9} disabled={saving}>
+              {saving ? "Saving…" : "Save & Continue →"}
+            </button>
+          </div>
+        )}
+
+        {/* ── STEP 4: Voluntary Self-Identification ── */}
+        {step === 4 && (
+          <div style={{...S.card, padding: isMobile ? 16 : 28}}>
+            <h2 style={S.cardTitle}>Step 4 of 4 — Voluntary Self-Identification</h2>
+            <p style={S.cardSub}>
+              QumulusAI is an equal opportunity employer. Providing this information is <strong>completely voluntary</strong> and will not affect your employment. It is used only for anonymized EEO reporting and diversity insights. You may decline any question.
+            </p>
+
+            <Field label="Gender">
+              <select style={S.select} value={selfId.gender} onChange={e => setSelfId(p => ({ ...p, gender: e.target.value }))}>
+                <option value="">Select…</option>
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+                <option value="non_binary">Non-binary</option>
+                <option value="other">Another gender identity</option>
+                <option value="decline">Decline to self-identify</option>
+              </select>
+            </Field>
+
+            <Field label="Race / Ethnicity">
+              <select style={S.select} value={selfId.ethnicity} onChange={e => setSelfId(p => ({ ...p, ethnicity: e.target.value }))}>
+                <option value="">Select…</option>
+                <option value="hispanic_latino">Hispanic or Latino</option>
+                <option value="white">White</option>
+                <option value="black">Black or African American</option>
+                <option value="asian">Asian</option>
+                <option value="native_american">American Indian or Alaska Native</option>
+                <option value="pacific_islander">Native Hawaiian or Pacific Islander</option>
+                <option value="two_or_more">Two or more races</option>
+                <option value="decline">Decline to self-identify</option>
+              </select>
+            </Field>
+
+            <Field label="Protected Veteran Status">
+              <select style={S.select} value={selfId.veteran_status} onChange={e => setSelfId(p => ({ ...p, veteran_status: e.target.value }))}>
+                <option value="">Select…</option>
+                <option value="veteran">I am a protected veteran</option>
+                <option value="not_veteran">I am not a protected veteran</option>
+                <option value="decline">Decline to self-identify</option>
+              </select>
+            </Field>
+
+            <Field label="Disability Status">
+              <select style={S.select} value={selfId.disability_status} onChange={e => setSelfId(p => ({ ...p, disability_status: e.target.value }))}>
+                <option value="">Select…</option>
+                <option value="yes">Yes, I have a disability (or previously had one)</option>
+                <option value="no">No, I do not have a disability</option>
+                <option value="decline">Decline to self-identify</option>
+              </select>
+            </Field>
+
+            <div style={S.infoBox}>Your responses are confidential and stored separately from hiring and performance decisions.</div>
+
+            <button style={{ ...S.btn, opacity: saving ? 0.6 : 1, cursor: saving ? "default" : "pointer" }}
+              onClick={() => finalizeOnboarding(true)} disabled={saving}>
               {saving ? "Submitting…" : "Submit All Documents ✓"}
+            </button>
+            <button style={{ width: "100%", background: "transparent", border: "none", color: "#64748B", fontSize: 13, fontWeight: 600, cursor: saving ? "default" : "pointer", marginTop: 10, fontFamily: "inherit", padding: "8px 0" }}
+              onClick={() => finalizeOnboarding(false)} disabled={saving}>
+              Skip — prefer not to answer
             </button>
           </div>
         )}

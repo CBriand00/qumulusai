@@ -738,6 +738,7 @@ function ManagerCoach() {
 // ─── EMPLOYEE HUB ─────────────────────────────────────────────────────────────
 function EmployeeHub() {
   const { ask, loading, response } = useAI();
+  const { isMobile } = useBreakpoint();
   const [employees, setEmployees] = useState([]);
   const [selectedEmp, setSelectedEmp] = useState(null);
   const [goals, setGoals] = useState([]);
@@ -798,8 +799,36 @@ function EmployeeHub() {
       <SectionHeader icon="○" accent={C.blueLight} title="Employee Hub & Performance" subtitle="Performance reviews, goal tracking, and instant HR answers." />
 
       <Card style={{ marginBottom: 14 }}>
+        <Label color={C.blueLight}>Team Roster</Label>
+        {employees.length === 0
+          ? <p style={{ color: C.textMuted, fontSize: 13 }}>Loading employees…</p>
+          : (
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+              {employees.map(emp => {
+                const initials = emp.full_name ? emp.full_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() : "?";
+                const tenure = emp.start_date ? Math.round((new Date() - new Date(emp.start_date)) / (365.25 * 86400000) * 10) / 10 : null;
+                return (
+                  <div key={emp.id}
+                    onClick={() => setSelectedEmp(emp)}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 10, border: `1px solid ${selectedEmp?.id === emp.id ? C.blueLight : C.border}`, background: selectedEmp?.id === emp.id ? `${C.blueLight}08` : C.bg, cursor: "pointer" }}>
+                    <div style={{ width: 38, height: 38, borderRadius: "50%", background: `${C.blueLight}20`, color: C.blueLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{initials}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.textDark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.full_name}</div>
+                      <div style={{ fontSize: 11, color: C.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.role_title}</div>
+                      {tenure !== null && <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>{tenure} yr{tenure !== 1 ? "s" : ""}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        }
+      </Card>
+
+      <Card style={{ marginBottom: 14 }}>
         <Label color={C.blueLight}>Performance Review</Label>
         <select
+          value={selectedEmp?.id || ""}
           onChange={e => setSelectedEmp(employees.find(emp => emp.id === e.target.value) || null)}
           style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${C.border}`, marginBottom: 16, fontSize: 13, color: C.textDark, background: C.bg, outline: "none", fontFamily: "inherit" }}>
           <option value="">Select an employee...</option>

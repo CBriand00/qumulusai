@@ -23,7 +23,18 @@ export const hiringService = {
     const offerAcceptRate = allOffers.length > 0 ? Math.round((signedOffers / allOffers.length) * 100) : null;
     const today = new Date();
     const upcomingInterviews = allInterviews.filter(i => i.date && new Date(i.date) >= today).length;
-    return { totalApplications: allApps.length, openRequisitions: openReqsSet.size, pipelineByStage: byStage, totalOffers: allOffers.length, offerAcceptRate, upcomingInterviews, totalInterviews: allInterviews.length };
+    // Time to Fill: avg days open for roles that have no hired application
+    const filledRoles = new Set(allApps.filter(a => a.status === "hired").map(a => a.role_title));
+    const openRoleFirstApp = {};
+    allApps.forEach(a => {
+      if (!filledRoles.has(a.role_title) && a.role_title && a.role_title.toLowerCase() !== "test role") {
+        const d = new Date(a.created_at);
+        if (!openRoleFirstApp[a.role_title] || d < openRoleFirstApp[a.role_title]) openRoleFirstApp[a.role_title] = d;
+      }
+    });
+    const openRoleDays = Object.values(openRoleFirstApp).map(d => Math.round((today - d) / 86400000));
+    const avgDaysOpen = openRoleDays.length > 0 ? Math.round(openRoleDays.reduce((s, d) => s + d, 0) / openRoleDays.length) : null;
+    return { totalApplications: allApps.length, openRequisitions: openReqsSet.size, pipelineByStage: byStage, totalOffers: allOffers.length, offerAcceptRate, upcomingInterviews, totalInterviews: allInterviews.length, avgDaysOpen };
   },
   async getSummary() {
     const m = await this.getMetrics();

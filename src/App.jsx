@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useBreakpoint } from "./useBreakpoint";
 import Auth, { getPreviousLogin } from "./Auth";
 import { supabase } from "./supabase";
@@ -1043,7 +1043,7 @@ function ManagerCoach() {
 }
 
 // ─── EMPLOYEE HUB ─────────────────────────────────────────────────────────────
-function EmployeeHub() {
+function EmployeeHub({ focusEmpId }) {
   const { ask, loading, response } = useAI();
   const { isMobile } = useBreakpoint();
   const [employees, setEmployees] = useState([]);
@@ -1054,10 +1054,22 @@ function EmployeeHub() {
   const [savingNote, setSavingNote] = useState(false);
   const [savedNote, setSavedNote] = useState(false);
 
+  const profileRef = useRef(null);
+
   useEffect(() => {
     supabase.from("employees").select("*").eq("status", "active")
       .then(({ data }) => setEmployees(data || []));
   }, []);
+
+  // Deep-link: when arriving with a focused employee id, select and scroll to them.
+  useEffect(() => {
+    if (!focusEmpId || employees.length === 0) return;
+    const emp = employees.find(e => e.id === focusEmpId);
+    if (emp) {
+      setSelectedEmp(emp);
+      setTimeout(() => profileRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    }
+  }, [focusEmpId, employees]);
 
   useEffect(() => {
     if (!selectedEmp) return;
@@ -1132,6 +1144,7 @@ function EmployeeHub() {
         }
       </Card>
 
+      <div ref={profileRef}>
       <Card style={{ marginBottom: 14 }}>
         <Label color={C.blueLight}>Performance Review</Label>
         <select
@@ -1146,6 +1159,15 @@ function EmployeeHub() {
 
         {selectedEmp && (
           <>
+            {(() => {
+              const manager = selectedEmp.manager_id ? employees.find(e => e.id === selectedEmp.manager_id) : null;
+              return manager ? (
+                <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 14 }}>
+                  Reports to <button onClick={() => setSelectedEmp(manager)} style={{ background: "none", border: "none", padding: 0, color: C.blueLight, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 12 }}>{manager.full_name}</button> · {manager.role_title}
+                </div>
+              ) : null;
+            })()}
+
             {(() => {
               const fmt$ = n => n != null && n !== "" ? "$" + Number(n).toLocaleString("en-US") : "—";
               const base = selectedEmp.base_salary;
@@ -1211,6 +1233,7 @@ function EmployeeHub() {
           </>
         )}
       </Card>
+      </div>
 
       <Card>
         <Label color={C.blueLight}>Ask HR Anything</Label>
@@ -1328,6 +1351,7 @@ function LoginBanner({ onDismiss }) {
 // ─── APP SHELL ────────────────────────────────────────────────────────────────
 export default function App() {
   const [active, setActive] = useState("home");
+  const [focusEmpId, setFocusEmpId] = useState(null);
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
@@ -1377,9 +1401,10 @@ export default function App() {
       });
   }, []);
 
-  // Close drawer on navigation (mobile)
-  function navigate(id) {
+  // Close drawer on navigation (mobile). Optional empId deep-links to a profile.
+  function navigate(id, empId) {
     setActive(id);
+    setFocusEmpId(empId || null);
     setSidebarOpen(false);
   }
 
@@ -1400,7 +1425,7 @@ export default function App() {
     recruit:   <RecruitingEngine />,
     onboard:   <OnboardingConcierge onNavigate={navigate} />,
     manager:   <ManagerCoach />,
-    employee:  <EmployeeHub />,
+    employee:  <EmployeeHub focusEmpId={focusEmpId} />,
     executive: <WorkforceIntel onNavigate={navigate} />,
     careers:   <CareersPortal />,
     inbox:     <TalentInbox />,

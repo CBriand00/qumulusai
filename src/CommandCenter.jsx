@@ -198,6 +198,7 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
         supabase.from("flight_risk_scores").select("employee_id, risk_level, risk_score, computed_at").order("computed_at", { ascending: false }),
       ]);
       var emps = results[0].data || [];
+      var empNameMap = emps.reduce(function(m, e) { m[e.id] = e.full_name; return m; }, {});
       var deptMap = (results[1].data || []).reduce(function(m, d) { m[d.id] = d.name; return m; }, {});
       var bandMap = (results[2].data || []).reduce(function(m, b) { m[b.role_title] = b; return m; }, {});
       var docMap = (results[3].data || []).reduce(function(m, d) { if (!m[d.employee_id]) m[d.employee_id] = d; return m; }, {});
@@ -211,7 +212,7 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
       var headers = [
         "Employee ID", "Full Name", "Work Email", "Personal Email", "Phone", "Date of Birth", "SSN (Last 4)",
         "Home Address", "City", "State", "ZIP", "Work Authorization",
-        "Department", "Job Title", "Employment Status", "Start Date", "Tenure (Years)",
+        "Department", "Job Title", "Reports To", "Employment Status", "Start Date", "Tenure (Years)",
         "Pay Type", "Base Salary", "Bonus Target %", "Equity Units",
         "Salary Band Min", "Salary Band Max", "Compa-Ratio", "Currency",
         "Latest Gross Pay", "Federal Tax", "State Tax", "Social Security", "Medicare", "Latest Net Pay",
@@ -237,7 +238,7 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
           doc.i9_dob || "", doc.i9_ssn_last4 ? "XXX-XX-" + doc.i9_ssn_last4 : "",
           doc.i9_address || "", doc.i9_city || "", doc.i9_state || "", doc.i9_zip || "",
           attestLabels[doc.i9_attestation] || "",
-          deptMap[e.department_id] || "", e.role_title, e.status, e.start_date || "", tenure,
+          deptMap[e.department_id] || "", e.role_title, e.manager_id ? (empNameMap[e.manager_id] || "") : "", e.status, e.start_date || "", tenure,
           e.pay_type || "salary", baseSalary, e.bonus_target_pct != null ? e.bonus_target_pct : "", e.equity_units != null ? e.equity_units : "",
           band.min_salary || "", band.max_salary || "", compaRatio, band.currency || "USD",
           stub.gross_pay || "", stub.federal_tax || "", stub.state_tax || "", stub.social_security || "", stub.medicare || "", stub.net_pay || "",
@@ -464,14 +465,19 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
                 {drillData.map(function(e) {
                   return (
-                    <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: C.bg, borderRadius: 8 }}>
+                    <div key={e.id} onClick={function(ev) { ev.stopPropagation(); if (onNavigate) onNavigate("employee", e.id); }}
+                      title="View full profile"
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: C.bg, borderRadius: 8, cursor: "pointer", border: "1px solid transparent", transition: "border-color 0.15s, background 0.15s" }}
+                      onMouseEnter={function(ev) { ev.currentTarget.style.borderColor = C.blue + "50"; ev.currentTarget.style.background = C.blue + "08"; }}
+                      onMouseLeave={function(ev) { ev.currentTarget.style.borderColor = "transparent"; ev.currentTarget.style.background = C.bg; }}>
                       <div style={{ width: 34, height: 34, borderRadius: "50%", background: C.blue + "20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: C.blue, flexShrink: 0 }}>
                         {e.full_name ? e.full_name.split(" ").map(function(w) { return w[0]; }).join("").slice(0,2) : "?"}
                       </div>
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.full_name}</div>
                         <div style={{ fontSize: 11, color: C.textMuted }}>{e.role_title} · {e.department}</div>
                       </div>
+                      <span style={{ fontSize: 14, color: C.blue, flexShrink: 0 }}>→</span>
                     </div>
                   );
                 })}
@@ -510,6 +516,7 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <span style={{ fontSize: 11, fontWeight: 700, background: color + "15", color, borderRadius: 6, padding: "3px 9px", textTransform: "capitalize" }}>{row.risk_level} risk · {row.risk_score}</span>
                       {emp && emp.email && <a href={"mailto:" + emp.email} style={{ fontSize: 11, color: C.blue, fontWeight: 600, textDecoration: "none" }}>Email →</a>}
+                      {emp && emp.id && <button onClick={function() { if (onNavigate) onNavigate("employee", emp.id); }} style={{ fontSize: 11, color: C.blue, fontWeight: 600, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Profile →</button>}
                     </div>
                   </div>
                 );

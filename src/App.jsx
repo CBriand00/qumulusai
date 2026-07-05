@@ -1146,6 +1146,38 @@ function EmployeeHub() {
 
         {selectedEmp && (
           <>
+            {(() => {
+              const fmt$ = n => n != null && n !== "" ? "$" + Number(n).toLocaleString("en-US") : "—";
+              const base = selectedEmp.base_salary;
+              const bonusPct = selectedEmp.bonus_target_pct;
+              const bonus = base != null && bonusPct != null ? Math.round(base * bonusPct / 100) : null;
+              const totalCash = base != null ? base + (bonus || 0) : null;
+              const fields = [
+                { label: "Base Salary", value: fmt$(base), accent: true },
+                { label: "Pay Type", value: selectedEmp.pay_type ? selectedEmp.pay_type.charAt(0).toUpperCase() + selectedEmp.pay_type.slice(1) : "—" },
+                { label: "Bonus Target", value: bonusPct != null ? bonusPct + "%" : "—" },
+                { label: "Target Bonus", value: fmt$(bonus) },
+                { label: "Total Target Cash", value: fmt$(totalCash), accent: true },
+                { label: "Equity Units", value: selectedEmp.equity_units != null ? Number(selectedEmp.equity_units).toLocaleString("en-US") : "—" },
+              ];
+              return (
+                <div style={{ marginBottom: 18 }}>
+                  <Label color={C.blueLight}>Compensation Profile — {selectedEmp.full_name}</Label>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3, 1fr)", gap: 10 }}>
+                    {fields.map(f => (
+                      <div key={f.label} style={{ padding: "12px 14px", borderRadius: 10, background: f.accent ? `${C.blueLight}0C` : C.bg, border: `1px solid ${f.accent ? `${C.blueLight}30` : C.border}` }}>
+                        <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>{f.label}</div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: f.accent ? C.blueLight : C.textDark, letterSpacing: "-0.01em" }}>{f.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {base == null && (
+                    <p style={{ fontSize: 11, color: C.textMuted, margin: "8px 0 0" }}>No compensation on file for this employee yet.</p>
+                  )}
+                </div>
+              );
+            })()}
+
             <Label color={C.blueLight}>Goals — {selectedEmp.full_name}</Label>
             {goals.length === 0 && <p style={{ color: C.textMuted, fontSize: 13 }}>No goals yet.</p>}
             {goals.map(goal => (

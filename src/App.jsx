@@ -202,9 +202,9 @@ function useOnboardingPipeline() {
 }
 
 // ─── Shared UI Components ─────────────────────────────────────────────────────
-function Card({ children, style }) {
+function Card({ children, style, ...rest }) {
   return (
-    <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: 22, ...style }}>
+    <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: 22, ...style }} {...rest}>
       {children}
     </div>
   );

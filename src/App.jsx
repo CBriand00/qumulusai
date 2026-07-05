@@ -1874,12 +1874,13 @@ function Learning({ onNavigate, focus }) {
   const [recording, setRecording] = useState(false);
   const [authoring, setAuthoring] = useState(false);
   const [authored, setAuthored] = useState(null);
+  const [cert, setCert] = useState(null); // certificate of completion
 
   useEffect(() => { if (focus === "gaps") setShowGaps(true); }, [focus]);
 
   async function openCourse(name) {
     setViewCourse(name);
-    setModules(null); setModIdx(0); setQuizAnswers({}); setQuizResult(null); setRecordFor(""); setAuthored(null);
+    setModules(null); setModIdx(0); setQuizAnswers({}); setQuizResult(null); setRecordFor(""); setAuthored(null); setCert(null);
     const { data } = await supabase.from("training_modules").select("*").eq("course_name", name).order("module_order");
     setModules(data || []);
   }
@@ -1915,11 +1916,11 @@ function Learning({ onNavigate, focus }) {
     openCourse(name);
   }
 
-  async function recordCompletion(courseName) {
-    if (!recordFor) return;
+  async function recordCompletion(courseName, emp, score) {
+    if (!emp) return;
     setRecording(true);
     await supabase.from("training_records").insert({
-      employee_id: recordFor,
+      employee_id: emp.id,
       organization_id: "00000000-0000-0000-0000-000000000001",
       training_name: courseName,
       status: "completed",
@@ -1927,9 +1928,47 @@ function Learning({ onNavigate, focus }) {
     });
     setRecording(false);
     setRecordFor("");
-    setAssignedMsg(`Completion recorded for "${courseName}".`);
-    setTimeout(() => setAssignedMsg(""), 4000);
+    setCert({
+      name: emp.full_name,
+      role: emp.role_title,
+      course: courseName,
+      date: new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+      id: `QAI-${new Date().getFullYear()}-${String(Math.floor(1000 + Math.random() * 9000))}`,
+      score,
+    });
     refresh();
+  }
+
+  function printCert() {
+    const c = cert;
+    const html = `<!DOCTYPE html><html><head><title>Certificate — ${c.name}</title><style>
+      body{font-family:'Georgia',serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#F7F8FA}
+      .cert{background:#fff;border:3px double #0A2540;border-radius:6px;padding:60px 70px;text-align:center;max-width:640px;position:relative}
+      .seal{width:70px;height:70px;border-radius:50%;background:radial-gradient(circle,#0D9488,#0A2540);color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 20px;font-family:'Inter',sans-serif;font-weight:800}
+      .co{font-size:13px;letter-spacing:.35em;color:#64748B;text-transform:uppercase;margin-bottom:6px}
+      h1{font-size:30px;color:#0A2540;margin:0 0 22px;font-weight:400}
+      .to{font-size:13px;color:#64748B;margin-bottom:6px}
+      .name{font-size:26px;color:#0D9488;font-style:italic;margin-bottom:4px}
+      .role{font-size:12px;color:#94A3B8;margin-bottom:20px}
+      .course{font-size:17px;color:#0F172A;font-weight:600;margin-bottom:18px}
+      .meta{font-size:12px;color:#64748B;line-height:1.9}
+      .sig{margin-top:34px;display:flex;justify-content:space-between;font-size:12px;color:#334155}
+      .sig div{border-top:1px solid #94A3B8;padding-top:6px;width:44%}
+      @media print{body{background:#fff}}
+    </style></head><body><div class="cert">
+      <div class="seal">Q</div>
+      <div class="co">QumulusAI · People Operating System</div>
+      <h1>Certificate of Completion</h1>
+      <div class="to">This certifies that</div>
+      <div class="name">${c.name}</div>
+      <div class="role">${c.role || ""}</div>
+      <div class="to">has successfully completed</div>
+      <div class="course">${c.course}</div>
+      <div class="meta">${c.score ? `Final assessment: ${c.score} · ` : ""}Completed ${c.date} · Certificate ${c.id}</div>
+      <div class="sig"><div>Chateau Briand<br/>Chief Human Resources Officer</div><div>QumulusAI Learning<br/>Compliance Record</div></div>
+    </div><script>window.print()</script></body></html>`;
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); }
   }
 
   // The drill panel renders above the course lists — bring it into view when a
@@ -1963,6 +2002,41 @@ function Learning({ onNavigate, focus }) {
     const subject = encodeURIComponent("Outstanding Required Training");
     const body = encodeURIComponent(`Hi ${row.emp.full_name.split(" ")[0]},\n\nOur records show the following required training is still outstanding for you:\n\n${row.courses.map(c => `  • ${c.name}`).join("\n")}\n\nPlease complete ${row.courses.length === 1 ? "it" : "these"} as soon as possible.\n\nThank you!`);
     window.open(`mailto:${row.emp.email}?subject=${subject}&body=${body}`);
+  }
+
+  // ── Certificate of completion (celebratory takeover) ────────────────────────
+  if (cert) {
+    return (
+      <div>
+        <button onClick={() => { setCert(null); setViewCourse(null); }}
+          style={{ background: "none", border: "none", color: C.emerald, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: 14 }}>
+          ← Back to Learning
+        </button>
+        <Card style={{ maxWidth: 620, margin: "0 auto", textAlign: "center", border: `3px double ${C.navy || "#0A2540"}`, padding: isMobile ? "36px 24px" : "48px 56px" }}>
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: `radial-gradient(circle, ${C.teal}, #0A2540)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 800, margin: "0 auto 18px" }}>Q</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.3em", color: C.textMuted, textTransform: "uppercase", marginBottom: 6 }}>QumulusAI · People Operating System</div>
+          <div style={{ fontSize: isMobile ? 22 : 28, color: "#0A2540", fontWeight: 800, letterSpacing: "-0.01em", marginBottom: 20 }}>Certificate of Completion</div>
+          <div style={{ fontSize: 12.5, color: C.textMuted, marginBottom: 5 }}>This certifies that</div>
+          <div style={{ fontSize: 24, color: C.teal, fontWeight: 800, marginBottom: 2 }}>{cert.name}</div>
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 18 }}>{cert.role}</div>
+          <div style={{ fontSize: 12.5, color: C.textMuted, marginBottom: 5 }}>has successfully completed</div>
+          <div style={{ fontSize: 17, color: C.textDark, fontWeight: 700, marginBottom: 16 }}>{cert.course}</div>
+          <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.9, marginBottom: 24 }}>
+            {cert.score && <>Final assessment: <strong style={{ color: C.emerald }}>{cert.score}</strong> · </>}Completed {cert.date}<br />Certificate ID {cert.id}
+          </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+            <button onClick={printCert}
+              style={{ background: C.navy || "#0A2540", color: "#fff", border: "none", borderRadius: 8, padding: "11px 22px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+              ⎙ Print / Save as PDF
+            </button>
+            <button onClick={() => { setCert(null); setViewCourse(null); }}
+              style={{ background: C.bg, color: C.textMid, border: `1px solid ${C.border}`, borderRadius: 8, padding: "11px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              Done
+            </button>
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   // ── Course viewer (full-page takeover) ──────────────────────────────────────
@@ -2042,10 +2116,11 @@ function Learning({ onNavigate, focus }) {
               <div style={{ fontSize: 11, fontWeight: 800, color: C.emerald, letterSpacing: "0.1em", marginBottom: 10 }}>MODULE {modIdx + 1} OF {modules.length}</div>
               <div style={{ fontSize: 14 }}>{renderMarkdown(m.content)}</div>
 
-              {/* Knowledge check */}
+              {/* Knowledge check / final assessment */}
               {m.quiz && (
                 <div style={{ marginTop: 20, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
-                  <Label color={C.violet}>Knowledge Check</Label>
+                  <Label color={C.violet}>{isLast ? "Final Assessment" : "Knowledge Check"}</Label>
+                  {isLast && <p style={{ fontSize: 12, color: C.textMuted, margin: "-8px 0 12px" }}>Pass all questions to earn your certificate of completion.</p>}
                   {m.quiz.map((q, qi) => (
                     <div key={qi} style={{ marginBottom: 14 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 600, color: C.textDark, marginBottom: 8 }}>{qi + 1}. {q.q}</div>
@@ -2095,10 +2170,10 @@ function Learning({ onNavigate, focus }) {
                       <option value="">Record completion for…</option>
                       {(course?.missing || []).map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
                     </select>
-                    <button onClick={() => recordCompletion(viewCourse)} disabled={!recordFor || recording || (m.quiz && !quizPassed)}
-                      title={m.quiz && !quizPassed ? "Pass the knowledge check first" : undefined}
+                    <button onClick={() => recordCompletion(viewCourse, (course?.missing || []).find(e => e.id === recordFor), quizResult ? `${quizResult.correct}/${quizResult.total}` : null)} disabled={!recordFor || recording || (m.quiz && !quizPassed)}
+                      title={m.quiz && !quizPassed ? "Pass the final assessment first" : undefined}
                       style={{ background: C.emerald, color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: (!recordFor || (m.quiz && !quizPassed)) ? 0.5 : 1 }}>
-                      {recording ? "…" : "✓ Record Completion"}
+                      {recording ? "…" : "✓ Complete & Get Certificate"}
                     </button>
                   </div>
                 )}

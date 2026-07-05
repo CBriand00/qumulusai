@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useBreakpoint } from "./useBreakpoint";
 import Auth, { getPreviousLogin } from "./Auth";
 import { supabase } from "./supabase";
-import { brand } from "./brand";
+import { brand, company, companyBlurb } from "./brand";
 import CommandCenter from "./CommandCenter";
 import CareersPortal from "./Careers";
 import TalentInbox from "./TalentInbox";
@@ -516,7 +516,7 @@ function RecruitingEngine() {
   const [activeTab, setActiveTab] = useState("intake");
   const { isMobile } = useBreakpoint();
 
-  const intakeSys = `You are QumulusAI's Recruiting Intelligence engine. Context: You are an AI People Operations assistant for QumulusAI — a vertically integrated AI infrastructure company based in Marietta, Georgia. QumulusAI provides bare-metal GPU cloud services and is scaling rapidly from 18 to 300+ employees after securing $500M in financing. CEO is Mike Maniscalco. The company's mission is to universalize access to AI compute. Roles are highly technical: GPU Infrastructure Engineers, AI Solutions Architects, Data Center Operations, Enterprise Sales. When given a hiring need or role description, generate a comprehensive, structured recruiting package. Format your response with clear sections using headers like:
+  const intakeSys = `You are ${brand.name}'s Recruiting Intelligence engine. Context: ${companyBlurb} When given a hiring need or role description, generate a comprehensive, structured recruiting package. Format your response with clear sections using headers like:
 
 JOB TITLE:
 BUSINESS NEED:
@@ -954,7 +954,7 @@ function ManagerCoach() {
   const { ask, loading, response } = useAI();
   const { isMobile } = useBreakpoint();
 
-  const sys = "You are an AI People Operations assistant for QumulusAI — a vertically integrated AI infrastructure company based in Marietta, Georgia. QumulusAI provides bare-metal GPU cloud services and is scaling rapidly from 18 to 300+ employees after securing $500M in financing. CEO is Mike Maniscalco. The company's mission is to universalize access to AI compute. Roles are highly technical: GPU Infrastructure Engineers, AI Solutions Architects, Data Center Operations, Enterprise Sales. You are their AI Manager Coach. Give specific, actionable leadership advice. Be empathetic but direct. Under 200 words.";
+  const sys = "You are an AI People Operations assistant for " + brand.name + ". " + companyBlurb + "You are their AI Manager Coach. Give specific, actionable leadership advice. Be empathetic but direct. Under 200 words.";
 
   const chips = [
     "Help me prepare for Sofia's performance review — she's underperforming but has high potential",
@@ -1492,7 +1492,7 @@ function OrgChart({ onNavigate }) {
     }
   });
   // Synthetic CEO at the top; department heads (roots) report to them.
-  const ceo = { id: "__ceo__", full_name: "Mike Maniscalco", role_title: "Chief Executive Officer", department_id: null };
+  const ceo = { id: "__ceo__", full_name: company.ceo, role_title: "Chief Executive Officer", department_id: null };
   childrenMap["__ceo__"] = roots;
 
   const hasReporting = employees.some(e => e.manager_id);
@@ -3391,7 +3391,7 @@ function WorkforceIntel({ onNavigate }) {
   const { ask, loading, response } = useAI();
   const { isMobile } = useBreakpoint();
 
-  const sys = "You are an AI People Operations assistant for QumulusAI — a vertically integrated AI infrastructure company based in Marietta, Georgia. QumulusAI provides bare-metal GPU cloud services and is scaling rapidly from 18 to 300+ employees after securing $500M in financing. CEO is Mike Maniscalco. The company's mission is to universalize access to AI compute. Roles are highly technical: GPU Infrastructure Engineers, AI Solutions Architects, Data Center Operations, Enterprise Sales. You are their Workforce Intelligence engine advising the CEO and incoming CHRO. Provide strategic, data-driven insights. Be direct and predictive. Under 200 words.";
+  const sys = "You are an AI People Operations assistant for " + brand.name + ". " + companyBlurb + "You are their Workforce Intelligence engine advising the CEO and incoming CHRO. Provide strategic, data-driven insights. Be direct and predictive. Under 200 words.";
   const chips = [
     "Our Sales attrition is 29% — what's the strategic risk and what do we do?",
     "Should we hire or upskill for AI roles given our current team?",

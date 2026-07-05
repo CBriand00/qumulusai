@@ -500,6 +500,12 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
             </div>
           ) : drilldown === "missing_docs" ? (
             <div>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+                <button onClick={function(ev) { ev.stopPropagation(); if (onNavigate) onNavigate("compliance"); }}
+                  style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 7, padding: "6px 14px", fontSize: 12, fontWeight: 700, color: "#D97706", cursor: "pointer", fontFamily: "inherit" }}>
+                  ⚖ Open HR Compliance →
+                </button>
+              </div>
               {drillData.length === 0 ? <p style={{ color: C.emerald, fontSize: 13, fontWeight: 600 }}>✓ All documents are on file.</p> : drillData.map(function(row, i) {
                 var emp = row.employees;
                 return (

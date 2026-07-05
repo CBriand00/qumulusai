@@ -1792,6 +1792,8 @@ function Learning({ onNavigate }) {
   const totalDone = courses.reduce((s, c) => s + c.completed.length, 0);
   const overallPct = totalReq ? Math.round((totalDone / totalReq) * 100) : 0;
   const drillCourse = courses.find(c => c.name === drill);
+  // Course with the most outstanding people — target for the summary drills
+  const worstCourse = courses.reduce((w, c) => (!w || c.missing.length > w.missing.length ? c : w), null);
 
   async function markComplete(course, emp) {
     setMarking(emp.id + course.name);
@@ -1931,17 +1933,24 @@ function Learning({ onNavigate }) {
         </Card>
       )}
 
-      {/* Summary */}
+      {/* Summary — every number drills in */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 14 }}>
         {[
-          { label: "Overall Completion", value: `${overallPct}%`, color: overallPct === 100 ? C.emerald : overallPct >= 60 ? C.amber : C.rose },
-          { label: "Assignments Done", value: `${totalDone}/${totalReq}`, color: C.blue },
-          { label: "Compliance Courses", value: compliance.length, color: C.violet },
-          { label: "Role-Based Courses", value: roleBased.length, color: C.teal },
+          { label: "Overall Completion", value: `${overallPct}%`, color: overallPct === 100 ? C.emerald : overallPct >= 60 ? C.amber : C.rose,
+            hint: "See biggest gap", onClick: worstCourse && worstCourse.missing.length > 0 ? () => setDrill(worstCourse.name) : null },
+          { label: "Assignments Done", value: `${totalDone}/${totalReq}`, color: C.blue,
+            hint: "See biggest gap", onClick: worstCourse && worstCourse.missing.length > 0 ? () => setDrill(worstCourse.name) : null },
+          { label: "Compliance Courses", value: compliance.length, color: C.violet,
+            hint: "Jump to compliance courses", onClick: () => document.getElementById("learning-compliance")?.scrollIntoView({ behavior: "smooth" }) },
+          { label: "Role-Based Courses", value: roleBased.length, color: C.teal,
+            hint: "Jump to role-based courses", onClick: () => document.getElementById("learning-role")?.scrollIntoView({ behavior: "smooth" }) },
         ].map(m => (
-          <Card key={m.label} style={{ padding: "16px 18px", textAlign: "center" }}>
+          <Card key={m.label} onClick={m.onClick || undefined} title={m.onClick ? m.hint : undefined}
+            style={{ padding: "16px 18px", textAlign: "center", cursor: m.onClick ? "pointer" : "default", transition: "border-color 0.15s" }}
+            onMouseEnter={e => { if (m.onClick) e.currentTarget.style.borderColor = m.color; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}>
             <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{m.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 900, color: m.color }}>{m.value}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: m.color, textDecoration: m.onClick ? "underline" : "none", textDecorationColor: `${m.color}50`, textUnderlineOffset: 3 }}>{m.value}</div>
           </Card>
         ))}
       </div>
@@ -1980,10 +1989,14 @@ function Learning({ onNavigate }) {
         </Card>
       )}
 
-      <CourseSection title="State & Federal Compliance — Required for All" list={compliance} accent={C.violet}
-        note="Applies to every active employee. State-tagged courses apply only to employees in that state (default GA)." />
-      <CourseSection title="Role-Based Training — Required by Position" list={roleBased} accent={C.teal}
-        note="Assigned automatically from each employee's job title." />
+      <div id="learning-compliance">
+        <CourseSection title="State & Federal Compliance — Required for All" list={compliance} accent={C.violet}
+          note="Applies to every active employee. State-tagged courses apply only to employees in that state (default GA)." />
+      </div>
+      <div id="learning-role">
+        <CourseSection title="Role-Based Training — Required by Position" list={roleBased} accent={C.teal}
+          note="Assigned automatically from each employee's job title." />
+      </div>
     </div>
   );
 }
@@ -2002,6 +2015,7 @@ function HRCompliance({ onNavigate }) {
   const { isMobile } = useBreakpoint();
   const [data, setData] = useState(null);
   const [trainData] = useTrainingData();
+  const [eeoDrill, setEeoDrill] = useState(null); // { key, title, members }
 
   useEffect(() => {
     async function load() {
@@ -2053,29 +2067,34 @@ function HRCompliance({ onNavigate }) {
   }
 
   const kpis = [
-    { label: "Missing Documents", value: missingDocs.length, color: missingDocs.length ? C.rose : C.emerald, nav: null },
-    { label: "Certs Expiring ≤90d", value: expiring.length, color: expiring.length ? C.amber : C.emerald },
-    { label: "I-9 Incomplete", value: i9Missing.length, color: i9Missing.length ? C.rose : C.emerald },
-    { label: "Training Gaps", value: trainingGaps == null ? "…" : trainingGaps, color: trainingGaps ? C.amber : C.emerald, nav: "learning" },
+    { label: "Missing Documents", value: missingDocs.length, color: missingDocs.length ? C.rose : C.emerald,
+      onClick: () => document.getElementById("hrc-docs")?.scrollIntoView({ behavior: "smooth" }) },
+    { label: "Certs Expiring ≤90d", value: expiring.length, color: expiring.length ? C.amber : C.emerald,
+      onClick: () => document.getElementById("hrc-certs")?.scrollIntoView({ behavior: "smooth" }) },
+    { label: "I-9 Incomplete", value: i9Missing.length, color: i9Missing.length ? C.rose : C.emerald,
+      onClick: () => document.getElementById("hrc-certs")?.scrollIntoView({ behavior: "smooth" }) },
+    { label: "Training Gaps", value: trainingGaps == null ? "…" : trainingGaps, color: trainingGaps ? C.amber : C.emerald,
+      onClick: () => onNavigate && onNavigate("learning") },
   ];
 
   return (
     <div>
       <SectionHeader icon="⚖" accent={C.amber} title="HR Compliance" subtitle="Documents, certifications, I-9 verification, training gaps, and EEO reporting in one place." />
 
-      {/* KPI row */}
+      {/* KPI row — every number drills in */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 14 }}>
         {kpis.map(m => (
-          <Card key={m.label} onClick={m.nav && onNavigate ? undefined : undefined} style={{ padding: "16px 18px", textAlign: "center", cursor: m.nav ? "pointer" : "default" }}>
-            <div onClick={() => m.nav && onNavigate && onNavigate(m.nav)}>
-              <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{m.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: m.color, textDecoration: m.nav ? "underline" : "none", textUnderlineOffset: 3 }}>{m.value}</div>
-            </div>
+          <Card key={m.label} onClick={m.onClick} style={{ padding: "16px 18px", textAlign: "center", cursor: "pointer", transition: "border-color 0.15s" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = m.color; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}>
+            <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{m.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: m.color, textDecoration: "underline", textDecorationColor: `${m.color}50`, textUnderlineOffset: 3 }}>{m.value}</div>
           </Card>
         ))}
       </div>
 
       {/* Missing documents */}
+      <div id="hrc-docs" />
       <Card style={{ marginBottom: 14 }}>
         <Label color={C.rose}>Missing Documents</Label>
         {missingDocs.length === 0 ? <p style={{ fontSize: 13, color: C.emerald, fontWeight: 600, margin: 0 }}>✓ All required documents are on file.</p> :
@@ -2090,13 +2109,14 @@ function HRCompliance({ onNavigate }) {
       </Card>
 
       {/* Certifications + I-9 side by side */}
+      <div id="hrc-certs" />
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
         <Card>
           <Label color={C.amber}>Certifications Expiring ≤ 90 Days</Label>
           {expiring.length === 0 ? <p style={{ fontSize: 13, color: C.emerald, fontWeight: 600, margin: 0 }}>✓ No upcoming expirations.</p> :
             expiring.map((c, i) => (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: i < expiring.length - 1 ? `1px solid ${C.border}` : "none", fontSize: 13, gap: 8 }}>
-                <span style={{ color: C.textDark, fontWeight: 600 }}>{c.employees?.full_name} <span style={{ color: C.textMuted, fontWeight: 400, fontSize: 11 }}>· {c.name}</span></span>
+                <span onClick={() => c.employees?.id && onNavigate && onNavigate("employee", c.employees.id)} style={{ color: C.textDark, fontWeight: 600, cursor: "pointer" }}>{c.employees?.full_name} <span style={{ color: C.textMuted, fontWeight: 400, fontSize: 11 }}>· {c.name}</span></span>
                 <span style={{ color: C.amber, fontWeight: 700, whiteSpace: "nowrap" }}>{new Date(c.expiry_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
               </div>
             ))}
@@ -2122,53 +2142,95 @@ function HRCompliance({ onNavigate }) {
             ⬇ Export EEO-1 Style CSV
           </button>
         </div>
-        <p style={{ fontSize: 11.5, color: C.textMuted, margin: "4px 0 14px" }}>Based on voluntary self-identification collected at onboarding. Employees who declined or haven't responded appear as Undisclosed.</p>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: "#F8FAFC" }}>
-                <th style={{ padding: "9px 12px", textAlign: "left", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}` }}>Job Category</th>
-                {genders.map(g => <th key={g} style={{ padding: "9px 12px", textAlign: "center", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}` }}>{g}</th>)}
-                <th style={{ padding: "9px 12px", textAlign: "center", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}` }}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map(cat => {
-                const inCat = emps.filter(e => eeoCategory(e.role_title) === cat);
-                return (
-                  <tr key={cat} style={{ borderBottom: `1px solid ${C.border}` }}>
-                    <td style={{ padding: "9px 12px", fontWeight: 600, color: C.textDark }}>{cat}</td>
-                    {genders.map(g => <td key={g} style={{ padding: "9px 12px", textAlign: "center", color: C.textMid }}>{inCat.filter(e => (genderLabels[e.gender] || "Undisclosed") === g).length || "—"}</td>)}
-                    <td style={{ padding: "9px 12px", textAlign: "center", fontWeight: 800, color: C.textDark }}>{inCat.length}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <p style={{ fontSize: 11.5, color: C.textMuted, margin: "4px 0 14px" }}>Based on voluntary self-identification collected at onboarding. Employees who declined or haven't responded appear as Undisclosed. Click any count to see the people behind it.</p>
 
-        <Label color={C.violet} style={{ marginTop: 18 }}>Job Category × Race / Ethnicity</Label>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: "#F8FAFC" }}>
-                <th style={{ padding: "9px 12px", textAlign: "left", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}` }}>Job Category</th>
-                {eths.map(et => <th key={et} style={{ padding: "9px 12px", textAlign: "center", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{et}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map(cat => {
-                const inCat = emps.filter(e => eeoCategory(e.role_title) === cat);
-                return (
-                  <tr key={cat} style={{ borderBottom: `1px solid ${C.border}` }}>
-                    <td style={{ padding: "9px 12px", fontWeight: 600, color: C.textDark }}>{cat}</td>
-                    {eths.map(et => <td key={et} style={{ padding: "9px 12px", textAlign: "center", color: C.textMid }}>{inCat.filter(e => (ethLabels[e.ethnicity] || "Undisclosed") === et).length || "—"}</td>)}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        {eeoDrill && (
+          <div style={{ background: `${C.violet}08`, border: `1px solid ${C.violet}30`, borderRadius: 10, padding: 14, marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 800, color: C.violet, letterSpacing: "0.06em", textTransform: "uppercase" }}>{eeoDrill.title} · {eeoDrill.members.length}</span>
+              <button onClick={() => setEeoDrill(null)} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>✕ Close</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
+              {eeoDrill.members.map(e => (
+                <div key={e.id} onClick={() => onNavigate && onNavigate("employee", e.id)} title="View profile"
+                  style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 11px", background: "#fff", borderRadius: 8, cursor: "pointer", border: `1px solid ${C.border}` }}>
+                  <span style={{ width: 26, height: 26, borderRadius: "50%", background: `${C.violet}18`, color: C.violet, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
+                    {e.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                  </span>
+                  <span style={{ minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: C.textDark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.full_name}</span>
+                    <span style={{ display: "block", fontSize: 10.5, color: C.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.role_title}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(() => {
+          const eeoCell = (members, key, title, opts = {}) => {
+            const active = eeoDrill?.key === key;
+            if (members.length === 0) return <td key={key} style={{ padding: "9px 12px", textAlign: "center", color: "#CBD5E1" }}>—</td>;
+            return (
+              <td key={key} onClick={() => setEeoDrill(active ? null : { key, title, members })} title={`View ${members.length} ${members.length === 1 ? "person" : "people"}`}
+                style={{ padding: "9px 12px", textAlign: "center", color: opts.bold ? C.textDark : C.violet, fontWeight: opts.bold ? 800 : 600, cursor: "pointer",
+                  background: active ? `${C.violet}10` : "transparent",
+                  textDecoration: "underline", textDecorationStyle: "dotted", textDecorationColor: `${C.violet}60`, textUnderlineOffset: 3 }}>
+                {members.length}
+              </td>
+            );
+          };
+          return (
+            <>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: "#F8FAFC" }}>
+                      <th style={{ padding: "9px 12px", textAlign: "left", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}` }}>Job Category</th>
+                      {genders.map(g => <th key={g} style={{ padding: "9px 12px", textAlign: "center", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}` }}>{g}</th>)}
+                      <th style={{ padding: "9px 12px", textAlign: "center", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}` }}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categories.map(cat => {
+                      const inCat = emps.filter(e => eeoCategory(e.role_title) === cat);
+                      return (
+                        <tr key={cat} style={{ borderBottom: `1px solid ${C.border}` }}>
+                          <td style={{ padding: "9px 12px", fontWeight: 600, color: C.textDark }}>{cat}</td>
+                          {genders.map(g => eeoCell(inCat.filter(e => (genderLabels[e.gender] || "Undisclosed") === g), `g|${cat}|${g}`, `${cat} — ${g}`))}
+                          {eeoCell(inCat, `g|${cat}|total`, cat, { bold: true })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <Label color={C.violet} style={{ marginTop: 18 }}>Job Category × Race / Ethnicity</Label>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: "#F8FAFC" }}>
+                      <th style={{ padding: "9px 12px", textAlign: "left", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}` }}>Job Category</th>
+                      {eths.map(et => <th key={et} style={{ padding: "9px 12px", textAlign: "center", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{et}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categories.map(cat => {
+                      const inCat = emps.filter(e => eeoCategory(e.role_title) === cat);
+                      return (
+                        <tr key={cat} style={{ borderBottom: `1px solid ${C.border}` }}>
+                          <td style={{ padding: "9px 12px", fontWeight: 600, color: C.textDark }}>{cat}</td>
+                          {eths.map(et => eeoCell(inCat.filter(e => (ethLabels[e.ethnicity] || "Undisclosed") === et), `e|${cat}|${et}`, `${cat} — ${et}`))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          );
+        })()}
       </Card>
     </div>
   );

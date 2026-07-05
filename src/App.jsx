@@ -3490,6 +3490,7 @@ function LoginBanner({ onDismiss }) {
 export default function App() {
   const [active, setActive] = useState("home");
   const [focusEmpId, setFocusEmpId] = useState(null);
+  const [previewEmployee, setPreviewEmployee] = useState(false);
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
@@ -3577,6 +3578,17 @@ export default function App() {
   const assessToken = params.get("assess");
   if (assessToken) return <AssessmentPortal token={assessToken} />;
   if (session && userRole === "employee") return <EmployeePortal user={session.user} />;
+
+  // Admin previewing the employee experience — shows the real portal with an exit bar.
+  if (session && previewEmployee) return (
+    <div>
+      <div style={{ position: "sticky", top: 0, zIndex: 100, background: C.navy, color: "#fff", padding: "9px 20px", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, fontSize: 13, fontWeight: 600 }}>
+        <span style={{ opacity: 0.85 }}>👁 Previewing the employee experience</span>
+        <button onClick={() => setPreviewEmployee(false)} style={{ background: "#fff", color: C.navy, border: "none", borderRadius: 7, padding: "5px 14px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Exit preview</button>
+      </div>
+      <EmployeePortal user={session.user} />
+    </div>
+  );
 
   const screens = {
     home: <CommandCenter userRole={userRole} onNavigate={navigate} />,
@@ -3709,6 +3721,11 @@ export default function App() {
               ⚔ Security &amp; Activity →
             </button>
           </div>
+          <button
+            onClick={() => { setPreviewEmployee(true); setSidebarOpen(false); }}
+            style={{ width: "100%", background: "transparent", border: `1px solid ${C.borderDark}`, borderRadius: 6, padding: "9px 0", color: C.cyan, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", minHeight: 40, marginBottom: 8 }}>
+            👁 Preview as employee
+          </button>
           <button
             onClick={() => supabase.auth.signOut()}
             style={{ width: "100%", background: "transparent", border: `1px solid ${C.borderDark}`, borderRadius: 6, padding: "10px 0", color: C.textMutedDark, fontSize: 12, cursor: "pointer", fontFamily: "inherit", minHeight: 44 }}>

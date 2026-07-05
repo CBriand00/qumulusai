@@ -310,6 +310,164 @@ function buildAchFile(run, entries) {
   return lines.map(l => achPad(l, 94)).join("\r\n");
 }
 
+// ── Tax Liability Report ──────────────────────────────────────────────────────
+// Aggregates withheld + employer-side taxes per quarter so whoever files the
+// 941 / GA G-7 has every line ready. The system does NOT file or remit.
+const FUTA_RATE = 0.006, FUTA_BASE = 7000;      // after full state credit
+const SUTA_RATE = 0.027, SUTA_BASE = 9500;      // GA new-employer rate
+const round2 = n => Math.round(n * 100) / 100;
+
+function TaxLiability({ showToast }) {
+  const [stubs, setStubs] = useState(null);
+  const { isMobile } = useBreakpoint();
+
+  useEffect(() => {
+    supabase.from("pay_stubs")
+      .select("employee_id, gross_pay, federal_tax, state_tax, social_security, medicare, net_pay, pay_date, employees(full_name)")
+      .not("payroll_run_id", "is", null)
+      .order("pay_date")
+      .then(({ data }) => setStubs(data || []));
+  }, []);
+
+  if (!stubs) return null;
+  if (stubs.length === 0) return null;
+
+  // Per-employee running gross (for FUTA/SUTA wage bases) + quarter buckets
+  const ytdByEmp = {};
+  const quarters = {};
+  stubs.forEach(s => {
+    const d = new Date(s.pay_date);
+    const q = `${d.getFullYear()} Q${Math.floor(d.getMonth() / 3) + 1}`;
+    if (!quarters[q]) quarters[q] = { gross: 0, fed: 0, state: 0, ssEmp: 0, medEmp: 0, medErGross: 0, futa: 0, suta: 0, year: d.getFullYear(), qn: Math.floor(d.getMonth() / 3) + 1 };
+    const Q = quarters[q];
+    const gross = Number(s.gross_pay || 0);
+    const prior = ytdByEmp[s.employee_id] || 0;
+    Q.gross += gross;
+    Q.fed   += Number(s.federal_tax || 0);
+    Q.state += Number(s.state_tax || 0);
+    Q.ssEmp += Number(s.social_security || 0);
+    Q.medEmp+= Number(s.medicare || 0);
+    Q.medErGross += gross;
+    Q.futa  += Math.max(0, Math.min(FUTA_BASE - prior, gross)) * FUTA_RATE;
+    Q.suta  += Math.max(0, Math.min(SUTA_BASE - prior, gross)) * SUTA_RATE;
+    ytdByEmp[s.employee_id] = prior + gross;
+  });
+
+  const qKeys = Object.keys(quarters).sort().reverse();
+  const DUE = { 1: "Apr 30", 2: "Jul 31", 3: "Oct 31", 4: "Jan 31" };
+
+  function exportQuarter(qk) {
+    const Q = quarters[qk];
+    const ssEr = Q.ssEmp;                                   // employer matches employee SS
+    const medEr = round2(Q.medErGross * 0.0145);            // employer Medicare (no addl 0.9%)
+    const rows = [
+      ["QumulusAI — Quarterly Tax Liability Worksheet (941 / GA G-7 prep)", ""],
+      ["Quarter", qk],
+      ["", ""],
+      ["Line", "Amount"],
+      ["Total wages (941 line 2)", round2(Q.gross)],
+      ["Federal income tax withheld (941 line 3)", round2(Q.fed)],
+      ["Social Security tax — employee withheld", round2(Q.ssEmp)],
+      ["Social Security tax — employer match", round2(ssEr)],
+      ["Medicare tax — employee withheld (incl. addl)", round2(Q.medEmp)],
+      ["Medicare tax — employer share (1.45%)", medEr],
+      ["Total federal deposit due (income tax + all FICA)", round2(Q.fed + Q.ssEmp + ssEr + Q.medEmp + medEr)],
+      ["", ""],
+      ["Georgia income tax withheld (G-7)", round2(Q.state)],
+      ["FUTA estimate (0.6% of first $7,000/employee)", round2(Q.futa)],
+      ["GA SUTA estimate (2.7% of first $9,500/employee)", round2(Q.suta)],
+      ["", ""],
+      ["941 filing deadline", DUE[Q.qn]],
+      ["Note", "Estimates for filing prep only. This system does not file or remit taxes."],
+    ];
+    const csv = "﻿" + rows.map(r => r.map(v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `QumulusAI_TaxLiability_${qk.replace(" ", "_")}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`Tax worksheet for ${qk} downloaded.`);
+  }
+
+  function exportW2() {
+    const byEmp = {};
+    stubs.forEach(s => {
+      const k = s.employee_id;
+      if (!byEmp[k]) byEmp[k] = { name: s.employees?.full_name || "Unknown", gross: 0, fed: 0, ss: 0, med: 0, state: 0 };
+      byEmp[k].gross += Number(s.gross_pay || 0);
+      byEmp[k].fed   += Number(s.federal_tax || 0);
+      byEmp[k].ss    += Number(s.social_security || 0);
+      byEmp[k].med   += Number(s.medicare || 0);
+      byEmp[k].state += Number(s.state_tax || 0);
+    });
+    const header = ["Employee", "Box 1 Wages", "Box 2 Fed Income Tax", "Box 3 SS Wages", "Box 4 SS Tax", "Box 5 Medicare Wages", "Box 6 Medicare Tax", "Box 16 State Wages (GA)", "Box 17 State Income Tax (GA)"];
+    const rows = Object.values(byEmp).map(e => [e.name, round2(e.gross), round2(e.fed), round2(Math.min(e.gross, 176100)), round2(e.ss), round2(e.gross), round2(e.med), round2(e.gross), round2(e.state)]);
+    const csv = "﻿" + [header, ...rows].map(r => r.map(v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `QumulusAI_W2_Data_${new Date().getFullYear()}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("W-2 wage data downloaded.");
+  }
+
+  return (
+    <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, marginTop: 20, overflow: "hidden" }}>
+      <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark }}>Tax Liability</div>
+          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>Withheld + employer-side taxes by quarter. Prep numbers for Form 941 / GA G-7 — filing happens at EFTPS &amp; GTC, not here.</div>
+        </div>
+        <button onClick={exportW2}
+          style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 14px", fontSize: 12, fontWeight: 600, color: C.textMid, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+          ⬇ W-2 Data (YTD)
+        </button>
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#F8FAFC" }}>
+              {["Quarter", "Wages", "Fed W/H", "FICA (EE+ER)", "GA W/H", "FUTA est.", "SUTA est.", "Total Liability", "941 Due", ""].map((h, hi) => (
+                <th key={h + hi} style={{ padding: "10px 12px", textAlign: hi >= 1 && hi <= 7 ? "right" : "left", fontSize: 10.5, fontWeight: 700, color: C.textMuted, letterSpacing: "0.07em", textTransform: "uppercase", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {qKeys.map(qk => {
+              const Q = quarters[qk];
+              const ssEr = Q.ssEmp;
+              const medEr = round2(Q.medErGross * 0.0145);
+              const fica = round2(Q.ssEmp + ssEr + Q.medEmp + medEr);
+              const total = round2(Q.fed + fica + Q.state + Q.futa + Q.suta);
+              return (
+                <tr key={qk} style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <td style={{ padding: "11px 12px", fontWeight: 700, color: C.textDark, fontSize: 13, whiteSpace: "nowrap" }}>{qk}</td>
+                  <td style={{ padding: "11px 12px", textAlign: "right", fontSize: 13, color: C.textDark, whiteSpace: "nowrap" }}>{fmt$(Q.gross)}</td>
+                  <td style={{ padding: "11px 12px", textAlign: "right", fontSize: 13, color: C.rose, whiteSpace: "nowrap" }}>{fmt$(Q.fed)}</td>
+                  <td style={{ padding: "11px 12px", textAlign: "right", fontSize: 13, color: C.rose, whiteSpace: "nowrap" }} title="Employee withheld + employer match">{fmt$(fica)}</td>
+                  <td style={{ padding: "11px 12px", textAlign: "right", fontSize: 13, color: C.rose, whiteSpace: "nowrap" }}>{fmt$(Q.state)}</td>
+                  <td style={{ padding: "11px 12px", textAlign: "right", fontSize: 13, color: C.amber, whiteSpace: "nowrap" }}>{fmt$(round2(Q.futa))}</td>
+                  <td style={{ padding: "11px 12px", textAlign: "right", fontSize: 13, color: C.amber, whiteSpace: "nowrap" }}>{fmt$(round2(Q.suta))}</td>
+                  <td style={{ padding: "11px 12px", textAlign: "right", fontSize: 13, fontWeight: 800, color: C.textDark, whiteSpace: "nowrap" }}>{fmt$(total)}</td>
+                  <td style={{ padding: "11px 12px", fontSize: 12, color: C.textMuted, whiteSpace: "nowrap" }}>{DUE[Q.qn]}</td>
+                  <td style={{ padding: "11px 12px" }}>
+                    <button onClick={() => exportQuarter(qk)}
+                      style={{ background: "#EEF2FF", border: "1px solid #C7D2FE", borderRadius: 6, padding: "5px 12px", fontSize: 11.5, fontWeight: 700, color: "#4338CA", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                      ⬇ 941 Worksheet
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Payroll Component ────────────────────────────────────────────────────
 export default function Payroll() {
   const [runs, setRuns] = useState([]);
@@ -626,9 +784,12 @@ export default function Payroll() {
         )}
       </div>
 
+      {/* Tax liability report */}
+      <TaxLiability showToast={showToast} />
+
       {/* Footer note */}
       <div style={{ marginTop: 16, fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>
-        Federal withholding calculated using 2026 IRS Pub 15-T percentage method. Georgia state tax at 5.49% flat rate. FICA: Social Security 6.2% (up to $176,100 wage base) · Medicare 1.45% + 0.9% additional above threshold. Consult a tax professional for official payroll compliance.
+        Federal withholding calculated using 2026 IRS Pub 15-T percentage method. Georgia state tax at 5.49% flat rate. FICA: Social Security 6.2% (up to $176,100 wage base) · Medicare 1.45% + 0.9% additional above threshold. FUTA/SUTA figures are estimates. This system prepares filing numbers but does not file or remit taxes — deposits are made via EFTPS (federal) and Georgia Tax Center (state). Consult a tax professional for official payroll compliance.
       </div>
     </div>
   );

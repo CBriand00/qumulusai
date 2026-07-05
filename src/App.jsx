@@ -1864,8 +1864,73 @@ function Learning({ onNavigate, focus }) {
   const [assignEmps, setAssignEmps] = useState({});
   const [assigning, setAssigning] = useState(false);
   const [assignedMsg, setAssignedMsg] = useState("");
+  // Course viewer state
+  const [viewCourse, setViewCourse] = useState(null);   // course name
+  const [modules, setModules] = useState(null);
+  const [modIdx, setModIdx] = useState(0);
+  const [quizAnswers, setQuizAnswers] = useState({});
+  const [quizResult, setQuizResult] = useState(null);
+  const [recordFor, setRecordFor] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [authoring, setAuthoring] = useState(false);
+  const [authored, setAuthored] = useState(null);
 
   useEffect(() => { if (focus === "gaps") setShowGaps(true); }, [focus]);
+
+  async function openCourse(name) {
+    setViewCourse(name);
+    setModules(null); setModIdx(0); setQuizAnswers({}); setQuizResult(null); setRecordFor(""); setAuthored(null);
+    const { data } = await supabase.from("training_modules").select("*").eq("course_name", name).order("module_order");
+    setModules(data || []);
+  }
+
+  // AI-author a course draft; HR reviews before it's saved to the catalog.
+  async function authorCourse(course) {
+    setAuthoring(true);
+    setAuthored(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-query", {
+        body: {
+          max_tokens: 3000,
+          system: `You write internal corporate training. Return ONLY valid JSON: an array of exactly 3 modules, each {"title": string, "content": string (markdown with ## heading, bold, bullet lists; 200-350 words), "quiz": null or array of 2 objects {"q": string, "options": [3 strings], "answer": index}}. The final module must include a quiz. No text outside the JSON.`,
+          messages: [{ role: "user", content: `Write the course "${course.name}" for QumulusAI, an AI-native GPU cloud (NeoCloud) infrastructure company preparing for public markets. Course description: ${course.description}. Audience: ${course.applies_to === "all" ? "all employees" : "employees in roles matching: " + course.applies_to}.` }],
+        },
+      });
+      if (error) throw error;
+      const text = data?.content?.map(b => b.text || "").join("") || "";
+      const parsed = JSON.parse(text.slice(text.indexOf("["), text.lastIndexOf("]") + 1));
+      setAuthored(parsed);
+    } catch (e) {
+      setAssignedMsg("AI authoring failed: " + e.message);
+      setTimeout(() => setAssignedMsg(""), 5000);
+    }
+    setAuthoring(false);
+  }
+
+  async function saveAuthored(name) {
+    await supabase.from("training_modules").insert(authored.map((m, i) => ({
+      course_name: name, module_order: i + 1, title: m.title, content: m.content, quiz: m.quiz || null,
+    })));
+    setAuthored(null);
+    openCourse(name);
+  }
+
+  async function recordCompletion(courseName) {
+    if (!recordFor) return;
+    setRecording(true);
+    await supabase.from("training_records").insert({
+      employee_id: recordFor,
+      organization_id: "00000000-0000-0000-0000-000000000001",
+      training_name: courseName,
+      status: "completed",
+      completed_at: new Date().toISOString(),
+    });
+    setRecording(false);
+    setRecordFor("");
+    setAssignedMsg(`Completion recorded for "${courseName}".`);
+    setTimeout(() => setAssignedMsg(""), 4000);
+    refresh();
+  }
 
   // The drill panel renders above the course lists — bring it into view when a
   // course is selected so the click visibly lands somewhere.
@@ -1898,6 +1963,151 @@ function Learning({ onNavigate, focus }) {
     const subject = encodeURIComponent("Outstanding Required Training");
     const body = encodeURIComponent(`Hi ${row.emp.full_name.split(" ")[0]},\n\nOur records show the following required training is still outstanding for you:\n\n${row.courses.map(c => `  • ${c.name}`).join("\n")}\n\nPlease complete ${row.courses.length === 1 ? "it" : "these"} as soon as possible.\n\nThank you!`);
     window.open(`mailto:${row.emp.email}?subject=${subject}&body=${body}`);
+  }
+
+  // ── Course viewer (full-page takeover) ──────────────────────────────────────
+  if (viewCourse) {
+    const course = courses.find(c => c.name === viewCourse);
+    const m = modules?.[modIdx];
+    const isLast = modules && modIdx === modules.length - 1;
+    const quizPassed = quizResult && quizResult.correct === quizResult.total;
+    const gradeQuiz = () => {
+      let correct = 0;
+      m.quiz.forEach((q, qi) => { if (quizAnswers[qi] === q.answer) correct++; });
+      setQuizResult({ correct, total: m.quiz.length });
+    };
+    return (
+      <div>
+        <button onClick={() => setViewCourse(null)}
+          style={{ background: "none", border: "none", color: C.emerald, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: 0, marginBottom: 14 }}>
+          ← Back to Learning
+        </button>
+        <SectionHeader icon="📖" accent={C.emerald} title={viewCourse} subtitle={course?.description || ""} />
+
+        {!modules ? (
+          <Card><p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading course…</p></Card>
+        ) : modules.length === 0 ? (
+          <Card>
+            <Label color={C.emerald}>No Content Yet</Label>
+            {!authored ? (
+              <>
+                <p style={{ fontSize: 13, color: C.textMid, lineHeight: 1.7, margin: "0 0 14px" }}>
+                  This course has no material yet. QumulusAI can draft a 3-module curriculum with a knowledge check — you review it before it becomes official. (AI drafts, humans approve — per our AI governance.)
+                </p>
+                <button onClick={() => authorCourse(course)} disabled={authoring}
+                  style={{ background: C.emerald, color: "#fff", border: "none", borderRadius: 8, padding: "11px 22px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: authoring ? 0.6 : 1 }}>
+                  {authoring ? "◈ Drafting curriculum…" : "✦ Draft Course with AI"}
+                </button>
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: 12.5, color: C.textMid, margin: "0 0 12px" }}>Draft ready — review below, then publish or regenerate.</p>
+                {authored.map((am, i) => (
+                  <div key={i} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: 16, marginBottom: 10, background: "#FAFBFD" }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: C.emerald, marginBottom: 6 }}>MODULE {i + 1}{am.quiz ? " · INCLUDES KNOWLEDGE CHECK" : ""}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.textDark, marginBottom: 8 }}>{am.title}</div>
+                    <div style={{ fontSize: 13 }}>{renderMarkdown(am.content)}</div>
+                  </div>
+                ))}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => saveAuthored(viewCourse)}
+                    style={{ background: C.emerald, color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                    ✓ Publish Course
+                  </button>
+                  <button onClick={() => authorCourse(course)} disabled={authoring}
+                    style={{ background: C.bg, color: C.textMid, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                    {authoring ? "…" : "↻ Regenerate"}
+                  </button>
+                </div>
+              </>
+            )}
+          </Card>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "230px 1fr", gap: 14, alignItems: "start" }}>
+            {/* Module nav */}
+            <Card style={{ padding: 12 }}>
+              {modules.map((mod, i) => (
+                <button key={mod.id} onClick={() => { setModIdx(i); setQuizResult(null); setQuizAnswers({}); }}
+                  style={{ display: "flex", alignItems: "center", gap: 9, width: "100%", textAlign: "left", background: i === modIdx ? `${C.emerald}12` : "transparent", border: "none", borderRadius: 8, padding: "10px 10px", cursor: "pointer", fontFamily: "inherit", marginBottom: 2 }}>
+                  <span style={{ width: 20, height: 20, borderRadius: "50%", background: i < modIdx ? C.emerald : i === modIdx ? `${C.emerald}25` : C.border, color: i < modIdx ? "#fff" : i === modIdx ? C.emerald : C.textMuted, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, flexShrink: 0 }}>
+                    {i < modIdx ? "✓" : i + 1}
+                  </span>
+                  <span style={{ fontSize: 12.5, fontWeight: i === modIdx ? 700 : 500, color: i === modIdx ? C.textDark : C.textMid, lineHeight: 1.3 }}>{mod.title}</span>
+                </button>
+              ))}
+            </Card>
+
+            {/* Content */}
+            <Card>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.emerald, letterSpacing: "0.1em", marginBottom: 10 }}>MODULE {modIdx + 1} OF {modules.length}</div>
+              <div style={{ fontSize: 14 }}>{renderMarkdown(m.content)}</div>
+
+              {/* Knowledge check */}
+              {m.quiz && (
+                <div style={{ marginTop: 20, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+                  <Label color={C.violet}>Knowledge Check</Label>
+                  {m.quiz.map((q, qi) => (
+                    <div key={qi} style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: C.textDark, marginBottom: 8 }}>{qi + 1}. {q.q}</div>
+                      {q.options.map((opt, oi) => {
+                        const chosen = quizAnswers[qi] === oi;
+                        const showState = quizResult != null;
+                        const correct = oi === q.answer;
+                        return (
+                          <label key={oi} style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "7px 10px", borderRadius: 8, cursor: "pointer", fontSize: 13, color: C.textMid, marginBottom: 4,
+                            background: showState && chosen ? (correct ? "#ECFDF5" : "#FEF2F2") : chosen ? `${C.violet}0E` : C.bg,
+                            border: `1px solid ${showState && chosen ? (correct ? C.emerald : C.rose) : chosen ? C.violet : C.border}` }}>
+                            <input type="radio" name={`q${qi}`} checked={chosen} onChange={() => { setQuizAnswers(p => ({ ...p, [qi]: oi })); setQuizResult(null); }} style={{ accentColor: C.violet, marginTop: 2 }} />
+                            <span>{opt}{showState && correct && <strong style={{ color: C.emerald }}> ✓</strong>}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ))}
+                  <button onClick={gradeQuiz} disabled={Object.keys(quizAnswers).length < m.quiz.length}
+                    style={{ background: C.violet, color: "#fff", border: "none", borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: Object.keys(quizAnswers).length < m.quiz.length ? 0.5 : 1 }}>
+                    Check Answers
+                  </button>
+                  {quizResult && (
+                    <span style={{ marginLeft: 12, fontSize: 13, fontWeight: 700, color: quizPassed ? C.emerald : C.rose }}>
+                      {quizResult.correct}/{quizResult.total} correct{quizPassed ? " — passed!" : " — review and try again"}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Footer nav + completion */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 20, borderTop: `1px solid ${C.border}`, paddingTop: 14, flexWrap: "wrap", gap: 10 }}>
+                <button onClick={() => { setModIdx(i => Math.max(0, i - 1)); setQuizResult(null); setQuizAnswers({}); }} disabled={modIdx === 0}
+                  style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600, color: C.textMid, cursor: "pointer", fontFamily: "inherit", opacity: modIdx === 0 ? 0.4 : 1 }}>
+                  ← Previous
+                </button>
+                {!isLast ? (
+                  <button onClick={() => { setModIdx(i => i + 1); setQuizResult(null); setQuizAnswers({}); }}
+                    style={{ background: C.emerald, color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                    Next Module →
+                  </button>
+                ) : (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <select value={recordFor} onChange={e => setRecordFor(e.target.value)}
+                      disabled={m.quiz ? !quizPassed : false}
+                      style={{ padding: "8px 11px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 12.5, background: C.bg, outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
+                      <option value="">Record completion for…</option>
+                      {(course?.missing || []).map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                    </select>
+                    <button onClick={() => recordCompletion(viewCourse)} disabled={!recordFor || recording || (m.quiz && !quizPassed)}
+                      title={m.quiz && !quizPassed ? "Pass the knowledge check first" : undefined}
+                      style={{ background: C.emerald, color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: (!recordFor || (m.quiz && !quizPassed)) ? 0.5 : 1 }}>
+                      {recording ? "…" : "✓ Record Completion"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
+        )}
+      </div>
+    );
   }
 
   async function markComplete(course, emp) {
@@ -2130,6 +2340,10 @@ function Learning({ onNavigate, focus }) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             <Label color={C.emerald} style={{ marginBottom: 0 }}>{drillCourse.name} — {drillCourse.missing.length} outstanding</Label>
             <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => openCourse(drillCourse.name)}
+                style={{ background: `${C.emerald}12`, border: `1px solid ${C.emerald}30`, borderRadius: 7, padding: "7px 14px", fontSize: 12, fontWeight: 700, color: C.emerald, cursor: "pointer", fontFamily: "inherit" }}>
+                📖 Open Course
+              </button>
               {drillCourse.missing.length > 0 && (
                 <button onClick={() => remindAll(drillCourse)}
                   style={{ background: C.blue, color: "#fff", border: "none", borderRadius: 7, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>

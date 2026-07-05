@@ -18,6 +18,7 @@ export default function TalentInbox() {
   const [loading, setLoading]   = useState(true);
   const [selected, setSelected] = useState(null);
   const [search, setSearch]     = useState("");
+  const [filter, setFilter]     = useState("all");
   const [updating, setUpdating] = useState(null);
   const [scores, setScores]     = useState({});
   const { isMobile } = useBreakpoint();
@@ -77,8 +78,14 @@ export default function TalentInbox() {
   }
 
   const q = search.trim().toLowerCase();
-  const visible = apps.filter((a) => !q || a.full_name?.toLowerCase().includes(q) || a.email?.toLowerCase().includes(q) || a.role_title?.toLowerCase().includes(q));
-  const byStatus = STATUSES.reduce((acc, s) => { acc[s] = visible.filter((a) => a.status === s); return acc; }, {});
+  const counts = STATUSES.reduce((acc, s) => { acc[s] = apps.filter((a) => a.status === s).length; return acc; }, {});
+  const visible = apps.filter((a) => {
+    const matchFilter = filter === "all" || a.status === filter;
+    const matchSearch = !q || a.full_name?.toLowerCase().includes(q) || a.email?.toLowerCase().includes(q) || a.role_title?.toLowerCase().includes(q) || a.department?.toLowerCase().includes(q);
+    return matchFilter && matchSearch;
+  });
+
+  const chips = [{ key: "all", label: "All", color: "#7C3AED", count: apps.length }, ...STATUSES.map((s) => ({ key: s, label: STATUS_META[s].label, color: STATUS_META[s].color, count: counts[s] }))];
 
   return (
     <div style={board.shell}>
@@ -86,7 +93,7 @@ export default function TalentInbox() {
       <div style={board.header}>
         <div>
           <h1 style={board.title}>Talent Pipeline</h1>
-          <p style={board.subtitle}>{loading ? "Loading…" : `${apps.length} candidate${apps.length !== 1 ? "s" : ""} across ${STATUSES.length} stages`}</p>
+          <p style={board.subtitle}>{loading ? "Loading…" : `${apps.length} candidate${apps.length !== 1 ? "s" : ""} · ${counts.new + counts.reviewing + counts.interview + counts.offer} active`}</p>
         </div>
         <div style={board.tools}>
           <div style={board.searchWrap}>
@@ -97,29 +104,46 @@ export default function TalentInbox() {
         </div>
       </div>
 
-      {/* Kanban board */}
-      <div style={board.columns}>
-        {STATUSES.map((s) => {
-          const m = STATUS_META[s];
-          const colApps = byStatus[s];
+      {/* Filter chips */}
+      <div style={board.chips}>
+        {chips.map((c) => {
+          const active = filter === c.key;
           return (
-            <div key={s} style={board.column}>
-              <div style={board.colHeader}>
-                <span style={board.colHeaderLeft}>
-                  <span style={{ width: 9, height: 9, borderRadius: "50%", background: m.color }} />
-                  <span style={board.colTitle}>{m.label}</span>
-                </span>
-                <span style={{ ...board.colCount, background: m.bg, color: m.color }}>{colApps.length}</span>
-              </div>
-              <div style={board.colBody}>
-                {colApps.map((app) => (
-                  <BoardCard key={app.id} app={app} score={scores[app.id]} selected={selected?.id === app.id} onClick={() => setSelected(app)} />
-                ))}
-                {colApps.length === 0 && <div style={board.colEmpty}>—</div>}
-              </div>
-            </div>
+            <button key={c.key} onClick={() => setFilter(c.key)}
+              style={{ ...board.chip, ...(active ? { background: c.color, color: "#fff", borderColor: c.color } : {}) }}>
+              {c.label}
+              <span style={{ ...board.chipCount, background: active ? "rgba(255,255,255,0.25)" : "#F1F5F9", color: active ? "#fff" : "#64748B" }}>{c.count}</span>
+            </button>
           );
         })}
+      </div>
+
+      {/* Full-width table */}
+      <div style={board.tableWrap}>
+        <table style={board.table}>
+          <thead>
+            <tr>
+              <th style={{ ...board.th, width: "26%" }}>Candidate</th>
+              <th style={{ ...board.th, width: "24%" }}>Role</th>
+              <th style={{ ...board.th, width: "16%" }}>Department</th>
+              <th style={{ ...board.th, width: "12%" }}>Applied</th>
+              <th style={{ ...board.th, width: "11%", textAlign: "center" }}>Assessment</th>
+              <th style={{ ...board.th, width: "11%" }}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((app) => (
+              <TalentRow key={app.id} app={app} score={scores[app.id]} selected={selected?.id === app.id} onClick={() => setSelected(app)} />
+            ))}
+          </tbody>
+        </table>
+        {!loading && visible.length === 0 && (
+          <div style={styles.empty}>
+            <div style={styles.emptyCircle}>✦</div>
+            <p style={styles.emptyText}>No candidates match this view.</p>
+            <p style={styles.emptySub}>Try a different filter or clear your search.</p>
+          </div>
+        )}
       </div>
 
       {/* Slide-over detail drawer */}
@@ -136,28 +160,36 @@ export default function TalentInbox() {
   );
 }
 
-function BoardCard({ app, score, selected, onClick }) {
+function TalentRow({ app, score, selected, onClick }) {
   const m = STATUS_META[app.status] ?? STATUS_META.new;
   const [hover, setHover] = useState(false);
-  const date = new Date(app.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const date = new Date(app.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const scoreColor = score == null ? null : score >= 70 ? "#059669" : score >= 50 ? "#D97706" : "#DC2626";
   const scoreBg = score == null ? null : score >= 70 ? "#ECFDF5" : score >= 50 ? "#FFFBEB" : "#FEF2F2";
   return (
-    <div onClick={onClick}
-      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ ...board.card, borderColor: selected ? m.color : (hover ? "#CBD5E1" : C.border), boxShadow: hover || selected ? "0 4px 14px rgba(15,23,42,0.10)" : "0 1px 2px rgba(15,23,42,0.04)", transform: hover ? "translateY(-1px)" : "none" }}>
-      <div style={board.cardTop}>
-        <div style={{ ...board.cardAvatar, background: m.bg, color: m.color }}>{initials(app.full_name)}</div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={board.cardName}>{app.full_name}</div>
-          <div style={board.cardRole}>{app.role_title}</div>
+    <tr onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ cursor: "pointer", background: selected ? "#F5F3FF" : hover ? "#FAFAFE" : "transparent", transition: "background 0.12s" }}>
+      <td style={{ ...board.td, borderLeft: `3px solid ${selected ? m.color : "transparent"}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+          <div style={{ ...board.rowAvatar, background: m.bg, color: m.color }}>{initials(app.full_name)}</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={board.rowName}>{app.full_name}</div>
+            {app.email && <div style={board.rowEmail}>{app.email}</div>}
+          </div>
         </div>
-      </div>
-      <div style={board.cardFooter}>
-        <span style={board.cardDate}>{date}</span>
-        {score != null && <span style={{ ...board.cardScore, background: scoreBg, color: scoreColor }}>{score}/100</span>}
-      </div>
-    </div>
+      </td>
+      <td style={{ ...board.td, color: "#334155" }}>{app.role_title}</td>
+      <td style={{ ...board.td, color: C.muted }}>{app.department || "—"}</td>
+      <td style={{ ...board.td, color: C.muted, fontSize: 12 }}>{date}</td>
+      <td style={{ ...board.td, textAlign: "center" }}>
+        {score != null
+          ? <span style={{ ...board.scorePill, background: scoreBg, color: scoreColor }}>{score}</span>
+          : <span style={{ color: "#CBD5E1", fontSize: 12 }}>—</span>}
+      </td>
+      <td style={board.td}>
+        <span style={{ ...board.statusPill, background: m.bg, color: m.color }}>{m.label}</span>
+      </td>
+    </tr>
   );
 }
 
@@ -586,22 +618,18 @@ const board = {
   searchIcon: { position: "absolute", left: 12, color: C.muted, fontSize: 15, pointerEvents: "none" },
   search: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 9, padding: "9px 12px 9px 32px", fontSize: 13, outline: "none", minWidth: 220, color: C.text, fontFamily: "inherit" },
   refreshBtn: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 9, color: C.muted, fontSize: 12, fontWeight: 600, padding: "9px 16px", cursor: "pointer", fontFamily: "inherit" },
-  columns: { display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8, alignItems: "flex-start" },
-  column: { flex: "0 0 262px", width: 262, background: "#F8FAFC", border: `1px solid ${C.border}`, borderRadius: 12, display: "flex", flexDirection: "column", maxHeight: "calc(100vh - 210px)" },
-  colHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", borderBottom: `1px solid ${C.border}` },
-  colHeaderLeft: { display: "flex", alignItems: "center", gap: 8 },
-  colTitle: { fontSize: 13, fontWeight: 700, color: "#334155" },
-  colCount: { fontSize: 11, fontWeight: 800, borderRadius: 20, padding: "2px 9px", minWidth: 22, textAlign: "center" },
-  colBody: { display: "flex", flexDirection: "column", gap: 10, padding: 12, overflowY: "auto", flex: 1, minHeight: 60 },
-  colEmpty: { textAlign: "center", color: "#CBD5E1", fontSize: 18, padding: "18px 0" },
-  card: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12, cursor: "pointer", transition: "box-shadow 0.15s, transform 0.15s, border-color 0.15s" },
-  cardTop: { display: "flex", gap: 10, alignItems: "center" },
-  cardAvatar: { width: 34, height: 34, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, flexShrink: 0 },
-  cardName: { fontSize: 13, fontWeight: 700, color: "#0F172A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-  cardRole: { fontSize: 11, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 1 },
-  cardFooter: { display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 10 },
-  cardDate: { fontSize: 11, color: C.muted },
-  cardScore: { fontSize: 10, fontWeight: 800, borderRadius: 6, padding: "2px 7px" },
+  chips: { display: "flex", gap: 8, flexWrap: "wrap" },
+  chip: { display: "inline-flex", alignItems: "center", gap: 7, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: "6px 12px", fontSize: 12.5, fontWeight: 600, color: "#475569", cursor: "pointer", fontFamily: "inherit", transition: "all 0.12s" },
+  chipCount: { fontSize: 11, fontWeight: 800, borderRadius: 20, padding: "1px 7px", minWidth: 20, textAlign: "center" },
+  tableWrap: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" },
+  table: { width: "100%", borderCollapse: "collapse", tableLayout: "fixed" },
+  th: { textAlign: "left", fontSize: 10.5, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: C.muted, padding: "13px 16px", borderBottom: `1px solid ${C.border}`, background: "#FAFBFD" },
+  td: { padding: "12px 16px", borderBottom: `1px solid ${C.border}`, fontSize: 13.5, verticalAlign: "middle", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  rowAvatar: { width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, flexShrink: 0 },
+  rowName: { fontSize: 13.5, fontWeight: 700, color: "#0F172A", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  rowEmail: { fontSize: 11.5, color: C.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 1 },
+  scorePill: { display: "inline-block", minWidth: 30, fontSize: 12, fontWeight: 800, borderRadius: 7, padding: "3px 8px", textAlign: "center" },
+  statusPill: { fontSize: 10.5, fontWeight: 700, borderRadius: 20, padding: "3px 10px", textTransform: "uppercase", letterSpacing: "0.03em", whiteSpace: "nowrap" },
   scrim: { position: "fixed", inset: 0, background: "rgba(15,23,42,0.35)", zIndex: 40 },
   drawer: { position: "fixed", top: 0, right: 0, height: "100vh", width: 460, maxWidth: "100%", background: C.bg, boxShadow: "-8px 0 30px rgba(15,23,42,0.18)", zIndex: 41, overflowY: "auto" },
   drawerClose: { display: "flex", alignItems: "center", gap: 6, background: C.surface, border: "none", borderBottom: `1px solid ${C.border}`, color: C.muted, fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "14px 20px", width: "100%", textAlign: "left", fontFamily: "inherit", position: "sticky", top: 0, zIndex: 1 },

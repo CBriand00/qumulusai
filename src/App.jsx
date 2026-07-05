@@ -82,6 +82,7 @@ const NAV_GROUPS = [
       { id: "manager",   label: "Manager Coach",       icon: "◇", accent: C.blue },
       { id: "payroll",   label: "Payroll",             icon: "◈", accent: C.teal },
       { id: "comp",      label: "Compensation",        icon: "◆", accent: C.amber },
+      { id: "contractors",label: "Contractors",        icon: "◆", accent: C.teal },
       { id: "relations", label: "Employee Relations",  icon: "◉", accent: C.rose },
       { id: "compliance",label: "Compliance",          icon: "⚖", accent: C.amber },
       { id: "aigov",     label: "AI Governance",       icon: "✦", accent: C.cyan },
@@ -2673,6 +2674,136 @@ function Compensation({ onNavigate }) {
   );
 }
 
+// ─── CONTRACTORS / CONTINGENT WORKFORCE ───────────────────────────────────────
+const ENGAGE_LABELS = { staff_aug: "Staff Aug", project: "Project", advisory: "Advisory", agency: "Agency" };
+function contractorMonthly(c) {
+  return Number(c.bill_rate || 0) * Number(c.hours_per_week || 0) * 4.33;
+}
+
+function Contractors({ onNavigate }) {
+  const { isMobile } = useBreakpoint();
+  const [rows, setRows] = useState(null);
+  const [deptMap, setDeptMap] = useState({});
+  const [empMap, setEmpMap] = useState({});
+  const [filter, setFilter] = useState("active");
+  const [open, setOpen] = useState(null);
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from("contractors").select("*").order("start_date", { ascending: false }),
+      supabase.from("departments").select("id, name"),
+      supabase.from("employees").select("id, full_name"),
+    ]).then(([{ data: c }, { data: d }, { data: e }]) => {
+      setRows(c || []);
+      setDeptMap((d || []).reduce((m, x) => { m[x.id] = x.name; return m; }, {}));
+      setEmpMap((e || []).reduce((m, x) => { m[x.id] = x.full_name; return m; }, {}));
+    });
+  }, []);
+
+  if (!rows) return <div><SectionHeader icon="◆" accent={C.teal} title="Contractors" subtitle="Contingent workforce — engagements, spend, and end dates." /><Card><p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading engagements…</p></Card></div>;
+
+  const fmt$ = n => "$" + Math.round(Number(n)).toLocaleString("en-US");
+  const today = new Date();
+  const daysLeft = c => c.end_date ? Math.round((new Date(c.end_date) - today) / 86400000) : null;
+  const active = rows.filter(c => c.status === "active");
+  const endingSoon = active.filter(c => { const d = daysLeft(c); return d != null && d <= 30; });
+  const monthlySpend = active.reduce((s, c) => s + contractorMonthly(c), 0);
+  const avgRate = active.length ? active.reduce((s, c) => s + Number(c.bill_rate || 0), 0) / active.length : 0;
+
+  const visible = filter === "active" ? active : filter === "ending" ? endingSoon : filter === "ended" ? rows.filter(c => c.status === "ended") : rows;
+
+  const kpis = [
+    { label: "Active Contractors", value: active.length, tone: "info", f: "active" },
+    { label: "Monthly Spend", value: fmt$(monthlySpend), tone: "neutral", f: "active" },
+    { label: "Ending ≤30 Days", value: endingSoon.length, tone: endingSoon.length ? "warn" : "good", f: "ending" },
+    { label: "Avg Bill Rate", value: fmt$(avgRate) + "/hr", tone: "neutral", f: "active" },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <SectionHeader icon="◆" accent={C.teal} title="Contractors" subtitle="Contingent workforce — engagements, spend, and renewal dates. Distinct from payroll employees." />
+      </div>
+
+      {/* KPIs — each filters the list */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 14 }}>
+        {kpis.map(m => (
+          <Card key={m.label} onClick={() => setFilter(m.f)} style={{ padding: "16px 18px", cursor: "pointer", borderColor: filter === m.f ? C.teal : C.border, transition: "border-color 0.15s" }}>
+            <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>{m.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: C.textDark, textDecoration: "underline", textDecorationColor: `${C.teal}40`, textUnderlineOffset: 3 }}>{m.value}</div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Filter chips */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        {[["active", "Active"], ["ending", "Ending soon"], ["ended", "Ended"], ["all", "All"]].map(([k, lbl]) => {
+          const on = filter === k;
+          return (
+            <button key={k} onClick={() => setFilter(k)}
+              style={{ background: on ? C.teal : C.bgCard, color: on ? "#fff" : C.textMid, border: `1px solid ${on ? C.teal : C.border}`, borderRadius: 20, padding: "6px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+              {lbl}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* List */}
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        {visible.length === 0 ? (
+          <p style={{ fontSize: 13, color: C.textMuted, padding: "20px 22px", margin: 0 }}>No contractors match this view.</p>
+        ) : visible.map((c, i) => {
+          const dl = daysLeft(c);
+          const soon = c.status === "active" && dl != null && dl <= 30;
+          const expanded = open === c.id;
+          return (
+            <div key={c.id} style={{ borderBottom: i < visible.length - 1 ? `1px solid ${C.border}` : "none" }}>
+              <div onClick={() => setOpen(expanded ? null : c.id)}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 22px", cursor: "pointer", background: expanded ? "#FAFBFC" : "transparent" }}
+                onMouseEnter={e => { if (!expanded) e.currentTarget.style.background = "#FAFBFC"; }}
+                onMouseLeave={e => { if (!expanded) e.currentTarget.style.background = "transparent"; }}>
+                <div style={{ width: 34, height: 34, borderRadius: "50%", background: `${C.teal}18`, color: C.teal, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, flexShrink: 0 }}>
+                  {c.full_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: C.textDark }}>{c.full_name}</div>
+                  <div style={{ fontSize: 11.5, color: C.textMuted }}>{c.role_title} · {c.vendor || "Independent"}</div>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, background: `${C.blue}12`, color: C.blue, borderRadius: 20, padding: "3px 9px", flexShrink: 0 }}>{ENGAGE_LABELS[c.engagement]}</span>
+                <span style={{ fontSize: 12.5, color: C.textDark, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}>{fmt$(contractorMonthly(c))}/mo</span>
+                {c.status === "ended"
+                  ? <span style={{ fontSize: 10.5, fontWeight: 700, color: C.textMuted, flexShrink: 0 }}>ENDED</span>
+                  : soon && <span style={{ fontSize: 10.5, fontWeight: 800, background: "#FFFBEB", color: C.amber, borderRadius: 6, padding: "2px 7px", flexShrink: 0 }}>{dl}d left</span>}
+                <span style={{ color: "#CBD5E1", fontSize: 12, transform: expanded ? "rotate(90deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}>›</span>
+              </div>
+              {expanded && (
+                <div style={{ padding: "2px 22px 16px 22px", display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12 }}>
+                  {[
+                    ["Bill rate", fmt$(c.bill_rate) + "/hr · " + (c.hours_per_week || 0) + " hrs/wk"],
+                    ["Department", deptMap[c.department_id] || "—"],
+                    ["Manager", c.manager_id ? empMap[c.manager_id] || "—" : "—"],
+                    ["Engagement", c.start_date ? new Date(c.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + (c.end_date ? " → " + new Date(c.end_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : " → ongoing") : "—"],
+                  ].map(([k, v]) => (
+                    <div key={k}>
+                      <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>{k}</div>
+                      <div style={{ fontSize: 12.5, color: C.textDark, fontWeight: 500, marginTop: 3 }}>{v}</div>
+                    </div>
+                  ))}
+                  {c.email && <div style={{ gridColumn: "1 / -1" }}><a href={`mailto:${c.email}`} style={{ fontSize: 12, color: C.blue, fontWeight: 600, textDecoration: "none" }}>✉ {c.email}</a></div>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </Card>
+
+      <p style={{ fontSize: 11.5, color: C.textMuted, margin: "12px 2px 0", lineHeight: 1.6 }}>
+        Contractors are tracked separately from payroll employees — no benefits, equity, or W-2. Monthly spend rolls into the Contractors line of Workforce Cost.
+      </p>
+    </div>
+  );
+}
+
 // ─── AI GOVERNANCE ────────────────────────────────────────────────────────────
 // Inventory of every AI touchpoint in the platform and its human-in-the-loop
 // control. The governing principle: AI recommends, humans decide.
@@ -3457,6 +3588,7 @@ export default function App() {
     diversity: <Diversity onNavigate={navigate} />,
     learning:  <Learning onNavigate={navigate} focus={focusEmpId} />,
     comp:      <Compensation onNavigate={navigate} />,
+    contractors:<Contractors onNavigate={navigate} />,
     relations: <EmployeeRelations onNavigate={navigate} userRole={userRole} />,
     compliance:<HRCompliance onNavigate={navigate} />,
     aigov:     <AIGovernance onNavigate={navigate} />,

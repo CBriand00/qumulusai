@@ -124,13 +124,13 @@ function InsightItem({ text }) {
   );
 }
 
-function MiniStat({ label, value, trend, onClick }) {
+function MiniStat({ label, value, trend, onClick, active }) {
   return (
-    <div onClick={onClick} style={{ textAlign: "center", flex: 1, cursor: onClick ? "pointer" : "default", borderRadius: 8, padding: "8px 4px", transition: "background 0.15s" }}
-      onMouseEnter={e => { if (onClick) e.currentTarget.style.background = "#F0F4FF"; }}
-      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
-      <div style={{ fontSize: 22, fontWeight: 800, color: onClick ? C.blue : C.textDark }}>{value}</div>
-      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{label}</div>
+    <div onClick={onClick} style={{ textAlign: "center", flex: 1, cursor: onClick ? "pointer" : "default", borderRadius: 8, padding: "8px 4px", background: active ? "#EEF2FF" : "transparent", transition: "background 0.15s" }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.background = "#EEF2FF"; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+      <div style={{ fontSize: 22, fontWeight: 800, color: active ? C.blue : onClick ? C.textDark : C.textDark }}>{value}</div>
+      <div style={{ fontSize: 11, color: active ? C.blue : C.textMuted, marginTop: 4, fontWeight: active ? 700 : 400 }}>{label}</div>
       {trend && <div style={{ fontSize: 11, color: trend.indexOf("+") >= 0 || trend.indexOf("new") >= 0 || trend.indexOf("stable") >= 0 ? C.emerald : C.rose, marginTop: 2, fontWeight: 600 }}>{trend}</div>}
     </div>
   );
@@ -150,7 +150,29 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [asking, setAsking] = useState(false);
+  const [drilldown, setDrilldown] = useState(null);
+  const [drillData, setDrillData] = useState(null);
   const { isMobile } = useBreakpoint();
+
+  async function openDrilldown(type) {
+    if (drilldown === type) { setDrilldown(null); setDrillData(null); return; }
+    setDrilldown(type); setDrillData(null);
+    if (type === "headcount") {
+      var { data } = await supabase.from("employees").select("id, full_name, role_title, department_id, start_date, status, email").eq("status", "active").order("full_name");
+      var { data: depts } = await supabase.from("departments").select("id, name");
+      var deptMap = (depts || []).reduce(function(m, d) { m[d.id] = d.name; return m; }, {});
+      setDrillData((data || []).map(function(e) { return { ...e, department: deptMap[e.department_id] || "—" }; }));
+    } else if (type === "missing_docs") {
+      var { data } = await supabase.from("required_documents").select("document_name, status, employees(id, full_name, role_title, email)").eq("status", "missing");
+      setDrillData(data || []);
+    } else if (type === "flight_risk") {
+      var { data } = await supabase.from("flight_risk_scores").select("risk_score, risk_level, employees(id, full_name, role_title, email)").in("risk_level", ["high", "medium"]).order("risk_score", { ascending: false });
+      setDrillData(data || []);
+    } else if (type === "goals") {
+      var { data } = await supabase.from("goals").select("title, status, due_date, employees(id, full_name, role_title)").order("due_date");
+      setDrillData(data || []);
+    }
+  }
 
   useEffect(function() {
     async function loadAll() {
@@ -320,12 +342,98 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
         </div>
         <div style={{ display: "flex", gap: 16, overflowX: "auto" }}>
           <MiniStat label="New Hires" value={workforce ? workforce.newHiresLast30Days : "--"} trend="+new this month" onClick={function() { if (onNavigate) onNavigate("onboard"); }} />
-          <MiniStat label="Headcount" value={workforce ? workforce.totalHeadcount : "--"} onClick={function() { if (onNavigate) onNavigate("employee"); }} />
-          <MiniStat label="Goals Done" value={performance ? performance.completedGoals : "--"} trend={performance && performance.totalGoals ? "of " + performance.totalGoals : null} onClick={function() { if (onNavigate) onNavigate("executive"); }} />
-          <MiniStat label="Flight Risk" value={retention ? retention.highRiskCount : "0"} trend={retention && retention.highRiskCount > 0 ? "needs attention" : "stable"} onClick={function() { if (onNavigate) onNavigate("executive"); }} />
-          <MiniStat label="Missing Docs" value={compliance ? compliance.missingDocuments : "0"} trend={compliance && compliance.missingDocuments > 0 ? "action needed" : "clear"} onClick={function() { if (onNavigate) onNavigate("security"); }} />
+          <MiniStat label="Headcount" value={workforce ? workforce.totalHeadcount : "--"} onClick={function() { openDrilldown("headcount"); }} active={drilldown === "headcount"} />
+          <MiniStat label="Goals Done" value={performance ? performance.completedGoals : "--"} trend={performance && performance.totalGoals ? "of " + performance.totalGoals : null} onClick={function() { openDrilldown("goals"); }} active={drilldown === "goals"} />
+          <MiniStat label="Flight Risk" value={retention ? retention.highRiskCount : "0"} trend={retention && retention.highRiskCount > 0 ? "needs attention" : "stable"} onClick={function() { openDrilldown("flight_risk"); }} active={drilldown === "flight_risk"} />
+          <MiniStat label="Missing Docs" value={compliance ? compliance.missingDocuments : "0"} trend={compliance && compliance.missingDocuments > 0 ? "action needed" : "clear"} onClick={function() { openDrilldown("missing_docs"); }} active={drilldown === "missing_docs"} />
         </div>
       </SectionCard>
+
+      {/* DRILL-DOWN PANEL */}
+      {drilldown && (
+        <SectionCard title={
+          drilldown === "headcount" ? "Employee Census" :
+          drilldown === "missing_docs" ? "Missing Documents" :
+          drilldown === "flight_risk" ? "Flight Risk Employees" :
+          "Goals & Performance"
+        } action="✕ Close" onClick={function() { setDrilldown(null); setDrillData(null); }}>
+          {!drillData ? (
+            <div style={{ color: C.textMuted, fontSize: 13, padding: "12px 0" }}>Loading…</div>
+          ) : drilldown === "headcount" ? (
+            <div>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
+                {drillData.map(function(e) {
+                  return (
+                    <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: C.bg, borderRadius: 8 }}>
+                      <div style={{ width: 34, height: 34, borderRadius: "50%", background: C.blue + "20", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: C.blue, flexShrink: 0 }}>
+                        {e.full_name ? e.full_name.split(" ").map(function(w) { return w[0]; }).join("").slice(0,2) : "?"}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.full_name}</div>
+                        <div style={{ fontSize: 11, color: C.textMuted }}>{e.role_title} · {e.department}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {drillData.length === 0 && <p style={{ color: C.textMuted, fontSize: 13 }}>No active employees found.</p>}
+            </div>
+          ) : drilldown === "missing_docs" ? (
+            <div>
+              {drillData.length === 0 ? <p style={{ color: C.emerald, fontSize: 13, fontWeight: 600 }}>✓ All documents are on file.</p> : drillData.map(function(row, i) {
+                var emp = row.employees;
+                return (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < drillData.length - 1 ? "1px solid " + C.border : "none", flexWrap: "wrap", gap: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark }}>{emp ? emp.full_name : "Unknown"}</div>
+                      <div style={{ fontSize: 11, color: C.textMuted }}>{emp ? emp.role_title : ""}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, background: "#FEF2F2", color: C.rose, borderRadius: 6, padding: "3px 9px" }}>{row.document_name}</span>
+                      {emp && emp.email && <a href={"mailto:" + emp.email} style={{ fontSize: 11, color: C.blue, fontWeight: 600, textDecoration: "none" }}>Email →</a>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : drilldown === "flight_risk" ? (
+            <div>
+              {drillData.length === 0 ? <p style={{ color: C.emerald, fontSize: 13, fontWeight: 600 }}>✓ No high or medium flight risk employees.</p> : drillData.map(function(row, i) {
+                var emp = row.employees;
+                var color = row.risk_level === "high" ? C.rose : C.amber;
+                return (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < drillData.length - 1 ? "1px solid " + C.border : "none", flexWrap: "wrap", gap: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark }}>{emp ? emp.full_name : "Unknown"}</div>
+                      <div style={{ fontSize: 11, color: C.textMuted }}>{emp ? emp.role_title : ""}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, background: color + "15", color, borderRadius: 6, padding: "3px 9px", textTransform: "capitalize" }}>{row.risk_level} risk · {row.risk_score}</span>
+                      {emp && emp.email && <a href={"mailto:" + emp.email} style={{ fontSize: 11, color: C.blue, fontWeight: 600, textDecoration: "none" }}>Email →</a>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : drilldown === "goals" ? (
+            <div>
+              {drillData.length === 0 ? <p style={{ color: C.textMuted, fontSize: 13 }}>No goals found.</p> : drillData.map(function(row, i) {
+                var emp = row.employees;
+                var statusColor = row.status === "completed" ? C.emerald : row.status === "at_risk" ? C.rose : C.amber;
+                return (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < drillData.length - 1 ? "1px solid " + C.border : "none", flexWrap: "wrap", gap: 8 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.title}</div>
+                      <div style={{ fontSize: 11, color: C.textMuted }}>{emp ? emp.full_name + " · " + emp.role_title : ""}{row.due_date ? " · Due " + new Date(row.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}</div>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, background: statusColor + "15", color: statusColor, borderRadius: 6, padding: "3px 9px", textTransform: "capitalize", flexShrink: 0 }}>{row.status || "in_progress"}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </SectionCard>
+      )}
 
       {/* AI ASSISTANT BAR */}
       <div style={{ background: C.navy, borderRadius: 12, padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>

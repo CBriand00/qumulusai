@@ -64,28 +64,22 @@ const NAV_GROUPS = [
     id: "talent",
     label: "Talent",
     items: [
-      { id: "recruit",   label: "Recruiting",          icon: "◈", accent: C.violet },
+      { id: "recruit",   label: "Recruiting Engine",   icon: "◈", accent: C.violet },
       { id: "careers",   label: "Careers",             icon: "◉", accent: C.emerald },
       { id: "inbox",     label: "Talent Inbox",        icon: "◎", accent: C.rose },
     ],
   },
   {
-    id: "people",
-    label: "People",
+    id: "peopleops",
+    label: "People Operations",
     items: [
       { id: "employee",  label: "Employee Hub",        icon: "○", accent: C.blueLight },
       { id: "orgchart",  label: "Org Chart",           icon: "◫", accent: C.violet },
       { id: "learning",  label: "Learning",            icon: "◈", accent: C.emerald },
       { id: "onboard",   label: "Onboarding",          icon: "◎", accent: C.teal },
       { id: "manager",   label: "Manager Coach",       icon: "◇", accent: C.blue },
-    ],
-  },
-  {
-    id: "operations",
-    label: "Operations",
-    items: [
       { id: "payroll",   label: "Payroll",             icon: "◈", accent: C.teal },
-      { id: "compliance",label: "HR Compliance",       icon: "⚖", accent: C.amber },
+      { id: "compliance",label: "Compliance",          icon: "⚖", accent: C.amber },
       { id: "security",  label: "Security Center",     icon: "⚔", accent: C.blue },
     ],
   },
@@ -2199,7 +2193,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
   const [onboardingCount, setOnboardingCount] = useState(0);
-  const [groupsOpen, setGroupsOpen] = useState({ executive: true, talent: true, people: true, operations: true, communication: true });
+  const [groupsOpen, setGroupsOpen] = useState({ executive: true, talent: true, peopleops: true, communication: true });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showLoginBanner, setShowLoginBanner] = useState(() => {
     // Only show the banner immediately after a fresh sign-in, not on page refresh

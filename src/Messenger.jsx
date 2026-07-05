@@ -31,6 +31,19 @@ function slugify(s) {
   return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
 }
 
+// Bold the matched portion of a name/channel during quick-find.
+function highlight(text, q) {
+  const i = text.toLowerCase().indexOf(q);
+  if (i === -1) return text;
+  return (
+    <>
+      {text.slice(0, i)}
+      <strong style={{ color: "#7C3AED" }}>{text.slice(i, i + q.length)}</strong>
+      {text.slice(i + q.length)}
+    </>
+  );
+}
+
 export default function Messenger() {
   const [channel, setChannel]     = useState("general");
   const [messages, setMessages]   = useState([]);
@@ -44,6 +57,7 @@ export default function Messenger() {
   const [selfEmpId, setSelfEmpId] = useState(null);
   const [onboardingChannels, setOnboardingChannels] = useState([]);
   const [showNewChannel, setShowNewChannel] = useState(false);
+  const [quickFind, setQuickFind] = useState("");
   const [newChName, setNewChName] = useState("");
   const [newChDesc, setNewChDesc] = useState("");
   const [creating, setCreating]   = useState(false);
@@ -214,6 +228,13 @@ export default function Messenger() {
 
   // Resolve the current channel's display info across all sources
   const dmPeers = employees.filter(e => e.id !== selfEmpId && e.full_name !== name);
+
+  // Quick-find: filter channels, people, and onboarding threads together.
+  const q = quickFind.trim().toLowerCase();
+  const filteredChannels = q ? channels.filter(c => c.name.toLowerCase().includes(q) || (c.description || "").toLowerCase().includes(q)) : channels;
+  const filteredPeers = q ? dmPeers.filter(e => e.full_name.toLowerCase().includes(q) || (e.role_title || "").toLowerCase().includes(q)) : dmPeers;
+  const filteredOnboarding = q ? onboardingChannels.filter(c => c.label.toLowerCase().includes(q)) : onboardingChannels;
+  const noMatches = q && filteredChannels.length === 0 && filteredPeers.length === 0 && filteredOnboarding.length === 0;
   const chRow = channels.find(c => c.slug === channel);
   const obRow = onboardingChannels.find(c => c.id === channel);
   const dmPeer = channel.startsWith("dm-") ? dmPeers.find(e => channel.includes(e.id)) : null;
@@ -255,9 +276,34 @@ export default function Messenger() {
           </div>
         </div>
 
+        {/* Quick find */}
+        <div style={{ padding: "12px 12px 0" }}>
+          <div style={{ position: "relative" }}>
+            <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.muted, fontSize: 13, pointerEvents: "none" }}>⌕</span>
+            <input
+              value={quickFind}
+              onChange={e => setQuickFind(e.target.value)}
+              onKeyDown={e => { if (e.key === "Escape") setQuickFind(""); }}
+              placeholder="Find people or channels…"
+              style={{ width: "100%", boxSizing: "border-box", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 26px 8px 28px", fontSize: 12.5, color: C.text, outline: "none", fontFamily: "inherit" }}
+            />
+            {quickFind && (
+              <button onClick={() => setQuickFind("")} title="Clear"
+                style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.muted, fontSize: 12, cursor: "pointer", padding: 2, fontFamily: "inherit" }}>
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Channels */}
         <div style={{ padding: "16px 12px 8px", overflowY: "auto", flex: 1 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 8px 8px" }}>
+          {noMatches && (
+            <div style={{ padding: "16px 8px", fontSize: 12.5, color: C.muted, textAlign: "center", lineHeight: 1.6 }}>
+              No people or channels match "{quickFind}".
+            </div>
+          )}
+          <div style={{ display: (q && filteredChannels.length === 0) ? "none" : "flex", justifyContent: "space-between", alignItems: "center", padding: "0 8px 8px" }}>
             <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: "0.1em" }}>CHANNELS</span>
             <button onClick={() => setShowNewChannel(v => !v)} title="Create a new channel"
               style={{ background: showNewChannel ? C.accent : C.accent + "18", color: showNewChannel ? "#fff" : C.accent, border: "none", borderRadius: 6, width: 20, height: 20, fontSize: 14, fontWeight: 700, cursor: "pointer", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit" }}>
@@ -296,17 +342,17 @@ export default function Messenger() {
             </div>
           )}
 
-          {channels.map((ch) => (
+          {filteredChannels.map((ch) => (
             <button key={ch.slug} onClick={() => setChannel(ch.slug)} style={chanBtn(channel === ch.slug)}>
-              # {ch.name}
+              # {q ? highlight(ch.name, q) : ch.name}
             </button>
           ))}
 
           {/* Direct messages */}
-          {dmPeers.length > 0 && (
+          {filteredPeers.length > 0 && (
             <>
               <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: "0.1em", padding: "14px 8px 8px" }}>DIRECT MESSAGES</div>
-              {dmPeers.map((emp) => {
+              {filteredPeers.map((emp) => {
                 const slug = dmSlug(emp.id);
                 const active = channel === slug;
                 return (
@@ -315,17 +361,20 @@ export default function Messenger() {
                     <span style={{ width: 22, height: 22, borderRadius: "50%", background: active ? C.accent + "30" : C.border, color: active ? C.accent : C.muted, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9.5, fontWeight: 700, flexShrink: 0 }}>
                       {emp.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                     </span>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.full_name}</span>
+                    <span style={{ overflow: "hidden", minWidth: 0 }}>
+                      <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q ? highlight(emp.full_name, q) : emp.full_name}</span>
+                      {q && <span style={{ display: "block", fontSize: 10.5, color: C.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.role_title}</span>}
+                    </span>
                   </button>
                 );
               })}
             </>
           )}
 
-          {onboardingChannels.length > 0 && (
+          {filteredOnboarding.length > 0 && (
             <>
               <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: "0.1em", padding: "14px 8px 8px" }}>NEW HIRE ONBOARDING</div>
-              {onboardingChannels.map((ch) => (
+              {filteredOnboarding.map((ch) => (
                 <button key={ch.id} onClick={() => setChannel(ch.id)} style={{
                   ...chanBtn(channel === ch.id),
                   display: "flex", alignItems: "center", justifyContent: "space-between",

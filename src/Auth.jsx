@@ -713,14 +713,17 @@ export default function Auth({ onAuth }) {
           )}
         </div>
 
-        {/* ── Enterprise Security Card (sign-in + sign-up only) ── */}
-        {(view === "signin" || view === "signup") && <EnterpriseSecurityCard />}
+        {/* ── Trust line (sign-in + sign-up only) ── */}
+        {(view === "signin" || view === "signup") && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 18, fontSize: 11.5, color: C.textMuted }}>
+            <span style={{ fontSize: 12 }}>🔒</span>
+            <span>End-to-end encrypted · Audit logged · Enterprise-grade security</span>
+          </div>
+        )}
 
         {/* ── Footer ── */}
-        <p style={{ textAlign: "center", marginTop: 22, fontSize: 11, color: C.textMuted, lineHeight: 1.5 }}>
-          © 2026 QumulusAI · Enterprise AI Workforce Platform
-          <br />
-          <span style={{ fontSize: 10 }}>Your data is encrypted in transit and at rest.</span>
+        <p style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: C.textMuted }}>
+          © 2026 QumulusAI
         </p>
       </div>
     </div>

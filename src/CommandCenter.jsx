@@ -152,6 +152,7 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
   const [asking, setAsking] = useState(false);
   const [drilldown, setDrilldown] = useState(null);
   const [drillData, setDrillData] = useState(null);
+  const [exporting, setExporting] = useState(false);
   const { isMobile } = useBreakpoint();
 
   async function openDrilldown(type) {
@@ -182,6 +183,80 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
       var rows = Object.values(byEmp).sort(function(a, b) { return a.allDone === b.allDone ? 0 : a.allDone ? -1 : 1; });
       setDrillData(rows);
     }
+  }
+
+  async function downloadCensus() {
+    setExporting(true);
+    try {
+      var results = await Promise.all([
+        supabase.from("employees").select("id, full_name, email, role_title, department_id, status, start_date").order("full_name"),
+        supabase.from("departments").select("id, name"),
+        supabase.from("compensation_bands").select("role_title, min_salary, max_salary, currency"),
+        supabase.from("employee_onboarding_docs").select("employee_id, w4_filing_status, w4_dependents, dd_bank_name, dd_account_type, i9_address, i9_city, i9_state, i9_zip, i9_dob, i9_ssn_last4, i9_phone, i9_email, i9_attestation, status"),
+        supabase.from("pay_stubs").select("employee_id, gross_pay, federal_tax, state_tax, social_security, medicare, net_pay, pay_period_end").order("pay_period_end", { ascending: false }),
+        supabase.from("engagement_scores").select("employee_id, score, recorded_at").order("recorded_at", { ascending: false }),
+        supabase.from("flight_risk_scores").select("employee_id, risk_level, risk_score, computed_at").order("computed_at", { ascending: false }),
+      ]);
+      var emps = results[0].data || [];
+      var deptMap = (results[1].data || []).reduce(function(m, d) { m[d.id] = d.name; return m; }, {});
+      var bandMap = (results[2].data || []).reduce(function(m, b) { m[b.role_title] = b; return m; }, {});
+      var docMap = (results[3].data || []).reduce(function(m, d) { if (!m[d.employee_id]) m[d.employee_id] = d; return m; }, {});
+      var stubMap = (results[4].data || []).reduce(function(m, s) { if (!m[s.employee_id]) m[s.employee_id] = s; return m; }, {});
+      var engMap = (results[5].data || []).reduce(function(m, e) { if (!m[e.employee_id]) m[e.employee_id] = e; return m; }, {});
+      var riskMap = (results[6].data || []).reduce(function(m, r) { if (!m[r.employee_id]) m[r.employee_id] = r; return m; }, {});
+
+      var today = new Date();
+      var attestLabels = { citizen: "U.S. Citizen", noncitizen_national: "Noncitizen National", lawful_permanent_resident: "Permanent Resident", alien_authorized: "Authorized Alien" };
+
+      var headers = [
+        "Employee ID", "Full Name", "Work Email", "Personal Email", "Phone", "Date of Birth", "SSN (Last 4)",
+        "Home Address", "City", "State", "ZIP", "Work Authorization",
+        "Department", "Job Title", "Employment Status", "Start Date", "Tenure (Years)",
+        "Salary Band Min", "Salary Band Max", "Est. Annual Salary", "Currency",
+        "Latest Gross Pay", "Federal Tax", "State Tax", "Social Security", "Medicare", "Latest Net Pay",
+        "W-4 Filing Status", "W-4 Dependents", "Direct Deposit Bank", "Account Type",
+        "Engagement Score", "Flight Risk Level", "Flight Risk Score", "Onboarding Doc Status",
+      ];
+
+      var rows = emps.map(function(e) {
+        var doc = docMap[e.id] || {};
+        var band = bandMap[e.role_title] || {};
+        var stub = stubMap[e.id] || {};
+        var eng = engMap[e.id] || {};
+        var risk = riskMap[e.id] || {};
+        var tenure = e.start_date ? ((today - new Date(e.start_date)) / (365.25 * 86400000)).toFixed(1) : "";
+        var estSalary = stub.gross_pay ? Math.round(stub.gross_pay * 12) : (band.min_salary && band.max_salary ? Math.round((band.min_salary + band.max_salary) / 2) : "");
+        return [
+          e.id, e.full_name, e.email, doc.i9_email || "", doc.i9_phone || "",
+          doc.i9_dob || "", doc.i9_ssn_last4 ? "XXX-XX-" + doc.i9_ssn_last4 : "",
+          doc.i9_address || "", doc.i9_city || "", doc.i9_state || "", doc.i9_zip || "",
+          attestLabels[doc.i9_attestation] || "",
+          deptMap[e.department_id] || "", e.role_title, e.status, e.start_date || "", tenure,
+          band.min_salary || "", band.max_salary || "", estSalary, band.currency || "USD",
+          stub.gross_pay || "", stub.federal_tax || "", stub.state_tax || "", stub.social_security || "", stub.medicare || "", stub.net_pay || "",
+          doc.w4_filing_status || "", doc.w4_dependents != null ? doc.w4_dependents : "", doc.dd_bank_name || "", doc.dd_account_type || "",
+          eng.score != null ? eng.score : "", risk.risk_level || "", risk.risk_score != null ? risk.risk_score : "", doc.status || "not started",
+        ];
+      });
+
+      function esc(v) {
+        var s = v == null ? "" : String(v);
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      }
+      var csv = "﻿" + [headers].concat(rows).map(function(r) { return r.map(esc).join(","); }).join("\r\n");
+      var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "QumulusAI_Employee_Census_" + today.toISOString().split("T")[0] + ".csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Census export failed", err);
+    }
+    setExporting(false);
   }
 
 
@@ -372,6 +447,13 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
             <div style={{ color: C.textMuted, fontSize: 13, padding: "12px 0" }}>Loading…</div>
           ) : drilldown === "headcount" ? (
             <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+                <div style={{ fontSize: 12, color: C.textMuted }}>{drillData.length} active employee{drillData.length !== 1 ? "s" : ""} · full census includes demographics, job, and pay profile</div>
+                <button onClick={function(ev) { ev.stopPropagation(); downloadCensus(); }} disabled={exporting}
+                  style={{ fontSize: 12, fontWeight: 700, padding: "8px 16px", borderRadius: 8, background: exporting ? C.textMuted : C.emerald, color: "#fff", border: "none", cursor: exporting ? "default" : "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  {exporting ? "Preparing…" : "⬇ Download Census (Excel)"}
+                </button>
+              </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))", gap: 10 }}>
                 {drillData.map(function(e) {
                   return (

@@ -16,19 +16,21 @@ import Payroll from "./Payroll";
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
-  bg:           "#F0F2F7",
+  // Surface/text/border tokens aligned to the design system (src/theme.js).
+  bg:           "#F6F7F9",
   bgCard:       "#FFFFFF",
   bgSidebar:    "#080D1A",
   bgSidebarHov: "#0F1828",
   bgActive:     "#0A2540",
 
   textDark:     "#0D1117",
-  textMid:      "#3D4B5C",
-  textMuted:    "#7E8FA3",
+  textMid:      "#48566A",
+  textMuted:    "#8A97A8",
   textOnDark:   "#E8EEF8",
   textMutedDark:"#4A6080",
 
-  border:       "#DDE3ED",
+  border:       "#E9ECF1",
+  borderStrong: "#DCE0E7",
   borderDark:   "#0F1E30",
 
   cyan:         "#00C2E0",
@@ -207,7 +209,7 @@ function useOnboardingPipeline() {
 // ─── Shared UI Components ─────────────────────────────────────────────────────
 function Card({ children, style, ...rest }) {
   return (
-    <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: 22, ...style }} {...rest}>
+    <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: 22, boxShadow: "0 1px 2px rgba(15,23,42,0.04)", ...style }} {...rest}>
       {children}
     </div>
   );

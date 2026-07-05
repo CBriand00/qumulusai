@@ -1787,6 +1787,12 @@ function Learning({ onNavigate, focus }) {
 
   useEffect(() => { if (focus === "gaps") setShowGaps(true); }, [focus]);
 
+  // The drill panel renders above the course lists — bring it into view when a
+  // course is selected so the click visibly lands somewhere.
+  useEffect(() => {
+    if (drill) setTimeout(() => document.getElementById("learning-drill")?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+  }, [drill]);
+
   if (!data) return <div><SectionHeader icon="◈" accent={C.emerald} title="Learning" subtitle="Required compliance and role-based training." /><Card><p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading training data…</p></Card></div>;
 
   const { courses } = data;
@@ -2040,7 +2046,7 @@ function Learning({ onNavigate, focus }) {
 
       {/* Drill-down */}
       {drillCourse && (
-        <Card style={{ marginBottom: 14, borderColor: `${C.emerald}40` }}>
+        <Card id="learning-drill" style={{ marginBottom: 14, borderColor: `${C.emerald}40` }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             <Label color={C.emerald} style={{ marginBottom: 0 }}>{drillCourse.name} — {drillCourse.missing.length} outstanding</Label>
             <div style={{ display: "flex", gap: 8 }}>

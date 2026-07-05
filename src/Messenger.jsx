@@ -65,7 +65,16 @@ export default function Messenger() {
         const unique = [...new Set(data.map(m => m.channel))].sort().reverse();
         setOnboardingChannels(unique.map(id => ({
           id,
-          label: "🎉 " + id.replace("onboarding-", "").replace(/-/g, " "),
+          label: (() => {
+            const parts = id.replace("onboarding-", "").split("-");
+            const dateParts = parts.slice(-3);
+            const nameParts = parts.slice(0, -3);
+            const name = nameParts.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+            const date = dateParts.length === 3
+              ? new Date(`${dateParts[0]}-${dateParts[1]}-${dateParts[2]}`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+              : dateParts.join("-");
+            return `🎉 ${name} · ${date}`;
+          })(),
           desc: "New hire onboarding coordination",
           isOnboarding: true,
         })));

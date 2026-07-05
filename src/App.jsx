@@ -449,7 +449,7 @@ Be specific. Avoid generic language.`;
 
   return (
     <div>
-      <SectionHeader icon="◈" accent={C.violet} tag="Pillar One" title="AI Recruiting Engine" subtitle="From hiring need to accepted offer — one intelligent workflow. No admin. No gaps. No guesswork." />
+      <SectionHeader icon="◈" accent={C.violet} title="AI Recruiting Engine" subtitle="From hiring need to accepted offer — one intelligent workflow. No admin. No gaps. No guesswork." />
 
       {/* Pipeline */}
       <Card style={{ marginBottom: 16 }}>
@@ -581,7 +581,7 @@ function OnboardingConcierge() {
 
   return (
     <div>
-      <SectionHeader icon="◎" accent={C.teal} tag="Pillar Two" title="AI Onboarding Concierge" subtitle="Live onboarding tracker and AI-powered 30-60-90 plans." />
+      <SectionHeader icon="◎" accent={C.teal} title="AI Onboarding Concierge" subtitle="Live onboarding tracker and AI-powered 30-60-90 plans." />
 
       {onboardingEmployees.length > 0 ? (
         <Card style={{ marginBottom: 14 }}>
@@ -653,7 +653,7 @@ function ManagerCoach() {
 
   return (
     <div>
-      <SectionHeader icon="◇" accent={C.blue} tag="Pillar Three" title="AI Manager Coach" subtitle="Your AI leadership partner — preparation, coaching, documentation, and team intelligence." />
+      <SectionHeader icon="◇" accent={C.blue} title="AI Manager Coach" subtitle="Your AI leadership partner — preparation, coaching, documentation, and team intelligence." />
 
       <Card style={{ marginBottom: 14 }}>
         <Label color={C.blue}>Team Health — Direct Reports</Label>
@@ -795,7 +795,7 @@ function EmployeeHub() {
 
   return (
     <div>
-      <SectionHeader icon="○" accent={C.blueLight} tag="Pillar Four" title="Employee Hub & Performance" subtitle="Performance reviews, goal tracking, and instant HR answers." />
+      <SectionHeader icon="○" accent={C.blueLight} title="Employee Hub & Performance" subtitle="Performance reviews, goal tracking, and instant HR answers." />
 
       <Card style={{ marginBottom: 14 }}>
         <Label color={C.blueLight}>Performance Review</Label>
@@ -879,7 +879,7 @@ function WorkforceIntel() {
 
   return (
     <div>
-      <SectionHeader icon="◆" accent={C.amber} tag="Pillar Five" title="Workforce Intelligence" subtitle="Predictive dashboards, attrition signals, headcount planning, and AI-generated executive recommendations." />
+      <SectionHeader icon="◆" accent={C.amber} title="Workforce Intelligence" subtitle="Predictive dashboards, attrition signals, headcount planning, and AI-generated executive recommendations." />
 
       {/* KPI grid — 2 cols on mobile, auto-fit on desktop */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>

@@ -51,7 +51,6 @@ export default function SecurityActivity({ user }) {
   return (
     <div>
       <div style={{ marginBottom: 26 }}>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#2563EB12", border: "1px solid #2563EB30", borderRadius: 100, padding: "5px 14px", marginBottom: 14, fontSize: 10, fontWeight: 800, color: C.brand, letterSpacing: "0.12em", textTransform: "uppercase" }}>⚔ Security Center</div>
         <h2 style={{ fontSize: isMobile ? 20 : 24, fontWeight: 800, color: C.text, margin: "0 0 6px", letterSpacing: "-0.02em" }}>Security Activity</h2>
         <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Monitor your account access, devices, and security events.</p>
       </div>

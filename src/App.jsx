@@ -79,6 +79,7 @@ const NAV_GROUPS = [
       { id: "onboard",   label: "Onboarding",          icon: "◎", accent: C.teal },
       { id: "manager",   label: "Manager Coach",       icon: "◇", accent: C.blue },
       { id: "payroll",   label: "Payroll",             icon: "◈", accent: C.teal },
+      { id: "comp",      label: "Compensation",        icon: "◆", accent: C.amber },
       { id: "compliance",label: "Compliance",          icon: "⚖", accent: C.amber },
       { id: "security",  label: "Security Center",     icon: "⚔", accent: C.blue },
     ],
@@ -2090,6 +2091,210 @@ function Learning({ onNavigate, focus }) {
   );
 }
 
+// ─── COMPENSATION & EQUITY GOVERNANCE ─────────────────────────────────────────
+// Job level derived from title; equity targets are the framework's guidance
+// bands (demo values pending comp-committee ratification).
+const COMP_LEVELS = [
+  { key: "E",  label: "Executive",              test: t => /chief|vp|vice president/.test(t),            equityTarget: "0.50% – 1.50%" },
+  { key: "L3", label: "Lead / Manager",         test: t => /lead|architect|head|director|manager/.test(t), equityTarget: "0.10% – 0.25%" },
+  { key: "L2", label: "Senior IC",              test: t => /senior/.test(t),                             equityTarget: "0.05% – 0.10%" },
+  { key: "L1", label: "Individual Contributor", test: () => true,                                        equityTarget: "0.02% – 0.05%" },
+];
+function compLevel(title) {
+  const t = (title || "").toLowerCase();
+  return COMP_LEVELS.find(l => l.test(t));
+}
+// Standard 4-year monthly vest with a 1-year cliff, from start date.
+function vestedFraction(startDate) {
+  if (!startDate) return 0;
+  const months = Math.floor((Date.now() - new Date(startDate).getTime()) / (30.44 * 86400000));
+  if (months < 12) return 0;
+  return Math.min(1, months / 48);
+}
+
+function Compensation({ onNavigate }) {
+  const { isMobile } = useBreakpoint();
+  const [emps, setEmps] = useState(null);
+  const [bands, setBands] = useState([]);
+  const [drill, setDrill] = useState(null); // { key, title, members: [{emp, extra}] }
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from("employees").select("*").eq("status", "active").order("full_name"),
+      supabase.from("compensation_bands").select("*"),
+    ]).then(([{ data: e }, { data: b }]) => { setEmps(e || []); setBands(b || []); });
+  }, []);
+
+  if (!emps) return <div><SectionHeader icon="◈" accent={C.amber} title="Compensation" subtitle="Levels, pay bands, equity, and vesting." /><Card><p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading compensation data…</p></Card></div>;
+
+  const fmt$ = n => n != null ? "$" + Math.round(Number(n)).toLocaleString("en-US") : "—";
+  const bandFor = title => bands.find(b => b.role_title === title);
+
+  // Level framework rows
+  const levelRows = COMP_LEVELS.map(l => {
+    const members = emps.filter(e => compLevel(e.role_title)?.key === l.key);
+    const sals = members.map(e => Number(e.base_salary)).filter(Boolean);
+    return { ...l, members, low: sals.length ? Math.min(...sals) : null, high: sals.length ? Math.max(...sals) : null };
+  });
+
+  // Pay band rows (one per role with a band)
+  const roleRows = [...new Set(emps.map(e => e.role_title))].map(title => {
+    const members = emps.filter(e => e.role_title === title);
+    const band = bandFor(title);
+    const sals = members.map(e => Number(e.base_salary)).filter(Boolean);
+    const avg = sals.length ? sals.reduce((s, v) => s + v, 0) / sals.length : null;
+    const mid = band ? (Number(band.min_salary) + Number(band.max_salary)) / 2 : null;
+    const compa = avg && mid ? avg / mid : null;
+    return { title, members, band, avg, compa };
+  }).sort((a, b) => (b.avg || 0) - (a.avg || 0));
+
+  // Equity + vesting
+  const totalUnits = emps.reduce((s, e) => s + Number(e.equity_units || 0), 0);
+  const totalVested = emps.reduce((s, e) => s + Number(e.equity_units || 0) * vestedFraction(e.start_date), 0);
+  const totalPayroll = emps.reduce((s, e) => s + Number(e.base_salary || 0), 0);
+  const compas = roleRows.map(r => r.compa).filter(Boolean);
+  const avgCompa = compas.length ? compas.reduce((s, v) => s + v, 0) / compas.length : null;
+  const marketPos = c => c == null ? { label: "No band", color: C.textMuted } : c < 0.9 ? { label: "Below market", color: C.rose } : c > 1.1 ? { label: "Above market", color: C.violet } : { label: "At market", color: C.emerald };
+
+  const openDrill = (key, title, members) => setDrill(d => d?.key === key ? null : { key, title, members });
+
+  return (
+    <div>
+      <SectionHeader icon="◈" accent={C.amber} title="Compensation" subtitle="Job levels, pay bands, market position, and equity governance. Every number drills into the people behind it." />
+
+      {/* Summary */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 14 }}>
+        {[
+          { label: "Annual Base Payroll", value: fmt$(totalPayroll), color: C.amber, onClick: () => openDrill("all", "All Employees — Base Salary", emps.map(e => ({ emp: e, extra: fmt$(e.base_salary) }))) },
+          { label: "Avg Compa-Ratio", value: avgCompa ? avgCompa.toFixed(2) : "—", color: marketPos(avgCompa).color, onClick: () => document.getElementById("comp-bands")?.scrollIntoView({ behavior: "smooth" }) },
+          { label: "Equity Units Granted", value: Math.round(totalUnits).toLocaleString(), color: C.violet, onClick: () => document.getElementById("comp-equity")?.scrollIntoView({ behavior: "smooth" }) },
+          { label: "Units Vested", value: Math.round(totalVested).toLocaleString(), color: C.emerald, onClick: () => document.getElementById("comp-equity")?.scrollIntoView({ behavior: "smooth" }) },
+        ].map(m => (
+          <Card key={m.label} onClick={m.onClick} title="Drill in"
+            style={{ padding: "16px 18px", textAlign: "center", cursor: "pointer", transition: "border-color 0.15s" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = m.color; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}>
+            <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{m.label}</div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: m.color, textDecoration: "underline", textDecorationColor: `${m.color}50`, textUnderlineOffset: 3 }}>{m.value}</div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Drill panel */}
+      {drill && (
+        <Card style={{ marginBottom: 14, borderColor: `${C.amber}50` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <Label color={C.amber} style={{ marginBottom: 0 }}>{drill.title} · {drill.members.length}</Label>
+            <button onClick={() => setDrill(null)} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>✕ Close</button>
+          </div>
+          {drill.members.map(({ emp, extra }, i) => (
+            <div key={emp.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < drill.members.length - 1 ? `1px solid ${C.border}` : "none", gap: 8 }}>
+              <span onClick={() => onNavigate && onNavigate("employee", emp.id)} style={{ fontSize: 13, fontWeight: 600, color: C.textDark, cursor: "pointer" }}>
+                {emp.full_name} <span style={{ fontWeight: 400, color: C.textMuted, fontSize: 11 }}>· {emp.role_title}</span>
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: C.textDark, whiteSpace: "nowrap" }}>{extra}</span>
+            </div>
+          ))}
+        </Card>
+      )}
+
+      {/* Leveling framework */}
+      <Card style={{ marginBottom: 14 }}>
+        <Label color={C.amber}>Leveling Framework</Label>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#F8FAFC" }}>
+                {["Level", "Definition", "Headcount", "Salary Range (actual)", "Equity Target"].map((h, hi) => (
+                  <th key={h} style={{ padding: "10px 12px", textAlign: hi >= 2 ? "center" : "left", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {levelRows.map(l => (
+                <tr key={l.key} style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <td style={{ padding: "11px 12px", fontWeight: 800, color: C.amber }}>{l.key}</td>
+                  <td style={{ padding: "11px 12px", color: C.textDark, fontWeight: 600 }}>{l.label}</td>
+                  <td onClick={() => l.members.length && openDrill(`lvl-${l.key}`, `${l.label} (${l.key})`, l.members.map(e => ({ emp: e, extra: fmt$(e.base_salary) })))}
+                    style={{ padding: "11px 12px", textAlign: "center", color: C.blue, fontWeight: 700, cursor: l.members.length ? "pointer" : "default", textDecoration: l.members.length ? "underline" : "none", textDecorationStyle: "dotted", textUnderlineOffset: 3 }}>
+                    {l.members.length || "—"}
+                  </td>
+                  <td style={{ padding: "11px 12px", textAlign: "center", color: C.textMid, whiteSpace: "nowrap" }}>{l.low ? `${fmt$(l.low)} – ${fmt$(l.high)}` : "—"}</td>
+                  <td style={{ padding: "11px 12px", textAlign: "center", color: C.violet, fontWeight: 600, whiteSpace: "nowrap" }}>{l.equityTarget}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Pay bands */}
+      <div id="comp-bands" />
+      <Card style={{ marginBottom: 14 }}>
+        <Label color={C.amber}>Pay Bands & Market Position</Label>
+        <p style={{ fontSize: 11.5, color: C.textMuted, margin: "0 0 12px" }}>Compa-ratio = average actual salary ÷ band midpoint. 0.90–1.10 is considered at market.</p>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#F8FAFC" }}>
+                {["Role", "HC", "Band Low", "Band High", "Avg Salary", "Compa", "Market Position"].map((h, hi) => (
+                  <th key={h} style={{ padding: "10px 12px", textAlign: hi === 0 ? "left" : "center", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {roleRows.map(r => {
+                const pos = marketPos(r.compa);
+                return (
+                  <tr key={r.title} style={{ borderBottom: `1px solid ${C.border}` }}>
+                    <td style={{ padding: "11px 12px", fontWeight: 600, color: C.textDark }}>{r.title}</td>
+                    <td onClick={() => openDrill(`role-${r.title}`, r.title, r.members.map(e => ({ emp: e, extra: fmt$(e.base_salary) })))}
+                      style={{ padding: "11px 12px", textAlign: "center", color: C.blue, fontWeight: 700, cursor: "pointer", textDecoration: "underline", textDecorationStyle: "dotted", textUnderlineOffset: 3 }}>{r.members.length}</td>
+                    <td style={{ padding: "11px 12px", textAlign: "center", color: C.textMid, whiteSpace: "nowrap" }}>{r.band ? fmt$(r.band.min_salary) : "—"}</td>
+                    <td style={{ padding: "11px 12px", textAlign: "center", color: C.textMid, whiteSpace: "nowrap" }}>{r.band ? fmt$(r.band.max_salary) : "—"}</td>
+                    <td style={{ padding: "11px 12px", textAlign: "center", fontWeight: 700, color: C.textDark, whiteSpace: "nowrap" }}>{fmt$(r.avg)}</td>
+                    <td style={{ padding: "11px 12px", textAlign: "center", fontWeight: 700, color: pos.color }}>{r.compa ? r.compa.toFixed(2) : "—"}</td>
+                    <td style={{ padding: "11px 12px", textAlign: "center" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, background: `${pos.color}12`, color: pos.color, borderRadius: 20, padding: "3px 10px", whiteSpace: "nowrap" }}>{pos.label}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Equity & vesting */}
+      <div id="comp-equity" />
+      <Card>
+        <Label color={C.violet}>Equity Grants & Vesting</Label>
+        <p style={{ fontSize: 11.5, color: C.textMuted, margin: "0 0 12px" }}>Standard 4-year monthly vesting with a 1-year cliff, measured from start date.</p>
+        {emps.filter(e => Number(e.equity_units) > 0).map((e, i, arr) => {
+          const frac = vestedFraction(e.start_date);
+          const units = Number(e.equity_units);
+          return (
+            <div key={e.id} style={{ padding: "10px 0", borderBottom: i < arr.length - 1 ? `1px solid ${C.border}` : "none" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5, gap: 8, flexWrap: "wrap" }}>
+                <span onClick={() => onNavigate && onNavigate("employee", e.id)} style={{ fontSize: 13, fontWeight: 600, color: C.textDark, cursor: "pointer" }}>
+                  {e.full_name} <span style={{ fontWeight: 400, color: C.textMuted, fontSize: 11 }}>· granted {new Date(e.start_date).toLocaleDateString("en-US", { month: "short", year: "numeric" })}</span>
+                </span>
+                <span style={{ fontSize: 12.5, color: C.textMid, whiteSpace: "nowrap" }}>
+                  <strong style={{ color: C.violet }}>{Math.round(units * frac).toLocaleString()}</strong> / {units.toLocaleString()} vested · {Math.round(frac * 100)}%
+                </span>
+              </div>
+              <div style={{ height: 6, background: C.border, borderRadius: 4 }}>
+                <div style={{ width: `${Math.round(frac * 100)}%`, height: "100%", borderRadius: 4, background: frac === 0 ? C.amber : C.violet }} />
+              </div>
+              {frac === 0 && <div style={{ fontSize: 10.5, color: C.amber, marginTop: 3 }}>Pre-cliff — vesting begins at 12 months</div>}
+            </div>
+          );
+        })}
+      </Card>
+    </div>
+  );
+}
+
 // ─── HR COMPLIANCE & EEO REPORTING ────────────────────────────────────────────
 function eeoCategory(title) {
   const t = (title || "").toLowerCase();
@@ -2544,6 +2749,7 @@ export default function App() {
     orgchart:  <OrgChart onNavigate={navigate} />,
     diversity: <Diversity onNavigate={navigate} />,
     learning:  <Learning onNavigate={navigate} focus={focusEmpId} />,
+    comp:      <Compensation onNavigate={navigate} />,
     compliance:<HRCompliance onNavigate={navigate} />,
     executive: <WorkforceIntel onNavigate={navigate} />,
     careers:   <CareersPortal />,

@@ -1756,13 +1756,16 @@ function useTrainingData() {
       ]);
       const stateMap = (docs || []).reduce((m, d) => { if (d.i9_state) m[d.employee_id] = d.i9_state; return m; }, {});
       const done = new Set((records || []).filter(r => r.status === "completed").map(r => `${r.employee_id}|${r.training_name}`));
+      // Any record (pending or completed) counts as an assignment — manual
+      // assignments extend the catalog-derived requirement set.
+      const assigned = new Set((records || []).map(r => `${r.employee_id}|${r.training_name}`));
       const courseRows = (courses || []).map(c => {
-        const required = (emps || []).filter(e => courseAppliesTo(c, e, stateMap[e.id]));
+        const required = (emps || []).filter(e => courseAppliesTo(c, e, stateMap[e.id]) || assigned.has(`${e.id}|${c.name}`));
         const completed = required.filter(e => done.has(`${e.id}|${c.name}`));
         const missing = required.filter(e => !done.has(`${e.id}|${c.name}`));
         return { ...c, required, completed, missing };
       });
-      setData({ employees: emps || [], courses: courseRows, stateMap });
+      setData({ employees: emps || [], courses: courseRows, stateMap, assigned });
     }
     load();
   }, [reload]);
@@ -1774,6 +1777,11 @@ function Learning({ onNavigate }) {
   const [data, refresh] = useTrainingData();
   const [drill, setDrill] = useState(null); // course name
   const [marking, setMarking] = useState(null);
+  const [showAssign, setShowAssign] = useState(false);
+  const [assignCourse, setAssignCourse] = useState("");
+  const [assignEmps, setAssignEmps] = useState({});
+  const [assigning, setAssigning] = useState(false);
+  const [assignedMsg, setAssignedMsg] = useState("");
 
   if (!data) return <div><SectionHeader icon="◈" accent={C.emerald} title="Learning" subtitle="Required compliance and role-based training." /><Card><p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading training data…</p></Card></div>;
 
@@ -1803,6 +1811,29 @@ function Learning({ onNavigate }) {
     const subject = encodeURIComponent(`Required Training: ${course.name}`);
     const body = encodeURIComponent(`Hi team,\n\nOur records show you haven't completed "${course.name}" yet. This training is required${course.state !== "ALL" ? ` for ${course.state} employees` : ""} — please complete it as soon as possible.\n\nThank you!`);
     window.open(`mailto:${emails.join(",")}?subject=${subject}&body=${body}`);
+  }
+
+  async function assignTraining() {
+    const course = courses.find(c => c.name === assignCourse);
+    const targets = data.employees.filter(e => assignEmps[e.id]);
+    if (!course || targets.length === 0) return;
+    setAssigning(true);
+    // Skip anyone who already has a record for this course
+    const fresh = targets.filter(e => !data.assigned.has(`${e.id}|${course.name}`));
+    if (fresh.length > 0) {
+      await supabase.from("training_records").insert(fresh.map(e => ({
+        employee_id: e.id,
+        organization_id: "00000000-0000-0000-0000-000000000001",
+        training_name: course.name,
+        status: "pending",
+      })));
+    }
+    setAssigning(false);
+    setAssignedMsg(`Assigned "${course.name}" to ${fresh.length} employee${fresh.length !== 1 ? "s" : ""}${targets.length - fresh.length > 0 ? ` (${targets.length - fresh.length} already had it)` : ""}.`);
+    setAssignEmps({});
+    setShowAssign(false);
+    refresh();
+    setTimeout(() => setAssignedMsg(""), 5000);
   }
 
   const CourseSection = ({ title, list, accent, note }) => (
@@ -1839,7 +1870,66 @@ function Learning({ onNavigate }) {
 
   return (
     <div>
-      <SectionHeader icon="◈" accent={C.emerald} title="Learning" subtitle="Required compliance training by state, plus role-specific requirements. Click any course to see who's outstanding." />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <SectionHeader icon="◈" accent={C.emerald} title="Learning" subtitle="Required compliance training by state, plus role-specific requirements. Click any course to see who's outstanding." />
+        <button onClick={() => setShowAssign(v => !v)}
+          style={{ background: showAssign ? C.bg : C.emerald, color: showAssign ? C.textMid : "#fff", border: showAssign ? `1px solid ${C.border}` : "none", borderRadius: 9, padding: "10px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+          {showAssign ? "✕ Cancel" : "＋ Assign Training"}
+        </button>
+      </div>
+
+      {assignedMsg && (
+        <div style={{ background: "#ECFDF5", border: "1px solid #BBF7D0", borderRadius: 10, padding: "11px 16px", marginBottom: 14, fontSize: 13, color: "#059669", fontWeight: 600 }}>
+          ✓ {assignedMsg}
+        </div>
+      )}
+
+      {showAssign && (
+        <Card style={{ marginBottom: 14, borderColor: `${C.emerald}40` }}>
+          <Label color={C.emerald}>Assign Training</Label>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Course</label>
+            <select value={assignCourse} onChange={e => setAssignCourse(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", marginTop: 6, padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, color: C.textDark, background: C.bg, outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
+              <option value="">Select a course…</option>
+              <optgroup label="Compliance">
+                {compliance.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </optgroup>
+              <optgroup label="Role-Based">
+                {roleBased.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </optgroup>
+            </select>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Employees · {Object.values(assignEmps).filter(Boolean).length} selected</label>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setAssignEmps(data.employees.reduce((m, e) => { m[e.id] = true; return m; }, {}))}
+                style={{ background: "none", border: "none", color: C.emerald, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Select all</button>
+              <button onClick={() => setAssignEmps({})}
+                style={{ background: "none", border: "none", color: C.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Clear</button>
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(220px, 1fr))", gap: 6, marginBottom: 14 }}>
+            {data.employees.map(e => {
+              const already = assignCourse && data.assigned.has(`${e.id}|${assignCourse}`);
+              const checked = !!assignEmps[e.id];
+              return (
+                <label key={e.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, cursor: already ? "default" : "pointer", background: checked ? `${C.emerald}0E` : C.bg, border: `1px solid ${checked ? C.emerald : C.border}`, opacity: already ? 0.5 : 1, fontSize: 13, color: C.textDark }}>
+                  <input type="checkbox" checked={checked} disabled={already}
+                    onChange={ev => setAssignEmps(p => ({ ...p, [e.id]: ev.target.checked }))}
+                    style={{ accentColor: C.emerald, cursor: "pointer" }} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{e.full_name}</span>
+                  {already && <span style={{ fontSize: 9.5, fontWeight: 700, color: C.textMuted, flexShrink: 0 }}>ASSIGNED</span>}
+                </label>
+              );
+            })}
+          </div>
+          <button onClick={assignTraining} disabled={assigning || !assignCourse || Object.values(assignEmps).filter(Boolean).length === 0}
+            style={{ background: C.emerald, color: "#fff", border: "none", borderRadius: 8, padding: "11px 22px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: (!assignCourse || Object.values(assignEmps).filter(Boolean).length === 0) ? 0.5 : 1 }}>
+            {assigning ? "Assigning…" : "Assign to Selected"}
+          </button>
+        </Card>
+      )}
 
       {/* Summary */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 14 }}>

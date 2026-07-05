@@ -272,6 +272,19 @@ export default function NewHirePortal({ token }) {
       }
     }
     await supabase.from("employee_onboarding_docs").update({ status: "complete" }).eq("id", doc.id);
+    // Auto-assign the New Hire Onboarding Checklist training (skip if already assigned at hire)
+    try {
+      const { data: existing } = await supabase.from("training_records")
+        .select("id").eq("employee_id", employee.id).eq("training_name", "New Hire Onboarding Checklist").limit(1);
+      if (!existing || existing.length === 0) {
+        await supabase.from("training_records").insert({
+          employee_id: employee.id,
+          organization_id: "00000000-0000-0000-0000-000000000001",
+          training_name: "New Hire Onboarding Checklist",
+          status: "pending",
+        });
+      }
+    } catch (_) { /* non-blocking */ }
     // Fire onboarding channel automation (non-blocking)
     triggerOnboardingChannel({ doc, employee, w4, dd }).catch(console.error);
     // Create employee login account and send welcome email (non-blocking)

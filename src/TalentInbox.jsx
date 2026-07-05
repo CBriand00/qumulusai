@@ -64,14 +64,23 @@ export default function TalentInbox() {
     if (newStatus === "hired") {
       const app = apps.find((a) => a.id === id);
       if (app) {
-        await supabase.from("employees").insert({
+        const { data: newEmp } = await supabase.from("employees").insert({
           full_name: app.full_name,
           email: app.email,
           role_title: app.role_title,
           application_id: app.id,
           status: "active",
           start_date: new Date().toISOString().slice(0, 10),
-        });
+        }).select().single();
+        // Auto-assign the New Hire Onboarding Checklist training
+        if (newEmp?.id) {
+          await supabase.from("training_records").insert({
+            employee_id: newEmp.id,
+            organization_id: "00000000-0000-0000-0000-000000000001",
+            training_name: "New Hire Onboarding Checklist",
+            status: "pending",
+          });
+        }
       }
     }
     setUpdating(null);

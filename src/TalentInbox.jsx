@@ -541,7 +541,9 @@ function OfferLetter({ app }) {
     const midBonus = Math.round(Number(l.mid_salary) * Number(l.bonus_target_pct) / 100);
     setSalary(fmt(l.mid_salary));
     setBonus(`${Number(l.bonus_target_pct)}% annual target (~${fmt(midBonus)})`);
-    setRsu(`${Number(l.rsu_low).toLocaleString()} RSUs vesting over 4 years (1-year cliff)`);
+    setRsu(l.rsu_basis === "pct_base"
+      ? `${Number(l.rsu_low)}% of base in RSUs annually (~${fmt(Math.round(Number(l.mid_salary) * Number(l.rsu_low) / 100))}), 4-year vest with 1-year cliff`
+      : `${Number(l.rsu_low).toLocaleString()} RSUs vesting over 4 years (1-year cliff)`);
   }
 
   async function generateLetter() {
@@ -610,7 +612,7 @@ function OfferLetter({ app }) {
           </select>
           {selectedLevel && (
             <div style={{ fontSize: 11.5, color: "#059669", background: "#ECFDF5", border: "1px solid #BBF7D0", borderRadius: 8, padding: "8px 12px" }}>
-              ✓ Filled from {selectedLevel.level_code} at band midpoint — adjust below for experience and market. Band: ${Number(selectedLevel.min_salary).toLocaleString()}–${Number(selectedLevel.max_salary).toLocaleString()} · Bonus {Number(selectedLevel.bonus_target_pct)}% · RSU {Number(selectedLevel.rsu_low).toLocaleString()}–{Number(selectedLevel.rsu_high).toLocaleString()}
+              ✓ Filled from {selectedLevel.level_code} at band midpoint — adjust below for experience and market. Band: ${Number(selectedLevel.min_salary).toLocaleString()}–${Number(selectedLevel.max_salary).toLocaleString()} · Bonus {Number(selectedLevel.bonus_target_pct)}% · RSU {selectedLevel.rsu_basis === "pct_base" ? `${Number(selectedLevel.rsu_low)}% of base` : `${Number(selectedLevel.rsu_low).toLocaleString()}–${Number(selectedLevel.rsu_high).toLocaleString()}`}
             </div>
           )}
         </>

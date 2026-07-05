@@ -82,6 +82,7 @@ const NAV_GROUPS = [
       { id: "comp",      label: "Compensation",        icon: "◆", accent: C.amber },
       { id: "relations", label: "Employee Relations",  icon: "◉", accent: C.rose },
       { id: "compliance",label: "Compliance",          icon: "⚖", accent: C.amber },
+      { id: "aigov",     label: "AI Governance",       icon: "✦", accent: C.cyan },
       { id: "security",  label: "Security Center",     icon: "⚔", accent: C.blue },
     ],
   },
@@ -1339,7 +1340,7 @@ function EmployeeHub({ focusEmpId }) {
       </Card>
       </div>
 
-      <Card>
+      <Card style={{ marginBottom: 14 }}>
         <Label color={C.blueLight}>Ask HR Anything</Label>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 4 }}>
           {chips.map(q => <Chip key={q} label={q} accent={C.blueLight} onClick={() => ask(sys, q)} />)}
@@ -1347,7 +1348,84 @@ function EmployeeHub({ focusEmpId }) {
         <AIInput placeholder="Ask about PTO, benefits, payroll, career, policies…" onSubmit={q => ask(sys, q)} loading={loading} accent={C.blueLight} />
         <AIBox loading={loading} response={response} accent={C.blueLight} />
       </Card>
+
+      <ReportConcern />
     </div>
+  );
+}
+
+// Anonymous code-of-conduct / whistleblower reporting channel. Files a
+// restricted case into Employee Relations with no reporter identity attached.
+function ReportConcern() {
+  const [open, setOpen] = useState(false);
+  const [type, setType] = useState("grievance");
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function submit() {
+    if (!text.trim()) return;
+    setSending(true);
+    const { count } = await supabase.from("er_cases").select("id", { count: "exact", head: true });
+    await supabase.from("er_cases").insert({
+      case_number: `ER-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(3, "0")}`,
+      case_type: type,
+      severity: "medium",
+      employee_id: null,
+      summary: `[Anonymous report via Employee Hub] ${text.trim()}`,
+      status: "open",
+      owner: "Unassigned",
+    });
+    setSending(false);
+    setDone(true);
+    setText("");
+  }
+
+  return (
+    <Card style={{ background: "#FAFBFD" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <Label color={C.rose} style={{ marginBottom: 4 }}>Report a Concern</Label>
+          <p style={{ fontSize: 12.5, color: C.textMuted, margin: 0, lineHeight: 1.6 }}>
+            Confidential channel for conduct, harassment, retaliation, or safety concerns. Reports are anonymous — no name or account is attached — and go directly to HR leadership.
+          </p>
+        </div>
+        {!open && !done && (
+          <button onClick={() => setOpen(true)}
+            style={{ background: "#fff", border: `1px solid ${C.rose}40`, borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 700, color: C.rose, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+            🔒 Make a Report
+          </button>
+        )}
+      </div>
+      {done && (
+        <div style={{ marginTop: 12, background: "#ECFDF5", border: "1px solid #BBF7D0", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#059669", fontWeight: 600 }}>
+          ✓ Your report was filed anonymously with HR leadership. Thank you for speaking up.
+        </div>
+      )}
+      {open && !done && (
+        <div style={{ marginTop: 14 }}>
+          <select value={type} onChange={e => setType(e.target.value)}
+            style={{ width: "100%", boxSizing: "border-box", padding: "9px 11px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, background: "#fff", outline: "none", fontFamily: "inherit", cursor: "pointer", marginBottom: 10 }}>
+            <option value="grievance">Workplace concern / grievance</option>
+            <option value="investigation">Harassment, discrimination, or retaliation</option>
+            <option value="disciplinary">Policy or code-of-conduct violation</option>
+          </select>
+          <textarea value={text} onChange={e => setText(e.target.value)}
+            placeholder="Describe what happened. Do not include your name unless you want to be identified."
+            style={{ width: "100%", boxSizing: "border-box", height: 90, padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, background: "#fff", resize: "vertical", outline: "none", fontFamily: "inherit", marginBottom: 10 }} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={submit} disabled={sending || !text.trim()}
+              style={{ background: C.rose, color: "#fff", border: "none", borderRadius: 8, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: text.trim() ? 1 : 0.5 }}>
+              {sending ? "Submitting…" : "Submit Anonymously"}
+            </button>
+            <button onClick={() => setOpen(false)}
+              style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: 8, padding: "9px 16px", fontSize: 13, color: C.textMid, cursor: "pointer", fontFamily: "inherit" }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -2222,7 +2300,9 @@ function Compensation({ onNavigate }) {
                     <td style={{ padding: "11px 12px", textAlign: "center", fontWeight: 700, color: C.textDark, whiteSpace: "nowrap" }}>{fmt$(l.mid_salary)}</td>
                     <td style={{ padding: "11px 12px", textAlign: "center", color: C.textMid, whiteSpace: "nowrap" }}>{fmt$(l.max_salary)}</td>
                     <td style={{ padding: "11px 12px", textAlign: "center", color: C.teal, fontWeight: 700 }}>{Number(l.bonus_target_pct)}%</td>
-                    <td style={{ padding: "11px 12px", textAlign: "center", color: C.violet, fontWeight: 600, whiteSpace: "nowrap" }}>{Number(l.rsu_low).toLocaleString()}–{Number(l.rsu_high).toLocaleString()}</td>
+                    <td style={{ padding: "11px 12px", textAlign: "center", color: C.violet, fontWeight: 600, whiteSpace: "nowrap" }}>
+                      {l.rsu_basis === "pct_base" ? `${Number(l.rsu_low)}% of base` : `${Number(l.rsu_low).toLocaleString()}–${Number(l.rsu_high).toLocaleString()}`}
+                    </td>
                     <td onClick={() => members.length && openDrill(`sl-${l.level_code}`, `${l.level_code} · ${l.level_name} — band ${fmt$(l.min_salary)}–${fmt$(l.max_salary)}`, members.map(e => ({ emp: e, extra: `${fmt$(e.base_salary)}${outOfBand(e) ? " ⚠" : ""}` })))}
                       style={{ padding: "11px 12px", textAlign: "center", color: members.length ? C.blue : "#CBD5E1", fontWeight: 700, cursor: members.length ? "pointer" : "default", textDecoration: members.length ? "underline" : "none", textDecorationStyle: "dotted", textUnderlineOffset: 3 }}>
                       {members.length || "—"}{members.some(outOfBand) ? " ⚠" : ""}
@@ -2298,6 +2378,143 @@ function Compensation({ onNavigate }) {
           );
         })}
       </Card>
+    </div>
+  );
+}
+
+// ─── AI GOVERNANCE ────────────────────────────────────────────────────────────
+// Inventory of every AI touchpoint in the platform and its human-in-the-loop
+// control. The governing principle: AI recommends, humans decide.
+const AI_INVENTORY = [
+  { feature: "Candidate Assessment Scoring", page: "inbox", where: "Talent Inbox",
+    does: "Scores submitted assessments (role fit, problem solving, culture, communication) with an explanation and risk indicators.",
+    hitl: "Score is advisory only — a human moves every pipeline stage; no auto-reject exists.", risk: "high" },
+  { feature: "AI Candidate Sourcing", page: "recruit", where: "Recruiting Engine",
+    does: "Suggests candidate profiles and outreach drafts for open roles.",
+    hitl: "Recruiter reviews and personally sends all outreach; no automated contact.", risk: "high" },
+  { feature: "Interview Intelligence", page: "inbox", where: "Talent Inbox",
+    does: "Structures interviewer notes into a competency debrief with a recommendation.",
+    hitl: "Debrief informs — never replaces — the hiring panel's decision; saved with the human's notes.", risk: "high" },
+  { feature: "Offer Letter Drafting", page: "inbox", where: "Talent Inbox",
+    does: "Drafts the offer letter from comp inputs pulled from the salary structure.",
+    hitl: "Comp comes from the ratified structure; recruiter edits and approves before any send.", risk: "medium" },
+  { feature: "30-60-90 Onboarding Plans", page: "onboard", where: "Onboarding",
+    does: "Generates personalized ramp plans for new hires.",
+    hitl: "Hiring manager reviews and edits before sending to the new hire.", risk: "low" },
+  { feature: "Manager Coach", page: "manager", where: "Manager Coach",
+    does: "Advises managers on feedback, PIPs, and difficult conversations.",
+    hitl: "Advisory chat only — produces no records and takes no actions.", risk: "medium" },
+  { feature: "Chief of Staff Briefings & Analytics", page: "home", where: "Command Center",
+    does: "Summarizes live workforce metrics into daily briefings and answers ad-hoc questions.",
+    hitl: "Descriptive analytics only — no decisions, recommendations logged nowhere.", risk: "low" },
+];
+
+const AI_LAWS = [
+  { law: "NYC Local Law 144", scope: "Automated employment decision tools used for NYC candidates/employees", control: "Assessment scoring would require an independent bias audit + candidate notice before NYC hiring." },
+  { law: "Illinois AI Video Interview Act", scope: "AI analysis of video interviews for IL positions", control: "Platform does not analyze video; if adopted, requires consent, explanation, and deletion rights." },
+  { law: "Colorado AI Act (eff. 2026)", scope: "High-risk AI systems in employment decisions", control: "Hiring AI is classified high-risk here; impact assessment and human oversight documented on this page." },
+  { law: "EEOC / Title VII guidance", scope: "Disparate impact from selection procedures, including AI", control: "Human decision on every stage move; diversity outcomes monitored on the Diversity & EEO pages." },
+];
+
+function AIGovernance({ onNavigate }) {
+  const { isMobile } = useBreakpoint();
+  const [training, setTraining] = useState(null);
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from("employees").select("id, role_title").eq("status", "active"),
+      supabase.from("training_records").select("employee_id, status").eq("training_name", "Responsible AI in Hiring & HR"),
+    ]).then(([{ data: emps }, { data: recs }]) => {
+      const managers = (emps || []).filter(e => /lead|architect|chief|head|director|vp|manager/.test((e.role_title || "").toLowerCase()));
+      const done = new Set((recs || []).filter(r => r.status === "completed").map(r => r.employee_id));
+      setTraining({ required: managers.length, completed: managers.filter(m => done.has(m.id)).length });
+    });
+  }, []);
+
+  const riskChip = r => {
+    const c = r === "high" ? C.rose : r === "medium" ? C.amber : C.emerald;
+    return <span style={{ fontSize: 10, fontWeight: 800, background: `${c}12`, color: c, borderRadius: 20, padding: "2px 9px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{r}</span>;
+  };
+
+  return (
+    <div>
+      <SectionHeader icon="✦" accent={C.cyan} title="AI Governance" subtitle="Every AI capability in this platform, its human-in-the-loop control, and the legal framework it operates under." />
+
+      <Card style={{ marginBottom: 14, background: "#F0FDFF", borderColor: `${C.cyan}40` }}>
+        <div style={{ fontSize: 13, color: C.textMid, lineHeight: 1.7 }}>
+          <strong style={{ color: C.textDark }}>Governing principle: AI recommends, humans decide.</strong> No employment decision — screening, hiring, compensation, performance, or discipline — is made by an automated system in this platform. Every AI output below is advisory and passes through a named human owner before it affects a person.
+        </div>
+      </Card>
+
+      {/* AI inventory */}
+      <Card style={{ marginBottom: 14 }}>
+        <Label color={C.cyan}>AI Capability Inventory & Human-in-the-Loop Controls</Label>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#F8FAFC" }}>
+                {["Capability", "What the AI does", "Human-in-the-loop control", "Risk", ""].map(h => (
+                  <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {AI_INVENTORY.map(row => (
+                <tr key={row.feature} style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <td style={{ padding: "11px 12px", minWidth: 150 }}>
+                    <div style={{ fontWeight: 700, color: C.textDark }}>{row.feature}</div>
+                    <div style={{ fontSize: 11, color: C.textMuted }}>{row.where}</div>
+                  </td>
+                  <td style={{ padding: "11px 12px", color: C.textMid, lineHeight: 1.5, minWidth: 200 }}>{row.does}</td>
+                  <td style={{ padding: "11px 12px", color: C.textMid, lineHeight: 1.5, minWidth: 200 }}>
+                    <span style={{ color: C.emerald, marginRight: 5 }}>✓</span>{row.hitl}
+                  </td>
+                  <td style={{ padding: "11px 12px" }}>{riskChip(row.risk)}</td>
+                  <td style={{ padding: "11px 12px" }}>
+                    <button onClick={() => onNavigate && onNavigate(row.page)}
+                      style={{ background: "none", border: "none", padding: 0, fontSize: 12, fontWeight: 600, color: C.blue, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                      Open →
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Legal + training side by side */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "3fr 2fr", gap: 14, marginBottom: 14 }}>
+        <Card>
+          <Label color={C.violet}>Jurisdictional Compliance Map</Label>
+          {AI_LAWS.map((l, i) => (
+            <div key={l.law} style={{ padding: "10px 0", borderBottom: i < AI_LAWS.length - 1 ? `1px solid ${C.border}` : "none" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark, marginBottom: 2 }}>{l.law}</div>
+              <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 4 }}>{l.scope}</div>
+              <div style={{ fontSize: 12, color: C.textMid, lineHeight: 1.55 }}>{l.control}</div>
+            </div>
+          ))}
+        </Card>
+        <Card>
+          <Label color={C.teal}>Manager Certification</Label>
+          <p style={{ fontSize: 12.5, color: C.textMid, lineHeight: 1.6, margin: "0 0 12px" }}>
+            Every people manager must complete <strong>Responsible AI in Hiring & HR</strong> annually — acceptable vs. unacceptable AI use in hiring, feedback, reviews, and employee communications.
+          </p>
+          <div onClick={() => onNavigate && onNavigate("learning")} title="Open Learning"
+            style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 16px", textAlign: "center", cursor: "pointer" }}>
+            <div style={{ fontSize: 26, fontWeight: 900, color: training && training.completed === training.required ? C.emerald : C.amber, textDecoration: "underline", textUnderlineOffset: 3 }}>
+              {training ? `${training.completed}/${training.required}` : "…"}
+            </div>
+            <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 4 }}>Managers certified</div>
+          </div>
+          <div style={{ marginTop: 14, fontSize: 12, color: C.textMid, lineHeight: 1.6 }}>
+            <div style={{ fontWeight: 700, color: C.textDark, marginBottom: 6, fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em" }}>Vendor diligence checklist</div>
+            {["Bias testing & adverse-impact analysis", "Privacy & data retention terms", "Security review (SOC 2)", "Explainability of outputs", "Model/provider change notification"].map(item => (
+              <div key={item} style={{ display: "flex", gap: 7, padding: "2px 0" }}><span style={{ color: C.emerald }}>✓</span>{item}</div>
+            ))}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -2951,6 +3168,7 @@ export default function App() {
     comp:      <Compensation onNavigate={navigate} />,
     relations: <EmployeeRelations onNavigate={navigate} userRole={userRole} />,
     compliance:<HRCompliance onNavigate={navigate} />,
+    aigov:     <AIGovernance onNavigate={navigate} />,
     executive: <WorkforceIntel onNavigate={navigate} />,
     careers:   <CareersPortal />,
     inbox:     <TalentInbox />,

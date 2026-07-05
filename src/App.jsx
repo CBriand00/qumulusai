@@ -75,6 +75,7 @@ const NAV_GROUPS = [
     items: [
       { id: "employee",  label: "Employee Hub",        icon: "○", accent: C.blueLight },
       { id: "orgchart",  label: "Org Chart",           icon: "◫", accent: C.violet },
+      { id: "learning",  label: "Learning",            icon: "◈", accent: C.emerald },
       { id: "onboard",   label: "Onboarding",          icon: "◎", accent: C.teal },
       { id: "manager",   label: "Manager Coach",       icon: "◇", accent: C.blue },
     ],
@@ -84,6 +85,7 @@ const NAV_GROUPS = [
     label: "Operations",
     items: [
       { id: "payroll",   label: "Payroll",             icon: "◈", accent: C.teal },
+      { id: "compliance",label: "HR Compliance",       icon: "⚖", accent: C.amber },
       { id: "security",  label: "Security Center",     icon: "⚔", accent: C.blue },
     ],
   },
@@ -214,9 +216,9 @@ function Card({ children, style }) {
   );
 }
 
-function Label({ children, color }) {
+function Label({ children, color, style }) {
   return (
-    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: color || C.textMuted, marginBottom: 14 }}>
+    <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: color || C.textMuted, marginBottom: 14, ...style }}>
       {children}
     </div>
   );
@@ -1735,6 +1737,359 @@ function Diversity({ onNavigate }) {
   );
 }
 
+// ─── LEARNING & TRAINING COMPLIANCE ───────────────────────────────────────────
+// A course applies to an employee when its role keywords match their title
+// (or 'all') AND its state matches their I-9 state ('ALL' matches everyone;
+// missing state defaults to GA since QumulusAI is Georgia-based).
+function courseAppliesTo(course, emp, empState) {
+  const stateOk = course.state === "ALL" || course.state === (empState || "GA");
+  if (!stateOk) return false;
+  if (course.applies_to === "all") return true;
+  const title = (emp.role_title || "").toLowerCase();
+  return course.applies_to.split(",").some(k => title.includes(k.trim()));
+}
+
+function useTrainingData() {
+  const [data, setData] = useState(null);
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    async function load() {
+      const [{ data: emps }, { data: courses }, { data: records }, { data: docs }] = await Promise.all([
+        supabase.from("employees").select("id, full_name, role_title, email, department_id").eq("status", "active"),
+        supabase.from("training_courses").select("*").order("category").order("name"),
+        supabase.from("training_records").select("employee_id, training_name, status, completed_at"),
+        supabase.from("employee_onboarding_docs").select("employee_id, i9_state"),
+      ]);
+      const stateMap = (docs || []).reduce((m, d) => { if (d.i9_state) m[d.employee_id] = d.i9_state; return m; }, {});
+      const done = new Set((records || []).filter(r => r.status === "completed").map(r => `${r.employee_id}|${r.training_name}`));
+      const courseRows = (courses || []).map(c => {
+        const required = (emps || []).filter(e => courseAppliesTo(c, e, stateMap[e.id]));
+        const completed = required.filter(e => done.has(`${e.id}|${c.name}`));
+        const missing = required.filter(e => !done.has(`${e.id}|${c.name}`));
+        return { ...c, required, completed, missing };
+      });
+      setData({ employees: emps || [], courses: courseRows, stateMap });
+    }
+    load();
+  }, [reload]);
+  return [data, () => setReload(r => r + 1)];
+}
+
+function Learning({ onNavigate }) {
+  const { isMobile } = useBreakpoint();
+  const [data, refresh] = useTrainingData();
+  const [drill, setDrill] = useState(null); // course name
+  const [marking, setMarking] = useState(null);
+
+  if (!data) return <div><SectionHeader icon="◈" accent={C.emerald} title="Learning" subtitle="Required compliance and role-based training." /><Card><p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading training data…</p></Card></div>;
+
+  const { courses } = data;
+  const compliance = courses.filter(c => c.category === "compliance");
+  const roleBased = courses.filter(c => c.category === "role");
+  const totalReq = courses.reduce((s, c) => s + c.required.length, 0);
+  const totalDone = courses.reduce((s, c) => s + c.completed.length, 0);
+  const overallPct = totalReq ? Math.round((totalDone / totalReq) * 100) : 0;
+  const drillCourse = courses.find(c => c.name === drill);
+
+  async function markComplete(course, emp) {
+    setMarking(emp.id + course.name);
+    await supabase.from("training_records").insert({
+      employee_id: emp.id,
+      organization_id: "00000000-0000-0000-0000-000000000001",
+      training_name: course.name,
+      status: "completed",
+      completed_at: new Date().toISOString(),
+    });
+    setMarking(null);
+    refresh();
+  }
+
+  function remindAll(course) {
+    const emails = course.missing.map(e => e.email).filter(Boolean);
+    const subject = encodeURIComponent(`Required Training: ${course.name}`);
+    const body = encodeURIComponent(`Hi team,\n\nOur records show you haven't completed "${course.name}" yet. This training is required${course.state !== "ALL" ? ` for ${course.state} employees` : ""} — please complete it as soon as possible.\n\nThank you!`);
+    window.open(`mailto:${emails.join(",")}?subject=${subject}&body=${body}`);
+  }
+
+  const CourseSection = ({ title, list, accent, note }) => (
+    <Card style={{ marginBottom: 14 }}>
+      <Label color={accent}>{title}</Label>
+      {note && <p style={{ fontSize: 12, color: C.textMuted, margin: "0 0 12px" }}>{note}</p>}
+      {list.map(c => {
+        const pct = c.required.length ? Math.round((c.completed.length / c.required.length) * 100) : 100;
+        const color = pct === 100 ? C.emerald : pct >= 60 ? C.amber : C.rose;
+        const active = drill === c.name;
+        return (
+          <div key={c.id} onClick={() => setDrill(active ? null : c.name)}
+            style={{ padding: "10px 8px", margin: "0 -8px", borderRadius: 8, cursor: "pointer", background: active ? `${color}0C` : "transparent", transition: "background 0.15s" }}
+            onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#F8FAFC"; }}
+            onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5, gap: 10 }}>
+              <div style={{ minWidth: 0 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: C.textDark }}>{c.name}</span>
+                {c.state !== "ALL" && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, background: "#EEF2FF", color: "#4338CA", borderRadius: 4, padding: "1px 6px" }}>{c.state}</span>}
+                <span style={{ marginLeft: 8, fontSize: 10.5, color: C.textMuted, textTransform: "capitalize" }}>{c.frequency}</span>
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 800, color, textDecoration: "underline", textDecorationColor: `${color}50`, textUnderlineOffset: 3, whiteSpace: "nowrap" }}>
+                {c.completed.length}/{c.required.length} · {pct}%
+              </span>
+            </div>
+            <div style={{ height: 7, background: C.border, borderRadius: 4 }}>
+              <div style={{ width: `${pct}%`, height: "100%", borderRadius: 4, background: color }} />
+            </div>
+          </div>
+        );
+      })}
+    </Card>
+  );
+
+  return (
+    <div>
+      <SectionHeader icon="◈" accent={C.emerald} title="Learning" subtitle="Required compliance training by state, plus role-specific requirements. Click any course to see who's outstanding." />
+
+      {/* Summary */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 14 }}>
+        {[
+          { label: "Overall Completion", value: `${overallPct}%`, color: overallPct === 100 ? C.emerald : overallPct >= 60 ? C.amber : C.rose },
+          { label: "Assignments Done", value: `${totalDone}/${totalReq}`, color: C.blue },
+          { label: "Compliance Courses", value: compliance.length, color: C.violet },
+          { label: "Role-Based Courses", value: roleBased.length, color: C.teal },
+        ].map(m => (
+          <Card key={m.label} style={{ padding: "16px 18px", textAlign: "center" }}>
+            <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{m.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: m.color }}>{m.value}</div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Drill-down */}
+      {drillCourse && (
+        <Card style={{ marginBottom: 14, borderColor: `${C.emerald}40` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+            <Label color={C.emerald} style={{ marginBottom: 0 }}>{drillCourse.name} — {drillCourse.missing.length} outstanding</Label>
+            <div style={{ display: "flex", gap: 8 }}>
+              {drillCourse.missing.length > 0 && (
+                <button onClick={() => remindAll(drillCourse)}
+                  style={{ background: C.blue, color: "#fff", border: "none", borderRadius: 7, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  ✉ Remind All ({drillCourse.missing.length})
+                </button>
+              )}
+              <button onClick={() => setDrill(null)} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>✕ Close</button>
+            </div>
+          </div>
+          {drillCourse.missing.length === 0 ? (
+            <p style={{ fontSize: 13, color: C.emerald, fontWeight: 600, margin: 0 }}>✓ Everyone required has completed this course.</p>
+          ) : (
+            drillCourse.missing.map((e, i) => (
+              <div key={e.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: i < drillCourse.missing.length - 1 ? `1px solid ${C.border}` : "none", flexWrap: "wrap", gap: 8 }}>
+                <div>
+                  <span onClick={() => onNavigate && onNavigate("employee", e.id)} style={{ fontSize: 13, fontWeight: 700, color: C.textDark, cursor: "pointer" }}>{e.full_name}</span>
+                  <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 8 }}>{e.role_title}</span>
+                </div>
+                <button onClick={() => markComplete(drillCourse, e)} disabled={marking === e.id + drillCourse.name}
+                  style={{ background: `${C.emerald}12`, border: `1px solid ${C.emerald}30`, borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700, color: C.emerald, cursor: "pointer", fontFamily: "inherit" }}>
+                  {marking === e.id + drillCourse.name ? "…" : "✓ Mark Complete"}
+                </button>
+              </div>
+            ))
+          )}
+        </Card>
+      )}
+
+      <CourseSection title="State & Federal Compliance — Required for All" list={compliance} accent={C.violet}
+        note="Applies to every active employee. State-tagged courses apply only to employees in that state (default GA)." />
+      <CourseSection title="Role-Based Training — Required by Position" list={roleBased} accent={C.teal}
+        note="Assigned automatically from each employee's job title." />
+    </div>
+  );
+}
+
+// ─── HR COMPLIANCE & EEO REPORTING ────────────────────────────────────────────
+function eeoCategory(title) {
+  const t = (title || "").toLowerCase();
+  if (/chief|vp|vice president|director|head of/.test(t)) return "Exec/Sr. Officials & Managers";
+  if (/lead|architect|manager/.test(t)) return "First/Mid-Level Officials & Managers";
+  if (/sales|account executive/.test(t)) return "Sales Workers";
+  if (/technician/.test(t)) return "Technicians";
+  return "Professionals";
+}
+
+function HRCompliance({ onNavigate }) {
+  const { isMobile } = useBreakpoint();
+  const [data, setData] = useState(null);
+  const [trainData] = useTrainingData();
+
+  useEffect(() => {
+    async function load() {
+      const [{ data: emps }, { data: missingDocs }, { data: certs }, { data: docs }] = await Promise.all([
+        supabase.from("employees").select("*").eq("status", "active"),
+        supabase.from("required_documents").select("document_name, status, employees(id, full_name, role_title)").eq("status", "missing"),
+        supabase.from("certifications").select("name, expiry_date, status, employees(id, full_name)"),
+        supabase.from("employee_onboarding_docs").select("employee_id, status, i9_signed_at, w4_signed_at, dd_signed_at"),
+      ]);
+      setData({ emps: emps || [], missingDocs: missingDocs || [], certs: certs || [], onbDocs: docs || [] });
+    }
+    load();
+  }, []);
+
+  if (!data) return <div><SectionHeader icon="⚖" accent={C.amber} title="HR Compliance" subtitle="Documents, certifications, training, and EEO reporting." /><Card><p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading compliance data…</p></Card></div>;
+
+  const { emps, missingDocs, certs, onbDocs } = data;
+  const ninety = new Date(Date.now() + 90 * 86400000);
+  const expiring = certs.filter(c => c.expiry_date && new Date(c.expiry_date) <= ninety);
+  const docMap = onbDocs.reduce((m, d) => { m[d.employee_id] = d; return m; }, {});
+  const i9Missing = emps.filter(e => !docMap[e.id]?.i9_signed_at);
+  const trainingGaps = trainData ? trainData.courses.reduce((s, c) => s + c.missing.length, 0) : null;
+
+  // EEO-1 style cross-tab from voluntary self-ID
+  const genderLabels = { female: "Female", male: "Male", non_binary: "Non-binary", other: "Other", decline: "Undisclosed" };
+  const ethLabels = { hispanic_latino: "Hispanic/Latino", white: "White", black: "Black/African Am.", asian: "Asian", native_american: "Am. Indian/AK Native", pacific_islander: "Native HI/Pac. Isl.", two_or_more: "Two or More", decline: "Undisclosed" };
+  const categories = [...new Set(emps.map(e => eeoCategory(e.role_title)))].sort();
+  const genders = [...new Set(emps.map(e => genderLabels[e.gender] || "Undisclosed"))];
+  const eths = [...new Set(emps.map(e => ethLabels[e.ethnicity] || "Undisclosed"))];
+
+  function exportEEO() {
+    const rows = [["EEO-1 Component 1 style report — QumulusAI (voluntary self-identification)", "", "", ""], ["Job Category", "Gender", "Race/Ethnicity", "Count"]];
+    categories.forEach(cat => {
+      genders.forEach(g => {
+        eths.forEach(et => {
+          const n = emps.filter(e => eeoCategory(e.role_title) === cat && (genderLabels[e.gender] || "Undisclosed") === g && (ethLabels[e.ethnicity] || "Undisclosed") === et).length;
+          if (n > 0) rows.push([cat, g, et, n]);
+        });
+      });
+    });
+    rows.push(["TOTAL", "", "", emps.length]);
+    const csv = "﻿" + rows.map(r => r.map(v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `QumulusAI_EEO_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  const kpis = [
+    { label: "Missing Documents", value: missingDocs.length, color: missingDocs.length ? C.rose : C.emerald, nav: null },
+    { label: "Certs Expiring ≤90d", value: expiring.length, color: expiring.length ? C.amber : C.emerald },
+    { label: "I-9 Incomplete", value: i9Missing.length, color: i9Missing.length ? C.rose : C.emerald },
+    { label: "Training Gaps", value: trainingGaps == null ? "…" : trainingGaps, color: trainingGaps ? C.amber : C.emerald, nav: "learning" },
+  ];
+
+  return (
+    <div>
+      <SectionHeader icon="⚖" accent={C.amber} title="HR Compliance" subtitle="Documents, certifications, I-9 verification, training gaps, and EEO reporting in one place." />
+
+      {/* KPI row */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 14 }}>
+        {kpis.map(m => (
+          <Card key={m.label} onClick={m.nav && onNavigate ? undefined : undefined} style={{ padding: "16px 18px", textAlign: "center", cursor: m.nav ? "pointer" : "default" }}>
+            <div onClick={() => m.nav && onNavigate && onNavigate(m.nav)}>
+              <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{m.label}</div>
+              <div style={{ fontSize: 22, fontWeight: 900, color: m.color, textDecoration: m.nav ? "underline" : "none", textUnderlineOffset: 3 }}>{m.value}</div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Missing documents */}
+      <Card style={{ marginBottom: 14 }}>
+        <Label color={C.rose}>Missing Documents</Label>
+        {missingDocs.length === 0 ? <p style={{ fontSize: 13, color: C.emerald, fontWeight: 600, margin: 0 }}>✓ All required documents are on file.</p> :
+          missingDocs.map((d, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: i < missingDocs.length - 1 ? `1px solid ${C.border}` : "none", flexWrap: "wrap", gap: 8 }}>
+              <span onClick={() => d.employees?.id && onNavigate && onNavigate("employee", d.employees.id)} style={{ fontSize: 13, fontWeight: 700, color: C.textDark, cursor: "pointer" }}>
+                {d.employees?.full_name || "Unknown"} <span style={{ fontWeight: 400, color: C.textMuted, fontSize: 11 }}>· {d.employees?.role_title}</span>
+              </span>
+              <span style={{ fontSize: 11, fontWeight: 700, background: "#FEF2F2", color: C.rose, borderRadius: 6, padding: "3px 9px" }}>{d.document_name}</span>
+            </div>
+          ))}
+      </Card>
+
+      {/* Certifications + I-9 side by side */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <Card>
+          <Label color={C.amber}>Certifications Expiring ≤ 90 Days</Label>
+          {expiring.length === 0 ? <p style={{ fontSize: 13, color: C.emerald, fontWeight: 600, margin: 0 }}>✓ No upcoming expirations.</p> :
+            expiring.map((c, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: i < expiring.length - 1 ? `1px solid ${C.border}` : "none", fontSize: 13, gap: 8 }}>
+                <span style={{ color: C.textDark, fontWeight: 600 }}>{c.employees?.full_name} <span style={{ color: C.textMuted, fontWeight: 400, fontSize: 11 }}>· {c.name}</span></span>
+                <span style={{ color: C.amber, fontWeight: 700, whiteSpace: "nowrap" }}>{new Date(c.expiry_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
+              </div>
+            ))}
+        </Card>
+        <Card>
+          <Label color={C.blue}>I-9 Employment Verification</Label>
+          {i9Missing.length === 0 ? <p style={{ fontSize: 13, color: C.emerald, fontWeight: 600, margin: 0 }}>✓ All active employees have completed I-9 Section 1.</p> :
+            i9Missing.map((e, i) => (
+              <div key={e.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: i < i9Missing.length - 1 ? `1px solid ${C.border}` : "none", fontSize: 13, gap: 8 }}>
+                <span onClick={() => onNavigate && onNavigate("employee", e.id)} style={{ color: C.textDark, fontWeight: 600, cursor: "pointer" }}>{e.full_name} <span style={{ color: C.textMuted, fontWeight: 400, fontSize: 11 }}>· {e.role_title}</span></span>
+                <span style={{ fontSize: 11, fontWeight: 700, background: "#FFFBEB", color: C.amber, borderRadius: 6, padding: "3px 9px", whiteSpace: "nowrap" }}>Not signed</span>
+              </div>
+            ))}
+        </Card>
+      </div>
+
+      {/* EEO reporting */}
+      <Card>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
+          <Label color={C.violet} style={{ marginBottom: 0 }}>EEO Reporting — Job Category × Gender</Label>
+          <button onClick={exportEEO}
+            style={{ background: C.violet, color: "#fff", border: "none", borderRadius: 7, padding: "7px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            ⬇ Export EEO-1 Style CSV
+          </button>
+        </div>
+        <p style={{ fontSize: 11.5, color: C.textMuted, margin: "4px 0 14px" }}>Based on voluntary self-identification collected at onboarding. Employees who declined or haven't responded appear as Undisclosed.</p>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#F8FAFC" }}>
+                <th style={{ padding: "9px 12px", textAlign: "left", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}` }}>Job Category</th>
+                {genders.map(g => <th key={g} style={{ padding: "9px 12px", textAlign: "center", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}` }}>{g}</th>)}
+                <th style={{ padding: "9px 12px", textAlign: "center", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}` }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map(cat => {
+                const inCat = emps.filter(e => eeoCategory(e.role_title) === cat);
+                return (
+                  <tr key={cat} style={{ borderBottom: `1px solid ${C.border}` }}>
+                    <td style={{ padding: "9px 12px", fontWeight: 600, color: C.textDark }}>{cat}</td>
+                    {genders.map(g => <td key={g} style={{ padding: "9px 12px", textAlign: "center", color: C.textMid }}>{inCat.filter(e => (genderLabels[e.gender] || "Undisclosed") === g).length || "—"}</td>)}
+                    <td style={{ padding: "9px 12px", textAlign: "center", fontWeight: 800, color: C.textDark }}>{inCat.length}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <Label color={C.violet} style={{ marginTop: 18 }}>Job Category × Race / Ethnicity</Label>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#F8FAFC" }}>
+                <th style={{ padding: "9px 12px", textAlign: "left", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}` }}>Job Category</th>
+                {eths.map(et => <th key={et} style={{ padding: "9px 12px", textAlign: "center", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{et}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {categories.map(cat => {
+                const inCat = emps.filter(e => eeoCategory(e.role_title) === cat);
+                return (
+                  <tr key={cat} style={{ borderBottom: `1px solid ${C.border}` }}>
+                    <td style={{ padding: "9px 12px", fontWeight: 600, color: C.textDark }}>{cat}</td>
+                    {eths.map(et => <td key={et} style={{ padding: "9px 12px", textAlign: "center", color: C.textMid }}>{inCat.filter(e => (ethLabels[e.ethnicity] || "Undisclosed") === et).length || "—"}</td>)}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 // ─── WORKFORCE INTEL ──────────────────────────────────────────────────────────
 function WorkforceIntel({ onNavigate }) {
   const { ask, loading, response } = useAI();
@@ -1936,6 +2291,8 @@ export default function App() {
     employee:  <EmployeeHub focusEmpId={focusEmpId} />,
     orgchart:  <OrgChart onNavigate={navigate} />,
     diversity: <Diversity onNavigate={navigate} />,
+    learning:  <Learning onNavigate={navigate} />,
+    compliance:<HRCompliance onNavigate={navigate} />,
     executive: <WorkforceIntel onNavigate={navigate} />,
     careers:   <CareersPortal />,
     inbox:     <TalentInbox />,

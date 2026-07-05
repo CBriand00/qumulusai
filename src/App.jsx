@@ -148,6 +148,61 @@ function useAI() {
   return { ask, loading, response, setResponse };
 }
 
+// ─── Onboarding Pipeline Hook ─────────────────────────────────────────────────
+function useOnboardingPipeline() {
+  const [pipeline, setPipeline] = useState(null);
+
+  useEffect(() => {
+    async function load() {
+      const [{ data: docs }, { data: emps }, { data: apps }] = await Promise.all([
+        supabase.from("employee_onboarding_docs").select("employee_id, status, w4_signed_at, i9_signed_at, dd_signed_at, created_at"),
+        supabase.from("employees").select("id, full_name, role_title, start_date, email, status").eq("status", "active"),
+        supabase.from("applications").select("id, full_name, role_title, status, created_at").eq("status", "hired"),
+      ]);
+
+      const today = new Date();
+      const daysSince = d => d ? Math.floor((today - new Date(d)) / 86400000) : null;
+      const docByEmp = (docs || []).reduce((m, d) => { m[d.employee_id] = d; return m; }, {});
+      const hiredApps = (apps || []);
+
+      // Build per-person stage
+      const people = (emps || []).map(e => {
+        const doc = docByEmp[e.id];
+        const hiredApp = hiredApps.find(a => a.full_name === e.full_name);
+        const startDays = daysSince(e.start_date);
+        const docsComplete = doc && doc.w4_signed_at && doc.i9_signed_at && doc.dd_signed_at;
+
+        let stage;
+        if (!hiredApp && !e.start_date) stage = "offer_signed";
+        else if (!docsComplete) stage = "docs_pending";
+        else if (startDays === null || startDays < 0) stage = "docs_complete";
+        else if (startDays < 30) stage = "day1";
+        else if (startDays < 60) stage = "day30";
+        else if (startDays < 90) stage = "day60";
+        else stage = "day90";
+
+        return { ...e, doc, hiredApp, startDays, docsComplete, stage };
+      });
+
+      const STAGES = [
+        { key: "offer_signed",  label: "Offer Signed",       icon: "✦", color: C.violet },
+        { key: "docs_pending",  label: "Docs Pending",       icon: "⏳", color: C.amber  },
+        { key: "docs_complete", label: "Docs Complete",      icon: "✓",  color: C.teal   },
+        { key: "day1",          label: "Day 1–30",           icon: "◈",  color: C.cyan   },
+        { key: "day30",         label: "30-Day Review",      icon: "◎",  color: C.blue   },
+        { key: "day60",         label: "60-Day Review",      icon: "◉",  color: C.emerald},
+        { key: "day90",         label: "90-Day Complete",    icon: "❖",  color: "#059669"},
+      ];
+
+      const counts = STAGES.reduce((m, s) => { m[s.key] = people.filter(p => p.stage === s.key).length; return m; }, {});
+      setPipeline({ people, stages: STAGES, counts });
+    }
+    load();
+  }, []);
+
+  return pipeline;
+}
+
 // ─── Shared UI Components ─────────────────────────────────────────────────────
 function Card({ children, style }) {
   return (
@@ -615,8 +670,97 @@ Be specific. Avoid generic language.`;
   );
 }
 
+// ─── ONBOARDING TRACKER ───────────────────────────────────────────────────────
+function OnboardingTracker({ onNavigate, compact = false }) {
+  const pipeline = useOnboardingPipeline();
+  const [activeStage, setActiveStage] = useState(null);
+
+  if (!pipeline) return (
+    <Card style={{ marginBottom: 14 }}>
+      <Label color={C.teal}>Onboarding Pipeline</Label>
+      <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading pipeline…</p>
+    </Card>
+  );
+
+  const { people, stages, counts } = pipeline;
+  const total = people.length;
+  const inProgress = people.filter(p => p.stage !== "day90").length;
+
+  const drillPeople = activeStage ? people.filter(p => p.stage === activeStage) : [];
+  const activeInfo = stages.find(s => s.key === activeStage);
+
+  return (
+    <Card style={{ marginBottom: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
+        <Label color={C.teal} style={{ marginBottom: 0 }}>Onboarding Pipeline</Label>
+        <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600 }}>
+          {inProgress} in progress · {total} total
+        </div>
+      </div>
+
+      {/* Stage rail */}
+      <div style={{ display: "flex", gap: compact ? 6 : 8, flexWrap: "wrap", marginBottom: activeStage ? 16 : 0 }}>
+        {stages.map((s, i) => {
+          const count = counts[s.key] || 0;
+          const isActive = activeStage === s.key;
+          return (
+            <button key={s.key} onClick={() => setActiveStage(isActive ? null : s.key)}
+              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: compact ? "8px 10px" : "10px 14px",
+                background: isActive ? `${s.color}18` : count > 0 ? "#fff" : "#FAFBFD",
+                border: `1.5px solid ${isActive ? s.color : count > 0 ? `${s.color}40` : C.border}`,
+                borderRadius: 10, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s", minWidth: compact ? 60 : 72, flex: "1 1 auto" }}>
+              <div style={{ fontSize: compact ? 16 : 18 }}>{s.icon}</div>
+              <div style={{ fontSize: count > 0 ? (compact ? 18 : 22) : (compact ? 14 : 18), fontWeight: 900, color: count > 0 ? s.color : C.textMuted, lineHeight: 1 }}>{count}</div>
+              <div style={{ fontSize: 10, color: isActive ? s.color : C.textMuted, fontWeight: 700, textAlign: "center", lineHeight: 1.2 }}>{s.label}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Drill-down list */}
+      {activeStage && (
+        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: activeInfo?.color, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
+            {activeInfo?.label} — {drillPeople.length} {drillPeople.length === 1 ? "person" : "people"}
+          </div>
+          {drillPeople.length === 0 ? (
+            <p style={{ fontSize: 13, color: C.textMuted, margin: 0 }}>No one at this stage.</p>
+          ) : (
+            drillPeople.map((p, i) => (
+              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0",
+                borderBottom: i < drillPeople.length - 1 ? `1px solid ${C.border}` : "none", flexWrap: "wrap", gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark }}>{p.full_name}</div>
+                  <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
+                    {p.role_title}{p.start_date ? ` · Started ${new Date(p.start_date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}
+                    {p.startDays !== null && p.startDays >= 0 ? ` · Day ${p.startDays}` : ""}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {p.email && (
+                    <a href={`mailto:${p.email}`}
+                      style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 6, background: `${activeInfo?.color}12`, color: activeInfo?.color, border: `1px solid ${activeInfo?.color}30`, textDecoration: "none" }}>
+                      Email
+                    </a>
+                  )}
+                  {onNavigate && (
+                    <button onClick={() => onNavigate("employee")}
+                      style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 6, background: `${C.teal}12`, color: C.teal, border: `1px solid ${C.teal}30`, cursor: "pointer", fontFamily: "inherit" }}>
+                      View Profile →
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // ─── ONBOARDING ───────────────────────────────────────────────────────────────
-function OnboardingConcierge() {
+function OnboardingConcierge({ onNavigate }) {
   const [onboardingEmployees, setOnboardingEmployees] = useState([]);
   const { ask, loading, response, setResponse } = useAI();
   const [draft, setDraft] = useState("");
@@ -679,6 +823,8 @@ function OnboardingConcierge() {
   return (
     <div>
       <SectionHeader icon="◎" accent={C.teal} title="AI Onboarding Concierge" subtitle="Live onboarding tracker and AI-powered 30-60-90 plans." />
+
+      <OnboardingTracker onNavigate={onNavigate} />
 
       {onboardingEmployees.length > 0 ? (
         <Card style={{ marginBottom: 14 }}>
@@ -1047,7 +1193,7 @@ function EmployeeHub() {
 }
 
 // ─── WORKFORCE INTEL ──────────────────────────────────────────────────────────
-function WorkforceIntel() {
+function WorkforceIntel({ onNavigate }) {
   const { ask, loading, response } = useAI();
   const { isMobile } = useBreakpoint();
 
@@ -1070,6 +1216,8 @@ function WorkforceIntel() {
   return (
     <div>
       <SectionHeader icon="◆" accent={C.amber} title="Workforce Intelligence" subtitle="Predictive dashboards, attrition signals, headcount planning, and AI-generated executive recommendations." />
+
+      <OnboardingTracker onNavigate={onNavigate} compact={true} />
 
       {/* KPI grid — 2 cols on mobile, auto-fit on desktop */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
@@ -1215,10 +1363,10 @@ export default function App() {
   const screens = {
     home: <CommandCenter userRole={userRole} onNavigate={navigate} />,
     recruit:   <RecruitingEngine />,
-    onboard:   <OnboardingConcierge />,
+    onboard:   <OnboardingConcierge onNavigate={navigate} />,
     manager:   <ManagerCoach />,
     employee:  <EmployeeHub />,
-    executive: <WorkforceIntel />,
+    executive: <WorkforceIntel onNavigate={navigate} />,
     careers:   <CareersPortal />,
     inbox:     <TalentInbox />,
     messenger: <Messenger />,

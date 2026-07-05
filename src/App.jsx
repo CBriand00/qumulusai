@@ -624,6 +624,7 @@ function OnboardingConcierge() {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [hireDesc, setHireDesc] = useState("");
+  const [recipients, setRecipients] = useState({ hiringManager: true, newHire: true });
 
   useEffect(() => {
     async function loadOnboarding() {
@@ -662,16 +663,15 @@ function OnboardingConcierge() {
     await ask(sys, prompt);
   }
 
-  async function sendToNewHire() {
-    if (!draft.trim()) return;
+  async function sendPlan() {
+    if (!draft.trim() || (!recipients.hiringManager && !recipients.newHire)) return;
     setSending(true);
-    const channelName = "onboarding-" + hireDesc.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) + "-" + new Date().toISOString().split("T")[0];
-    await supabase.from("messages").insert({
-      channel: channelName,
-      content: draft,
-      sender_name: "Hiring Manager",
-      sent_at: new Date().toISOString(),
-    });
+    const slug = hireDesc.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+    const date = new Date().toISOString().split("T")[0];
+    const inserts = [];
+    if (recipients.newHire) inserts.push({ channel: `onboarding-${slug}-${date}`, content: draft, sender_name: "Hiring Manager", sent_at: new Date().toISOString() });
+    if (recipients.hiringManager) inserts.push({ channel: `hiring-manager-${slug}-${date}`, content: draft, sender_name: "QumulusAI", sent_at: new Date().toISOString() });
+    if (inserts.length) await supabase.from("messages").insert(inserts);
     setSending(false);
     setSent(true);
   }
@@ -734,35 +734,62 @@ function OnboardingConcierge() {
 
       {draft && !loading && (
         <Card>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
-            <Label color={C.teal} style={{ marginBottom: 0 }}>30-60-90 Day Plan — Review & Send</Label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setEditMode(e => !e)}
-                style={{ background: editMode ? `${C.teal}15` : C.bg, border: `1px solid ${C.teal}40`, borderRadius: 6, padding: "5px 14px", fontSize: 12, color: C.teal, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
-                {editMode ? "Preview" : "✏ Edit"}
-              </button>
-              <button onClick={sendToNewHire} disabled={sending || sent}
-                style={{ background: sent ? C.emerald : C.teal, border: "none", borderRadius: 6, padding: "5px 16px", fontSize: 12, color: "#fff", cursor: (sending || sent) ? "default" : "pointer", fontFamily: "inherit", fontWeight: 700, opacity: sending ? 0.7 : 1 }}>
-                {sent ? "✓ Sent to Messenger" : sending ? "Sending…" : "Send to New Hire →"}
-              </button>
+          {/* Header row */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+            <div>
+              <Label color={C.teal} style={{ marginBottom: 4 }}>Review & Send Plan</Label>
+              <p style={{ margin: 0, fontSize: 12, color: C.textMuted }}>Review the plan below, edit if needed, then choose recipients.</p>
             </div>
+            <button onClick={() => setEditMode(e => !e)}
+              style={{ background: editMode ? `${C.teal}20` : C.bg, border: `1px solid ${C.teal}40`, borderRadius: 6, padding: "6px 14px", fontSize: 12, color: C.teal, cursor: "pointer", fontFamily: "inherit", fontWeight: 600, whiteSpace: "nowrap" }}>
+              {editMode ? "◎ Preview" : "✏ Edit"}
+            </button>
           </div>
 
+          {/* Plan preview or editor */}
           {editMode ? (
             <textarea
               value={draft}
               onChange={e => setDraft(e.target.value)}
-              style={{ width: "100%", boxSizing: "border-box", minHeight: 400, padding: "12px 14px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, lineHeight: 1.7, color: C.textDark, background: C.bg, resize: "vertical", outline: "none", fontFamily: "monospace" }}
+              style={{ width: "100%", boxSizing: "border-box", minHeight: 380, padding: "14px 16px", borderRadius: 10, border: `1px solid ${C.border}`, fontSize: 13, lineHeight: 1.8, color: C.textDark, background: "#FAFBFD", resize: "vertical", outline: "none", fontFamily: "monospace" }}
             />
           ) : (
-            <div style={{ background: "#FAFBFD", border: `1px solid ${C.border}`, borderRadius: 8, padding: "16px 20px" }}>
+            <div style={{ background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10, padding: "20px 24px", maxHeight: 500, overflowY: "auto" }}>
               {renderMarkdown(draft)}
             </div>
           )}
 
+          {/* Recipient picker + send */}
+          <div style={{ marginTop: 16, padding: "14px 16px", background: "#F8FAFD", border: `1px solid ${C.border}`, borderRadius: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Send To</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {[
+                  { key: "hiringManager", label: "Hiring Manager" },
+                  { key: "newHire", label: "New Hire" },
+                ].map(({ key, label }) => (
+                  <label key={key} style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", fontSize: 13, color: C.textDark, fontWeight: 500,
+                    background: recipients[key] ? `${C.teal}12` : C.bg,
+                    border: `1px solid ${recipients[key] ? C.teal : C.border}`,
+                    borderRadius: 8, padding: "7px 14px", transition: "all 0.15s" }}>
+                    <input type="checkbox" checked={recipients[key]} onChange={e => setRecipients(r => ({ ...r, [key]: e.target.checked }))}
+                      style={{ accentColor: C.teal, width: 15, height: 15, cursor: "pointer" }} />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <button
+                onClick={sendPlan}
+                disabled={sending || sent || (!recipients.hiringManager && !recipients.newHire)}
+                style={{ background: sent ? "#059669" : C.teal, border: "none", borderRadius: 8, padding: "9px 20px", fontSize: 13, color: "#fff", cursor: (sending || sent || (!recipients.hiringManager && !recipients.newHire)) ? "default" : "pointer", fontFamily: "inherit", fontWeight: 700, opacity: (sending || (!recipients.hiringManager && !recipients.newHire)) ? 0.6 : 1, whiteSpace: "nowrap" }}>
+                {sent ? "✓ Sent" : sending ? "Sending…" : "Send Plan →"}
+              </button>
+            </div>
+          </div>
+
           {sent && (
-            <div style={{ marginTop: 12, padding: "10px 14px", background: "#ECFDF5", borderRadius: 8, fontSize: 13, color: "#059669", fontWeight: 600 }}>
-              ✓ Plan sent to Messenger onboarding channel. The new hire will receive it when they join.
+            <div style={{ marginTop: 10, padding: "10px 14px", background: "#ECFDF5", border: "1px solid #BBF7D0", borderRadius: 8, fontSize: 13, color: "#059669", fontWeight: 600 }}>
+              ✓ Plan delivered to {[recipients.hiringManager && "Hiring Manager", recipients.newHire && "New Hire"].filter(Boolean).join(" & ")} via Messenger.
             </div>
           )}
         </Card>

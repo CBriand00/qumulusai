@@ -113,12 +113,12 @@ const OPEN_ROLES = [
 ];
 
 const METRICS = [
-  { label: "Headcount",     value: "18",  delta: "+6",   trend: "up" },
-  { label: "Open Roles",    value: "21",  delta: "+12",  trend: "up" },
-  { label: "Time-to-Hire",  value: "38d", delta: "+10d", trend: "down" },
-  { label: "Engagement",    value: "81",  delta: "+6",   trend: "up" },
-  { label: "Offer Accept",  value: "91%", delta: "+4pp", trend: "up" },
-  { label: "Attrition YTD",value: "11%", delta: "+3pp", trend: "down" },
+  { label: "Headcount",     value: "18",  delta: "+6",   trend: "up",   page: "employee" },
+  { label: "Open Roles",    value: "21",  delta: "+12",  trend: "up",   page: "recruit"  },
+  { label: "Time-to-Hire",  value: "38d", delta: "+10d", trend: "down", page: "recruit"  },
+  { label: "Engagement",    value: "81",  delta: "+6",   trend: "up",   page: "executive"},
+  { label: "Offer Accept",  value: "91%", delta: "+4pp", trend: "up",   page: "recruit"  },
+  { label: "Attrition YTD",value: "11%", delta: "+3pp", trend: "down", page: "executive"},
 ];
 
 // ─── AI Hook ──────────────────────────────────────────────────────────────────
@@ -1222,11 +1222,14 @@ function WorkforceIntel({ onNavigate }) {
       {/* KPI grid — 2 cols on mobile, auto-fit on desktop */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
         {METRICS.map(m => (
-          <Card key={m.label} style={{ padding: isMobile ? 14 : 16, textAlign: "center" }}>
+          <button key={m.label} onClick={() => onNavigate && onNavigate(m.page)}
+            style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: isMobile ? 14 : 16, textAlign: "center", cursor: onNavigate ? "pointer" : "default", fontFamily: "inherit", transition: "border-color 0.15s, box-shadow 0.15s" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.amber; e.currentTarget.style.boxShadow = `0 2px 8px ${C.amber}20`; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.boxShadow = "none"; }}>
             <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>{m.label}</div>
             <div style={{ fontSize: isMobile ? 22 : 24, fontWeight: 900, color: C.textDark, letterSpacing: "-0.02em" }}>{m.value}</div>
             <div style={{ fontSize: 12, fontWeight: 700, marginTop: 4, color: m.trend === "up" ? C.emerald : C.rose }}>{m.trend === "up" ? "↑" : "↓"} {m.delta}</div>
-          </Card>
+          </button>
         ))}
       </div>
 

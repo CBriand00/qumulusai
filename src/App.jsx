@@ -183,16 +183,78 @@ function Badge({ label }) {
   );
 }
 
+function renderMarkdown(text) {
+  if (!text) return null;
+  const lines = text.split("\n");
+  const elements = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const trim = line.trim();
+    // Table: collect consecutive | lines
+    if (trim.startsWith("|")) {
+      const tableLines = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        tableLines.push(lines[i].trim());
+        i++;
+      }
+      const rows = tableLines.filter(l => !/^\|[-| :]+\|$/.test(l));
+      const parsed = rows.map(r => r.replace(/^\||\|$/g, "").split("|").map(c => c.trim()));
+      if (parsed.length > 0) {
+        elements.push(
+          <div key={i} style={{ overflowX: "auto", marginBottom: 12 }}>
+            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 13 }}>
+              <thead>
+                <tr>{parsed[0].map((h, j) => <th key={j} style={{ padding: "6px 12px", background: "#F8FAFC", border: "1px solid #E2E8F0", fontWeight: 700, textAlign: "left", color: C.textDark }}>{h}</th>)}</tr>
+              </thead>
+              <tbody>
+                {parsed.slice(1).map((row, ri) => (
+                  <tr key={ri}>{row.map((cell, ci) => <td key={ci} style={{ padding: "6px 12px", border: "1px solid #E2E8F0", color: C.textMid, verticalAlign: "top" }}>{inlineFormat(cell)}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+      continue;
+    }
+    // Headings
+    if (trim.startsWith("### ")) { elements.push(<h3 key={i} style={{ fontSize: 14, fontWeight: 700, color: C.textDark, margin: "14px 0 4px" }}>{inlineFormat(trim.slice(4))}</h3>); i++; continue; }
+    if (trim.startsWith("## "))  { elements.push(<h2 key={i} style={{ fontSize: 16, fontWeight: 800, color: C.textDark, margin: "18px 0 6px" }}>{inlineFormat(trim.slice(3))}</h2>); i++; continue; }
+    if (trim.startsWith("# "))   { elements.push(<h1 key={i} style={{ fontSize: 18, fontWeight: 900, color: C.textDark, margin: "20px 0 8px", letterSpacing: "-0.01em" }}>{inlineFormat(trim.slice(2))}</h1>); i++; continue; }
+    // HR
+    if (trim === "---" || trim === "***") { elements.push(<hr key={i} style={{ border: "none", borderTop: "1px solid #E2E8F0", margin: "12px 0" }} />); i++; continue; }
+    // Bullet list
+    if (trim.startsWith("- ") || trim.startsWith("* ")) { elements.push(<div key={i} style={{ display: "flex", gap: 8, margin: "3px 0", fontSize: 13 }}><span style={{ color: C.textMuted, flexShrink: 0, marginTop: 2 }}>•</span><span style={{ color: C.textMid }}>{inlineFormat(trim.slice(2))}</span></div>); i++; continue; }
+    // Empty
+    if (!trim) { elements.push(<div key={i} style={{ height: 6 }} />); i++; continue; }
+    // Paragraph
+    elements.push(<p key={i} style={{ margin: "3px 0", fontSize: 13, lineHeight: 1.7, color: C.textMid }}>{inlineFormat(trim)}</p>);
+    i++;
+  }
+  return elements;
+}
+
+function inlineFormat(text) {
+  if (!text) return "";
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+  return parts.map((p, i) => {
+    if (p.startsWith("**") && p.endsWith("**")) return <strong key={i} style={{ color: C.textDark }}>{p.slice(2, -2)}</strong>;
+    if (p.startsWith("*") && p.endsWith("*")) return <em key={i}>{p.slice(1, -1)}</em>;
+    return p;
+  });
+}
+
 function AIBox({ loading, response, accent }) {
   if (!loading && !response) return null;
   const a = accent || C.cyan;
   return (
-    <div style={{ background: `${a}08`, border: `1px solid ${a}25`, borderLeft: `3px solid ${a}`, borderRadius: 8, padding: 18, marginTop: 14, fontSize: 14, lineHeight: 1.8, color: C.textDark, whiteSpace: "pre-wrap" }}>
+    <div style={{ background: `${a}08`, border: `1px solid ${a}25`, borderLeft: `3px solid ${a}`, borderRadius: 8, padding: 18, marginTop: 14, color: C.textDark }}>
       {loading
         ? <span style={{ color: a, fontSize: 13, fontWeight: 600 }}>◈ QumulusAI is thinking…</span>
         : <>
             <div style={{ fontSize: 9, fontWeight: 800, color: a, letterSpacing: "0.14em", marginBottom: 10 }}>✦ QUMULUSAI INTELLIGENCE</div>
-            {response}
+            {renderMarkdown(response)}
           </>
       }
     </div>
@@ -556,7 +618,12 @@ Be specific. Avoid generic language.`;
 // ─── ONBOARDING ───────────────────────────────────────────────────────────────
 function OnboardingConcierge() {
   const [onboardingEmployees, setOnboardingEmployees] = useState([]);
-  const { ask, loading, response } = useAI();
+  const { ask, loading, response, setResponse } = useAI();
+  const [draft, setDraft] = useState("");
+  const [editMode, setEditMode] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [hireDesc, setHireDesc] = useState("");
 
   useEffect(() => {
     async function loadOnboarding() {
@@ -577,7 +644,37 @@ function OnboardingConcierge() {
     loadOnboarding();
   }, []);
 
-  const sys = `You are QumulusAI's Onboarding Concierge. Generate a personalized 30-60-90 day plan for the new hire described. Include specific milestones, key meetings, deliverables, and success criteria for each phase.`;
+  // When AI finishes, move response into draft for editing
+  useEffect(() => {
+    if (response && !loading) {
+      setDraft(response);
+      setEditMode(false);
+      setSent(false);
+    }
+  }, [response, loading]);
+
+  const sys = `You are QumulusAI's Onboarding Concierge. Generate a personalized 30-60-90 day plan for the new hire described. Include specific milestones, key meetings, deliverables, and success criteria for each phase. Use clear markdown formatting with ## headings, bullet lists, and tables where appropriate.`;
+
+  async function generate(prompt) {
+    setDraft("");
+    setSent(false);
+    setEditMode(false);
+    await ask(sys, prompt);
+  }
+
+  async function sendToNewHire() {
+    if (!draft.trim()) return;
+    setSending(true);
+    const channelName = "onboarding-" + hireDesc.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) + "-" + new Date().toISOString().split("T")[0];
+    await supabase.from("messages").insert({
+      channel: channelName,
+      content: draft,
+      sender_name: "Hiring Manager",
+      sent_at: new Date().toISOString(),
+    });
+    setSending(false);
+    setSent(true);
+  }
 
   return (
     <div>
@@ -602,7 +699,7 @@ function OnboardingConcierge() {
                       {docStatus === "complete" ? "✅ Docs Complete" : "⏳ Docs Pending"}
                     </span>
                     <button
-                      onClick={() => ask(sys, `Generate a 30-60-90 day onboarding plan for ${emp.full_name}, ${emp.role_title} at QumulusAI, starting ${emp.start_date || "soon"}.`)}
+                      onClick={() => { setHireDesc(emp.full_name); generate(`Generate a 30-60-90 day onboarding plan for ${emp.full_name}, ${emp.role_title} at QumulusAI, starting ${emp.start_date || "soon"}.`); }}
                       style={{ background: `${C.teal}15`, border: `1px solid ${C.teal}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, color: C.teal, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, minHeight: 30 }}>
                       ✦ Generate 30-60-90
                     </button>
@@ -611,7 +708,6 @@ function OnboardingConcierge() {
               </div>
             );
           })}
-          <AIBox loading={loading} response={response} accent={C.teal} />
         </Card>
       ) : (
         <Card style={{ marginBottom: 14 }}>
@@ -620,7 +716,7 @@ function OnboardingConcierge() {
         </Card>
       )}
 
-      <Card>
+      <Card style={{ marginBottom: draft ? 14 : 0 }}>
         <Label color={C.teal}>Generate Personalized Onboarding Plan</Label>
         <p style={{ color: C.textMid, fontSize: 13, lineHeight: 1.7, marginBottom: 8 }}>Describe a new hire and QumulusAI builds their complete 90-day onboarding journey instantly.</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 4 }}>
@@ -628,11 +724,49 @@ function OnboardingConcierge() {
             "New hire: Sarah Chen, VP Engineering, starting Monday, will manage 40 engineers",
             "New hire: Marcus Webb, Enterprise AE, Chicago office, first SaaS role",
             "New hire: Aiko Tanaka, Senior Data Scientist, PhD ML from MIT",
-          ].map(q => <Chip key={q} label={q.slice(0, 46) + "…"} accent={C.teal} onClick={() => ask(sys, q)} />)}
+          ].map(q => <Chip key={q} label={q.slice(0, 46) + "…"} accent={C.teal} onClick={() => { setHireDesc(q); generate(q); }} />)}
         </div>
-        <AIInput placeholder="Describe the new hire — role, team, location, background…" onSubmit={q => ask(sys, q)} loading={loading} accent={C.teal} />
-        <AIBox loading={loading} response={response} accent={C.teal} />
+        <AIInput placeholder="Describe the new hire — role, team, location, background…" onSubmit={q => { setHireDesc(q); generate(q); }} loading={loading} accent={C.teal} />
+        {loading && (
+          <div style={{ marginTop: 14, color: C.teal, fontSize: 13, fontWeight: 600 }}>◈ QumulusAI is building the onboarding plan…</div>
+        )}
       </Card>
+
+      {draft && !loading && (
+        <Card>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+            <Label color={C.teal} style={{ marginBottom: 0 }}>30-60-90 Day Plan — Review & Send</Label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => setEditMode(e => !e)}
+                style={{ background: editMode ? `${C.teal}15` : C.bg, border: `1px solid ${C.teal}40`, borderRadius: 6, padding: "5px 14px", fontSize: 12, color: C.teal, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                {editMode ? "Preview" : "✏ Edit"}
+              </button>
+              <button onClick={sendToNewHire} disabled={sending || sent}
+                style={{ background: sent ? C.emerald : C.teal, border: "none", borderRadius: 6, padding: "5px 16px", fontSize: 12, color: "#fff", cursor: (sending || sent) ? "default" : "pointer", fontFamily: "inherit", fontWeight: 700, opacity: sending ? 0.7 : 1 }}>
+                {sent ? "✓ Sent to Messenger" : sending ? "Sending…" : "Send to New Hire →"}
+              </button>
+            </div>
+          </div>
+
+          {editMode ? (
+            <textarea
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              style={{ width: "100%", boxSizing: "border-box", minHeight: 400, padding: "12px 14px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, lineHeight: 1.7, color: C.textDark, background: C.bg, resize: "vertical", outline: "none", fontFamily: "monospace" }}
+            />
+          ) : (
+            <div style={{ background: "#FAFBFD", border: `1px solid ${C.border}`, borderRadius: 8, padding: "16px 20px" }}>
+              {renderMarkdown(draft)}
+            </div>
+          )}
+
+          {sent && (
+            <div style={{ marginTop: 12, padding: "10px 14px", background: "#ECFDF5", borderRadius: 8, fontSize: 13, color: "#059669", fontWeight: 600 }}>
+              ✓ Plan sent to Messenger onboarding channel. The new hire will receive it when they join.
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

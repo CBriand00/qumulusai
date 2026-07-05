@@ -1772,16 +1772,19 @@ function useTrainingData() {
   return [data, () => setReload(r => r + 1)];
 }
 
-function Learning({ onNavigate }) {
+function Learning({ onNavigate, focus }) {
   const { isMobile } = useBreakpoint();
   const [data, refresh] = useTrainingData();
   const [drill, setDrill] = useState(null); // course name
   const [marking, setMarking] = useState(null);
+  const [showGaps, setShowGaps] = useState(focus === "gaps");
   const [showAssign, setShowAssign] = useState(false);
   const [assignCourse, setAssignCourse] = useState("");
   const [assignEmps, setAssignEmps] = useState({});
   const [assigning, setAssigning] = useState(false);
   const [assignedMsg, setAssignedMsg] = useState("");
+
+  useEffect(() => { if (focus === "gaps") setShowGaps(true); }, [focus]);
 
   if (!data) return <div><SectionHeader icon="◈" accent={C.emerald} title="Learning" subtitle="Required compliance and role-based training." /><Card><p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading training data…</p></Card></div>;
 
@@ -1794,6 +1797,21 @@ function Learning({ onNavigate }) {
   const drillCourse = courses.find(c => c.name === drill);
   // Course with the most outstanding people — target for the summary drills
   const worstCourse = courses.reduce((w, c) => (!w || c.missing.length > w.missing.length ? c : w), null);
+
+  // Gap report: group every unmet person×course assignment by employee.
+  const gapsByEmp = {};
+  courses.forEach(c => c.missing.forEach(e => {
+    if (!gapsByEmp[e.id]) gapsByEmp[e.id] = { emp: e, courses: [] };
+    gapsByEmp[e.id].courses.push(c);
+  }));
+  const gapRows = Object.values(gapsByEmp).sort((a, b) => b.courses.length - a.courses.length);
+  const totalGaps = gapRows.reduce((s, r) => s + r.courses.length, 0);
+
+  function remindPerson(row) {
+    const subject = encodeURIComponent("Outstanding Required Training");
+    const body = encodeURIComponent(`Hi ${row.emp.full_name.split(" ")[0]},\n\nOur records show the following required training is still outstanding for you:\n\n${row.courses.map(c => `  • ${c.name}`).join("\n")}\n\nPlease complete ${row.courses.length === 1 ? "it" : "these"} as soon as possible.\n\nThank you!`);
+    window.open(`mailto:${row.emp.email}?subject=${subject}&body=${body}`);
+  }
 
   async function markComplete(course, emp) {
     setMarking(emp.id + course.name);
@@ -1937,9 +1955,9 @@ function Learning({ onNavigate }) {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 14 }}>
         {[
           { label: "Overall Completion", value: `${overallPct}%`, color: overallPct === 100 ? C.emerald : overallPct >= 60 ? C.amber : C.rose,
-            hint: "See biggest gap", onClick: worstCourse && worstCourse.missing.length > 0 ? () => setDrill(worstCourse.name) : null },
+            hint: "Open the gap report", onClick: totalGaps > 0 ? () => setShowGaps(v => !v) : null },
           { label: "Assignments Done", value: `${totalDone}/${totalReq}`, color: C.blue,
-            hint: "See biggest gap", onClick: worstCourse && worstCourse.missing.length > 0 ? () => setDrill(worstCourse.name) : null },
+            hint: "Open the gap report", onClick: totalGaps > 0 ? () => setShowGaps(v => !v) : null },
           { label: "Compliance Courses", value: compliance.length, color: C.violet,
             hint: "Jump to compliance courses", onClick: () => document.getElementById("learning-compliance")?.scrollIntoView({ behavior: "smooth" }) },
           { label: "Role-Based Courses", value: roleBased.length, color: C.teal,
@@ -1954,6 +1972,48 @@ function Learning({ onNavigate }) {
           </Card>
         ))}
       </div>
+
+      {/* Gap report — what "training gaps" means, person by person */}
+      {showGaps && (
+        <Card style={{ marginBottom: 14, borderColor: `${C.amber}50` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
+            <Label color={C.amber} style={{ marginBottom: 0 }}>Training Gap Report — {totalGaps} open item{totalGaps !== 1 ? "s" : ""} across {gapRows.length} employee{gapRows.length !== 1 ? "s" : ""}</Label>
+            <button onClick={() => setShowGaps(false)} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>✕ Close</button>
+          </div>
+          <p style={{ fontSize: 12.5, color: C.textMid, lineHeight: 1.6, margin: "0 0 14px" }}>
+            A <strong>gap</strong> is one required course not yet completed by one employee. Each person below owes the listed courses — click a course chip to open its drill-down, or send them one email covering everything they owe.
+          </p>
+          {gapRows.length === 0 ? (
+            <p style={{ fontSize: 13, color: C.emerald, fontWeight: 600, margin: 0 }}>✓ No training gaps — everyone is fully compliant.</p>
+          ) : (
+            gapRows.map((row, i) => (
+              <div key={row.emp.id} style={{ padding: "12px 0", borderBottom: i < gapRows.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                  <div>
+                    <span onClick={() => onNavigate && onNavigate("employee", row.emp.id)} style={{ fontSize: 13.5, fontWeight: 700, color: C.textDark, cursor: "pointer" }}>{row.emp.full_name}</span>
+                    <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 8 }}>{row.emp.role_title}</span>
+                    <span style={{ marginLeft: 10, fontSize: 10.5, fontWeight: 800, background: "#FFFBEB", color: C.amber, borderRadius: 20, padding: "2px 9px" }}>{row.courses.length} outstanding</span>
+                  </div>
+                  {row.emp.email && (
+                    <button onClick={() => remindPerson(row)}
+                      style={{ background: `${C.blue}10`, border: `1px solid ${C.blue}30`, borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700, color: C.blue, cursor: "pointer", fontFamily: "inherit" }}>
+                      ✉ Remind
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {row.courses.map(c => (
+                    <span key={c.id} onClick={() => { setDrill(c.name); setShowGaps(false); }} title="Open course drill-down"
+                      style={{ fontSize: 11, fontWeight: 600, background: c.category === "compliance" ? `${C.violet}10` : `${C.teal}10`, color: c.category === "compliance" ? C.violet : C.teal, border: `1px solid ${c.category === "compliance" ? C.violet : C.teal}30`, borderRadius: 20, padding: "3px 10px", cursor: "pointer" }}>
+                      {c.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </Card>
+      )}
 
       {/* Drill-down */}
       {drillCourse && (
@@ -2087,7 +2147,7 @@ function HRCompliance({ onNavigate }) {
     { label: "I-9 Incomplete", value: i9Missing.length, color: i9Missing.length ? C.rose : C.emerald,
       onClick: () => goTo("hrc-i9") },
     { label: "Training Gaps", value: trainingGaps == null ? "…" : trainingGaps, color: trainingGaps ? C.amber : C.emerald,
-      onClick: () => onNavigate && onNavigate("learning") },
+      onClick: () => onNavigate && onNavigate("learning", "gaps") },
   ];
 
   return (
@@ -2454,7 +2514,7 @@ export default function App() {
     employee:  <EmployeeHub focusEmpId={focusEmpId} />,
     orgchart:  <OrgChart onNavigate={navigate} />,
     diversity: <Diversity onNavigate={navigate} />,
-    learning:  <Learning onNavigate={navigate} />,
+    learning:  <Learning onNavigate={navigate} focus={focusEmpId} />,
     compliance:<HRCompliance onNavigate={navigate} />,
     executive: <WorkforceIntel onNavigate={navigate} />,
     careers:   <CareersPortal />,

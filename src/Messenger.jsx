@@ -16,12 +16,6 @@ function renderMarkdown(text) {
     return <p key={idx} style={{ margin: "1px 0", fontSize: 14, lineHeight: 1.65 }}>{formatted}</p>;
   });
 }
-const STATIC_CHANNELS = [
-  { id: "general",    label: "# general",    desc: "Company-wide announcements and conversation" },
-  { id: "recruiting", label: "# recruiting", desc: "Hiring updates, candidate discussions" },
-  { id: "engineering",label: "# engineering",desc: "Tech talk, infrastructure, and builds" },
-  { id: "sales",      label: "# sales",      desc: "Deals, pipeline, and revenue updates" },
-];
 
 const C = {
   bg:      "#F7F8FA",
@@ -33,6 +27,10 @@ const C = {
   green:   "#16A34A",
 };
 
+function slugify(s) {
+  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+}
+
 export default function Messenger() {
   const [channel, setChannel]     = useState("general");
   const [messages, setMessages]   = useState([]);
@@ -41,7 +39,16 @@ export default function Messenger() {
   const [name, setName]           = useState("");
   const [nameSet, setNameSet]     = useState(false);
   const [sending, setSending]     = useState(false);
+  const [channels, setChannels]   = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [selfEmpId, setSelfEmpId] = useState(null);
   const [onboardingChannels, setOnboardingChannels] = useState([]);
+  const [showNewChannel, setShowNewChannel] = useState(false);
+  const [newChName, setNewChName] = useState("");
+  const [newChDesc, setNewChDesc] = useState("");
+  const [creating, setCreating]   = useState(false);
+  const bottomRef                 = useRef(null);
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
@@ -51,8 +58,25 @@ export default function Messenger() {
             setName(displayName);
             setNameSet(true);
           });
+        // Match the signed-in user to an employee record for DMs
+        supabase.from("employees").select("id, email").eq("status", "active")
+          .then(({ data }) => {
+            const me = (data || []).find(e => e.email?.toLowerCase() === user.email?.toLowerCase());
+            if (me) setSelfEmpId(me.id);
+          });
       }
     });
+  }, []);
+
+  function loadChannels() {
+    supabase.from("channels").select("*").order("created_at")
+      .then(({ data }) => setChannels(data || []));
+  }
+  useEffect(() => { loadChannels(); }, []);
+
+  useEffect(() => {
+    supabase.from("employees").select("id, full_name, role_title").eq("status", "active").order("full_name")
+      .then(({ data }) => setEmployees(data || []));
   }, []);
 
   useEffect(() => {
@@ -80,7 +104,6 @@ export default function Messenger() {
         })));
       });
   }, []);
-  const bottomRef                 = useRef(null);
 
   // Fetch messages for current channel
   useEffect(() => {
@@ -124,11 +147,40 @@ export default function Messenger() {
     setSending(false);
   }
 
+  async function createChannel() {
+    const slug = slugify(newChName);
+    if (!slug) return;
+    setCreating(true);
+    const { data, error } = await supabase.from("channels").insert({
+      slug,
+      name: slug,
+      description: newChDesc.trim() || "Team channel",
+      created_by: name,
+    }).select().single();
+    setCreating(false);
+    if (error) {
+      // Most likely a duplicate slug — just switch to it
+      if (error.code === "23505") { setChannel(slug); setShowNewChannel(false); setNewChName(""); setNewChDesc(""); return; }
+      return;
+    }
+    setShowNewChannel(false);
+    setNewChName("");
+    setNewChDesc("");
+    loadChannels();
+    if (data) setChannel(data.slug);
+  }
+
   function handleKey(e) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
+  }
+
+  // Direct-message channel slug: stable regardless of who opens it.
+  function dmSlug(otherEmpId) {
+    const self = selfEmpId || "me-" + slugify(name);
+    return "dm-" + [self, otherEmpId].sort().join(".");
   }
 
   // Name setup screen
@@ -160,11 +212,25 @@ export default function Messenger() {
     );
   }
 
-  const ALL_CHANNELS = [...STATIC_CHANNELS, ...onboardingChannels];
-  const currentChannel = ALL_CHANNELS.find((c) => c.id === channel);
+  // Resolve the current channel's display info across all sources
+  const dmPeers = employees.filter(e => e.id !== selfEmpId && e.full_name !== name);
+  const chRow = channels.find(c => c.slug === channel);
+  const obRow = onboardingChannels.find(c => c.id === channel);
+  const dmPeer = channel.startsWith("dm-") ? dmPeers.find(e => channel.includes(e.id)) : null;
+  const headerLabel = chRow ? `# ${chRow.name}` : obRow ? obRow.label : dmPeer ? `@ ${dmPeer.full_name}` : `# ${channel}`;
+  const headerDesc  = chRow ? chRow.description : obRow ? obRow.desc : dmPeer ? `Direct message · ${dmPeer.role_title}` : "";
+
+  const chanBtn = (active) => ({
+    display: "block", width: "100%", textAlign: "left",
+    padding: "8px 12px", borderRadius: 8, border: "none",
+    background: active ? C.accent + "20" : "transparent",
+    color: active ? C.text : C.muted,
+    fontSize: 13, fontWeight: active ? 600 : 400,
+    cursor: "pointer", marginBottom: 2, fontFamily: "inherit",
+  });
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", height: "100vh", background: C.bg, color: C.text, fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "230px 1fr", height: "100vh", background: C.bg, color: C.text, fontFamily: "'Inter', sans-serif" }}>
 
       {/* Sidebar */}
       <aside style={{ borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", background: C.surface }}>
@@ -191,34 +257,81 @@ export default function Messenger() {
 
         {/* Channels */}
         <div style={{ padding: "16px 12px 8px", overflowY: "auto", flex: 1 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: "0.1em", padding: "0 8px 8px" }}>CHANNELS</div>
-          {STATIC_CHANNELS.map((ch) => (
-            <button key={ch.id} onClick={() => setChannel(ch.id)} style={{
-              display: "block", width: "100%", textAlign: "left",
-              padding: "8px 12px", borderRadius: 8, border: "none",
-              background: channel === ch.id ? C.accent + "20" : "transparent",
-              color: channel === ch.id ? C.text : C.muted,
-              fontSize: 13, fontWeight: channel === ch.id ? 600 : 400,
-              cursor: "pointer", marginBottom: 2, fontFamily: "inherit",
-            }}>
-              {ch.label}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 8px 8px" }}>
+            <span style={{ fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: "0.1em" }}>CHANNELS</span>
+            <button onClick={() => setShowNewChannel(v => !v)} title="Create a new channel"
+              style={{ background: showNewChannel ? C.accent : C.accent + "18", color: showNewChannel ? "#fff" : C.accent, border: "none", borderRadius: 6, width: 20, height: 20, fontSize: 14, fontWeight: 700, cursor: "pointer", lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit" }}>
+              +
+            </button>
+          </div>
+
+          {showNewChannel && (
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, marginBottom: 10 }}>
+              <input
+                autoFocus
+                value={newChName}
+                onChange={e => setNewChName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") createChannel(); if (e.key === "Escape") setShowNewChannel(false); }}
+                placeholder="channel-name"
+                style={{ width: "100%", boxSizing: "border-box", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", fontSize: 13, color: C.text, outline: "none", fontFamily: "inherit", marginBottom: 6 }}
+              />
+              <input
+                value={newChDesc}
+                onChange={e => setNewChDesc(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") createChannel(); }}
+                placeholder="What's it about? (optional)"
+                style={{ width: "100%", boxSizing: "border-box", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", fontSize: 12, color: C.text, outline: "none", fontFamily: "inherit", marginBottom: 8 }}
+              />
+              {newChName && <div style={{ fontSize: 10.5, color: C.muted, marginBottom: 8 }}>Will be created as <strong># {slugify(newChName)}</strong></div>}
+              <div style={{ display: "flex", gap: 6 }}>
+                <button onClick={createChannel} disabled={!slugify(newChName) || creating}
+                  style={{ flex: 1, background: C.accent, color: "#fff", border: "none", borderRadius: 7, padding: "7px 0", fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: slugify(newChName) ? 1 : 0.5, fontFamily: "inherit" }}>
+                  {creating ? "Creating…" : "Create"}
+                </button>
+                <button onClick={() => { setShowNewChannel(false); setNewChName(""); setNewChDesc(""); }}
+                  style={{ background: "transparent", color: C.muted, border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 12px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {channels.map((ch) => (
+            <button key={ch.slug} onClick={() => setChannel(ch.slug)} style={chanBtn(channel === ch.slug)}>
+              # {ch.name}
             </button>
           ))}
+
+          {/* Direct messages */}
+          {dmPeers.length > 0 && (
+            <>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: "0.1em", padding: "14px 8px 8px" }}>DIRECT MESSAGES</div>
+              {dmPeers.map((emp) => {
+                const slug = dmSlug(emp.id);
+                const active = channel === slug;
+                return (
+                  <button key={emp.id} onClick={() => setChannel(slug)}
+                    style={{ ...chanBtn(active), display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ width: 22, height: 22, borderRadius: "50%", background: active ? C.accent + "30" : C.border, color: active ? C.accent : C.muted, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 9.5, fontWeight: 700, flexShrink: 0 }}>
+                      {emp.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                    </span>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{emp.full_name}</span>
+                  </button>
+                );
+              })}
+            </>
+          )}
+
           {onboardingChannels.length > 0 && (
             <>
-              <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: "0.1em", padding: "12px 8px 8px" }}>NEW HIRE ONBOARDING</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, letterSpacing: "0.1em", padding: "14px 8px 8px" }}>NEW HIRE ONBOARDING</div>
               {onboardingChannels.map((ch) => (
                 <button key={ch.id} onClick={() => setChannel(ch.id)} style={{
+                  ...chanBtn(channel === ch.id),
                   display: "flex", alignItems: "center", justifyContent: "space-between",
-                  width: "100%", textAlign: "left",
-                  padding: "8px 12px", borderRadius: 8, border: "none",
-                  background: channel === ch.id ? C.accent + "20" : "transparent",
-                  color: channel === ch.id ? C.text : C.muted,
-                  fontSize: 13, fontWeight: channel === ch.id ? 600 : 400,
-                  cursor: "pointer", marginBottom: 2, fontFamily: "inherit",
                 }}>
-                  <span>{ch.label}</span>
-                  <span style={{ fontSize: 9, background: "#16A34A", color: "#fff", borderRadius: 4, padding: "1px 5px", fontWeight: 700, letterSpacing: "0.05em" }}>NEW</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ch.label}</span>
+                  <span style={{ fontSize: 9, background: "#16A34A", color: "#fff", borderRadius: 4, padding: "1px 5px", fontWeight: 700, letterSpacing: "0.05em", flexShrink: 0, marginLeft: 6 }}>NEW</span>
                 </button>
               ))}
             </>
@@ -231,8 +344,8 @@ export default function Messenger() {
 
         {/* Header */}
         <div style={{ padding: "16px 24px", borderBottom: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 2 }}>
-          <div style={{ fontWeight: 700, fontSize: 16 }}>{currentChannel?.label}</div>
-          <div style={{ fontSize: 12, color: C.muted }}>{currentChannel?.desc}</div>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>{headerLabel}</div>
+          <div style={{ fontSize: 12, color: C.muted }}>{headerDesc}</div>
         </div>
 
         {/* Messages */}
@@ -240,7 +353,7 @@ export default function Messenger() {
           {loading && <div style={{ color: C.muted, fontSize: 13 }}>Loading messages…</div>}
           {!loading && messages.length === 0 && (
             <div style={{ color: C.muted, fontSize: 13, textAlign: "center", marginTop: 48 }}>
-              No messages yet. Be the first to say something!
+              {dmPeer ? `This is the beginning of your conversation with ${dmPeer.full_name}.` : "No messages yet. Be the first to say something!"}
             </div>
           )}
           {messages.map((msg, i) => {
@@ -281,7 +394,7 @@ export default function Messenger() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKey}
-              placeholder={`Message ${currentChannel?.label}…`}
+              placeholder={`Message ${headerLabel}…`}
               rows={1}
               style={{ flex: 1, background: "transparent", border: "none", color: C.text, fontSize: 14, outline: "none", resize: "none", fontFamily: "inherit", lineHeight: 1.5 }}
             />

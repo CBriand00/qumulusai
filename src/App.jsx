@@ -1061,6 +1061,7 @@ function EmployeeHub({ focusEmpId }) {
   const [termForm, setTermForm] = useState({ date: new Date().toISOString().slice(0, 10), type: "voluntary", reason: "" });
   const [terminating, setTerminating] = useState(false);
   const [terminatedName, setTerminatedName] = useState("");
+  const [accessRevoked, setAccessRevoked] = useState(false);
 
   function loadEmployees() {
     return supabase.from("employees").select("*").eq("status", "active")
@@ -1082,7 +1083,16 @@ function EmployeeHub({ focusEmpId }) {
       termination_reason: termForm.reason,
       terminated_at: new Date().toISOString(),
     }).eq("id", selectedEmp.id);
+    // Revoke system access — bans the auth account so they can no longer sign in.
+    let accessRevoked = false;
+    try {
+      const { data: revoke } = await supabase.functions.invoke("revoke-employee-access", {
+        body: { employeeId: selectedEmp.id, email: selectedEmp.email },
+      });
+      accessRevoked = !!revoke?.disabled;
+    } catch (_) { /* non-blocking — termination still recorded */ }
     setTerminatedName(selectedEmp.full_name);
+    setAccessRevoked(accessRevoked);
     setTerminating(false);
     setShowTerminate(false);
     setSelectedEmp(null);
@@ -1148,7 +1158,9 @@ function EmployeeHub({ focusEmpId }) {
 
       {terminatedName && (
         <div style={{ background: "#FEF2F2", border: `1px solid ${C.rose}30`, borderRadius: 10, padding: "12px 16px", marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 13, color: C.rose, fontWeight: 600 }}>✓ {terminatedName} has been offboarded and removed from active rosters.</span>
+          <span style={{ fontSize: 13, color: C.rose, fontWeight: 600 }}>
+            ✓ {terminatedName} has been offboarded and removed from active rosters.{accessRevoked ? " System access has been revoked." : ""}
+          </span>
           <button onClick={() => setTerminatedName("")} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>✕</button>
         </div>
       )}
@@ -1304,8 +1316,9 @@ function EmployeeHub({ focusEmpId }) {
                     style={{ width: "100%", boxSizing: "border-box", marginTop: 5, height: 72, padding: "9px 11px", borderRadius: 7, border: `1px solid ${C.border}`, fontSize: 13, color: C.textDark, background: "#fff", resize: "vertical", outline: "none", fontFamily: "inherit" }} />
 
                   <div style={{ background: "#fff", borderRadius: 8, padding: "10px 14px", margin: "12px 0", fontSize: 12, color: C.textMid }}>
-                    <div style={{ fontWeight: 700, color: C.textDark, marginBottom: 6 }}>Offboarding checklist (manual)</div>
-                    {["Process final paycheck & unused PTO payout", "Revoke system access & disable accounts", "Collect company equipment", "Remove from benefits & payroll", "Conduct exit interview"].map(item => (
+                    <div style={{ fontWeight: 700, color: C.textDark, marginBottom: 6 }}>Offboarding checklist</div>
+                    <div style={{ display: "flex", gap: 8, padding: "2px 0" }}><span style={{ color: C.emerald }}>✓</span> <span>Revoke system access & disable login <span style={{ color: C.emerald, fontWeight: 600 }}>(automatic)</span></span></div>
+                    {["Process final paycheck & unused PTO payout", "Collect company equipment", "Remove from benefits & payroll", "Conduct exit interview"].map(item => (
                       <div key={item} style={{ display: "flex", gap: 8, padding: "2px 0" }}><span style={{ color: C.rose }}>○</span> {item}</div>
                     ))}
                   </div>

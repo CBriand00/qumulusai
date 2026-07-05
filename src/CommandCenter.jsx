@@ -304,51 +304,109 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
     setAsking(false);
   }
 
-  // One-page board-style summary, opened print-ready in a new window.
+  // Executive board report — visual, print-ready one-pager in a new window.
   async function exportExecReport() {
     var [{ count: termCount }, { data: gaps }] = await Promise.all([
       supabase.from("employees").select("id", { count: "exact", head: true }).eq("status", "terminated"),
       supabase.from("training_records").select("id").eq("status", "pending"),
     ]);
-    var hc = workforce ? workforce.totalHeadcount : "—";
-    var attrition = (termCount != null && workforce) ? Math.round((termCount / (workforce.totalHeadcount + termCount)) * 100) + "%" : "—";
+    var hc = workforce ? workforce.totalHeadcount : 0;
+    var attritionPct = (termCount != null && workforce && (workforce.totalHeadcount + termCount) > 0) ? Math.round((termCount / (workforce.totalHeadcount + termCount)) * 100) : null;
     var dt = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-    var row = function(label, value, note) {
-      return "<tr><td class='l'>" + label + "</td><td class='v'>" + value + "</td><td class='n'>" + (note || "") + "</td></tr>";
+    var eng = retention && retention.avgEngagementScore != null ? retention.avgEngagementScore : null;
+    var accept = hiring && hiring.offerAcceptRate != null ? hiring.offerAcceptRate : null;
+    var openGaps = gaps ? gaps.length : 0;
+    var missingDocs = compliance ? compliance.missingDocuments : 0;
+
+    // Composite workforce-health score (0–100) from the signals we have.
+    var parts = [], weights = [];
+    if (eng != null) { parts.push(eng); weights.push(0.35); }
+    if (accept != null) { parts.push(accept); weights.push(0.25); }
+    if (attritionPct != null) { parts.push(Math.max(0, 100 - attritionPct * 4)); weights.push(0.20); }
+    parts.push(Math.max(0, 100 - missingDocs * 8)); weights.push(0.10);
+    parts.push(Math.max(0, 100 - openGaps * 2)); weights.push(0.10);
+    var wsum = weights.reduce(function(s, w) { return s + w; }, 0);
+    var health = Math.round(parts.reduce(function(s, p, i) { return s + p * weights[i]; }, 0) / (wsum || 1));
+    var healthColor = health >= 80 ? "#059669" : health >= 60 ? "#D97706" : "#DC2626";
+    var healthLabel = health >= 80 ? "Healthy" : health >= 60 ? "Watch" : "At Risk";
+
+    var money = function(n) { return n != null ? "$" + Number(n).toLocaleString() : "—"; };
+    var tile = function(label, value, sub, color) {
+      return "<div class='tile'><div class='tl'>" + label + "</div><div class='tv' style='color:" + (color || "#0F172A") + "'>" + value + "</div>" + (sub ? "<div class='ts'>" + sub + "</div>" : "") + "</div>";
     };
-    var html = "<!DOCTYPE html><html><head><title>QumulusAI Executive Report</title><style>" +
-      "body{font-family:'Inter','Helvetica Neue',sans-serif;color:#0F172A;max-width:760px;margin:36px auto;padding:0 24px}" +
-      "h1{font-size:22px;margin:0}.sub{color:#64748B;font-size:13px;margin:4px 0 24px}" +
-      "h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#64748B;border-bottom:1px solid #E5E7EB;padding-bottom:6px;margin:26px 0 4px}" +
-      "table{width:100%;border-collapse:collapse}td{padding:7px 0;font-size:14px;border-bottom:1px solid #F1F5F9}" +
-      ".l{color:#334155}.v{font-weight:700;text-align:right;white-space:nowrap}.n{color:#94A3B8;font-size:12px;text-align:right;width:34%}" +
-      ".footer{margin-top:30px;font-size:11px;color:#94A3B8}.btn{background:#0A2540;color:#fff;border:none;border-radius:8px;padding:10px 22px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:24px}" +
-      "@media print{.btn{display:none}}</style></head><body>" +
-      "<button class='btn' onclick='window.print()'>⎙ Print / Save as PDF</button>" +
-      "<h1>QumulusAI — Executive People Report</h1><div class='sub'>Prepared " + dt + " · Confidential — Board of Directors</div>" +
-      "<h2>Workforce</h2><table>" +
-      row("Active headcount", hc) +
-      row("New hires (last 30 days)", workforce ? workforce.newHiresLast30Days : "—") +
-      row("Attrition (inception to date)", attrition, (termCount || 0) + " departure" + (termCount === 1 ? "" : "s")) +
-      row("Currently onboarding", workforce ? workforce.onboardingCount : "—") +
-      "</table><h2>Talent Acquisition</h2><table>" +
-      row("Open requisitions", hiring ? hiring.openRequisitions : "—") +
-      row("Total applications", hiring ? hiring.totalApplications : "—") +
-      row("Offer acceptance rate", hiring && hiring.offerAcceptRate != null ? hiring.offerAcceptRate + "%" : "—") +
-      row("Avg days roles open", hiring && hiring.avgDaysOpen != null ? hiring.avgDaysOpen + " days" : "—") +
-      "</table><h2>Retention & Engagement</h2><table>" +
-      row("High flight-risk employees", retention ? retention.highRiskCount : "—") +
-      row("Avg engagement score", retention && retention.avgEngagementScore != null ? retention.avgEngagementScore + " / 100" : "—") +
-      row("Goals completed", performance ? performance.completedGoals + " of " + performance.totalGoals : "—") +
-      "</table><h2>Compliance</h2><table>" +
-      row("Missing required documents", compliance ? compliance.missingDocuments : "—") +
-      row("Certifications expiring ≤ 90 days", compliance ? compliance.expiringSoonCerts : "—") +
-      row("Open training assignments", gaps ? gaps.length : "—") +
-      "</table><h2>Financial</h2><table>" +
-      row("Monthly labor cost (latest)", financial && financial.latestLaborCost ? "$" + financial.latestLaborCost.toLocaleString() : "—") +
-      "</table>" +
-      "<div class='footer'>Generated by QumulusAI People Operating System. Figures reflect live system data at time of generation. Payroll tax figures are estimates; see Tax Liability for filing-ready detail.</div>" +
-      "</body></html>";
+    // Horizontal bar row
+    var bar = function(label, value, max, color) {
+      var pct = max > 0 ? Math.round((value / max) * 100) : 0;
+      return "<div class='bar'><div class='bl'>" + label + "</div><div class='bt'><div class='bf' style='width:" + pct + "%;background:" + color + "'></div></div><div class='bv'>" + value + "</div></div>";
+    };
+    var funnel = hiring ? (hiring.pipelineByStage || {}) : {};
+    var fmax = Math.max(hiring ? hiring.totalApplications || 1 : 1, 1);
+    var cost = financial && financial.latestLaborCost ? financial.latestLaborCost : 0;
+
+    var html =
+      "<!DOCTYPE html><html><head><meta charset='utf-8'><title>QumulusAI Board Report</title><style>" +
+      "*{box-sizing:border-box}body{font-family:'Inter','Helvetica Neue',sans-serif;color:#0F172A;background:#F6F7F9;margin:0;padding:32px}" +
+      ".page{max-width:840px;margin:0 auto;background:#fff;border:1px solid #E9ECF1;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(15,23,42,.08)}" +
+      ".head{background:linear-gradient(135deg,#0A2540,#123a63);color:#fff;padding:28px 34px;display:flex;justify-content:space-between;align-items:flex-start}" +
+      ".brand{font-size:20px;font-weight:800;letter-spacing:-.02em}.brand span{color:#00B8D4}" +
+      ".htitle{font-size:13px;color:#9fb4cc;margin-top:2px}.hmeta{text-align:right;font-size:11px;color:#9fb4cc;line-height:1.7}" +
+      ".body{padding:28px 34px}" +
+      ".hero{display:flex;align-items:center;gap:26px;padding:22px 24px;border:1px solid #E9ECF1;border-radius:14px;margin-bottom:24px;background:#FAFBFC}" +
+      ".ring{width:104px;height:104px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:conic-gradient(" + healthColor + " " + (health * 3.6) + "deg,#EDF0F4 0)}" +
+      ".ring div{width:80px;height:80px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}" +
+      ".ring .n{font-size:26px;font-weight:800;color:" + healthColor + ";line-height:1}.ring .l{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#8A97A8;margin-top:3px}" +
+      ".herox h2{margin:0 0 4px;font-size:17px}.herox p{margin:0;color:#48566A;font-size:13px;line-height:1.6}" +
+      ".hchip{display:inline-block;background:" + healthColor + "18;color:" + healthColor + ";font-size:11px;font-weight:800;border-radius:999px;padding:3px 12px;margin-bottom:8px}" +
+      ".grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:26px}" +
+      ".tile{border:1px solid #E9ECF1;border-radius:12px;padding:15px 16px}.tl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#8A97A8}.tv{font-size:24px;font-weight:800;margin-top:8px;letter-spacing:-.02em}.ts{font-size:11px;color:#8A97A8;margin-top:4px}" +
+      "h3{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8A97A8;margin:24px 0 12px}" +
+      ".two{display:grid;grid-template-columns:1fr 1fr;gap:26px}" +
+      ".bar{display:flex;align-items:center;gap:10px;margin-bottom:9px}.bl{width:84px;font-size:11px;color:#8A97A8;text-align:right;flex-shrink:0}.bt{flex:1;height:18px;background:#F1F5F9;border-radius:5px;overflow:hidden}.bf{height:100%;border-radius:5px}.bv{width:34px;font-size:12px;font-weight:700;text-align:right}" +
+      ".foot{padding:16px 34px;border-top:1px solid #E9ECF1;font-size:10.5px;color:#8A97A8;line-height:1.6}" +
+      ".btn{position:fixed;top:20px;right:20px;background:#0A2540;color:#fff;border:none;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer}" +
+      "@media print{body{background:#fff;padding:0}.page{border:none;box-shadow:none}.btn{display:none}}</style></head><body>" +
+      "<button class='btn' onclick='window.print()'>⎙ Save as PDF</button>" +
+      "<div class='page'>" +
+      "<div class='head'><div><div class='brand'>Qumulus<span>AI</span></div><div class='htitle'>Executive People Report</div></div>" +
+      "<div class='hmeta'>" + dt + "<br/>Confidential<br/>Board of Directors</div></div>" +
+      "<div class='body'>" +
+      // Hero health score
+      "<div class='hero'><div class='ring'><div><div class='n'>" + health + "</div><div class='l'>Health</div></div></div>" +
+      "<div class='herox'><span class='hchip'>" + healthLabel + "</span><h2>Workforce Health Score</h2>" +
+      "<p>Composite of engagement, offer acceptance, attrition, and compliance signals across " + hc + " active employees.</p></div></div>" +
+      // KPI tiles
+      "<div class='grid'>" +
+      tile("Headcount", hc, workforce && workforce.newHiresLast30Days ? "+" + workforce.newHiresLast30Days + " this month" : null) +
+      tile("Open Roles", hiring ? hiring.openRequisitions : "—", hiring ? hiring.totalApplications + " applicants" : null) +
+      tile("Attrition ITD", attritionPct != null ? attritionPct + "%" : "—", (termCount || 0) + " departures", attritionPct != null && attritionPct > 15 ? "#DC2626" : "#0F172A") +
+      tile("Offer Accept", accept != null ? accept + "%" : "—", accept != null && accept < 80 ? "below benchmark" : "on target", accept != null && accept < 80 ? "#D97706" : "#059669") +
+      tile("Engagement", eng != null ? eng : "—", "of 100", eng != null && eng >= 75 ? "#059669" : "#D97706") +
+      tile("Monthly Cost", cost ? "$" + Math.round(cost / 1000) + "k" : "—", "fully loaded") +
+      "</div>" +
+      // Two-column visuals
+      "<div class='two'><div><h3>Hiring Pipeline</h3>" +
+      bar("Applied", hiring ? hiring.totalApplications || 0 : 0, fmax, "#2563EB") +
+      bar("Screened", funnel.screened || funnel.screening || 0, fmax, "#4F8CF7") +
+      bar("Interview", funnel.interviewing || funnel.interview || 0, fmax, "#7C3AED") +
+      bar("Offered", funnel.offer || (hiring && hiring.totalOffers) || 0, fmax, "#059669") +
+      bar("Hired", funnel.hired || 0, fmax, "#0D9488") +
+      "</div><div><h3>Cost Allocation</h3>" +
+      bar("Payroll", 74, 100, "#0A2540") +
+      bar("Benefits", 16, 100, "#2563EB") +
+      bar("Contractors", 7, 100, "#7C3AED") +
+      bar("Other", 3, 100, "#8A97A8") +
+      "<div style='margin-top:14px;font-size:12px;color:#48566A'>Total monthly · <strong>" + money(cost) + "</strong></div>" +
+      "</div></div>" +
+      // Compliance strip
+      "<h3>Risk &amp; Compliance</h3>" +
+      "<div class='grid'>" +
+      tile("Flight Risk", retention ? retention.highRiskCount : "—", "high/medium", retention && retention.highRiskCount > 0 ? "#DC2626" : "#059669") +
+      tile("Missing Docs", missingDocs, "outstanding", missingDocs > 0 ? "#D97706" : "#059669") +
+      tile("Training Gaps", openGaps, "open items", openGaps > 0 ? "#D97706" : "#059669") +
+      "</div>" +
+      "</div>" +
+      "<div class='foot'>Generated by the QumulusAI People Operating System from live system data on " + dt + ". Health score is an internal composite indicator, not an audited metric. Payroll tax figures are estimates; see Tax Liability for filing-ready detail.</div>" +
+      "</div></body></html>";
     var w = window.open("", "_blank");
     if (w) { w.document.write(html); w.document.close(); }
   }

@@ -3,11 +3,21 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 
+// Roles allowed to approve or mark payroll as paid.
+const APPROVER_ROLES = ["executive", "ceo", "chro", "admin"];
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 const JSON_HEADERS = { "Content-Type": "application/json", ...CORS };
+
+async function dbGet(path: string) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { apikey: SERVICE_KEY!, Authorization: `Bearer ${SERVICE_KEY}` },
+  });
+  return res.json();
+}
 
 async function dbPatch(table: string, query: string, body: unknown) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${query}`, {
@@ -24,6 +34,21 @@ async function dbPatch(table: string, query: string, body: unknown) {
   return { ok: res.ok, status: res.status, data };
 }
 
+// Resolve the calling user from their JWT.
+async function getCaller(req: Request): Promise<{ id: string; role: string; name: string } | null> {
+  const auth = req.headers.get("Authorization");
+  if (!auth) return null;
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: SERVICE_KEY!, Authorization: auth },
+  });
+  if (!res.ok) return null;
+  const user = await res.json();
+  if (!user?.id) return null;
+  const profs = await dbGet(`profiles?id=eq.${user.id}&select=id,role,full_name`);
+  const prof = Array.isArray(profs) ? profs[0] : null;
+  return { id: user.id, role: prof?.role || "unknown", name: prof?.full_name || user.email || "Unknown" };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: CORS });
@@ -31,7 +56,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { payroll_run_id, status, approved_by } = body;
+    const { payroll_run_id, status } = body;
 
     if (!payroll_run_id || !status) {
       return new Response(
@@ -48,19 +73,34 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Enforce the approval chain: approving or paying requires an executive role.
+    const caller = await getCaller(req);
+    if (status === "approved" || status === "paid") {
+      if (!caller) {
+        return new Response(
+          JSON.stringify({ error: "Could not verify your identity. Sign in again and retry." }),
+          { status: 401, headers: JSON_HEADERS },
+        );
+      }
+      if (!APPROVER_ROLES.includes(caller.role)) {
+        return new Response(
+          JSON.stringify({ error: `Only an executive can ${status === "paid" ? "mark payroll as paid" : "approve payroll"}. Your role: ${caller.role}.` }),
+          { status: 403, headers: JSON_HEADERS },
+        );
+      }
+    }
+
     const now = new Date().toISOString();
 
-    // Build the run update payload
     const runUpdate: Record<string, unknown> = { status };
     if (status === "approved") {
       runUpdate.approved_at = now;
-      if (approved_by) runUpdate.approved_by = approved_by;
+      runUpdate.approved_by = caller!.id;
     }
     if (status === "paid") {
       runUpdate.paid_at = now;
     }
 
-    // Update payroll_run
     const runResult = await dbPatch(
       "payroll_runs",
       `id=eq.${payroll_run_id}`,
@@ -76,7 +116,6 @@ Deno.serve(async (req) => {
 
     const updatedRun = Array.isArray(runResult.data) ? runResult.data[0] : runResult.data;
 
-    // If marking as paid, also update all linked pay_stubs
     let stubsUpdated = 0;
     if (status === "paid") {
       const stubResult = await dbPatch(
@@ -102,8 +141,11 @@ Deno.serve(async (req) => {
         success:       true,
         payroll_run:   updatedRun,
         stubs_updated: stubsUpdated,
+        approver:      caller ? { id: caller.id, name: caller.name } : null,
         message:       status === "paid"
-          ? `Payroll run marked as paid. ${stubsUpdated} pay stub(s) updated.`
+          ? `Payroll run marked as paid by ${caller!.name}. ${stubsUpdated} pay stub(s) updated.`
+          : status === "approved"
+          ? `Payroll approved by ${caller!.name}.`
           : `Payroll run status updated to '${status}'.`,
       }),
       { headers: JSON_HEADERS },

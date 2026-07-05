@@ -237,6 +237,79 @@ function PayStubsDrawer({ run, onClose }) {
   );
 }
 
+// ── NACHA (ACH) file generation ───────────────────────────────────────────────
+// Builds a bank-standard ACH credit file (PPD) from a run's pay stubs and the
+// employees' direct-deposit details. Company/ODFI identifiers are demo values —
+// replace with your bank's before uploading to a real bank portal.
+const ACH = {
+  odfiRouting: "061000104",        // originating bank (Truist ATL)
+  companyName: "QUMULUSAI",
+  companyId:   "1581234567",       // 1 + EIN (demo)
+  destName:    "TRUIST BANK",
+};
+
+function achPad(s, len, right = false, ch = " ") {
+  s = String(s ?? "").slice(0, len);
+  return right ? s.padStart(len, ch) : s.padEnd(len, ch);
+}
+
+function buildAchFile(run, entries) {
+  // entries: [{ name, routing, account, accountType, amountCents, empId }]
+  const now = new Date();
+  const yymmdd = now.toISOString().slice(2, 10).replace(/-/g, "");
+  const hhmm = now.toTimeString().slice(0, 5).replace(":", "");
+  const effDate = (run.pay_date || now.toISOString().slice(0, 10)).slice(2).replace(/-/g, "");
+  const lines = [];
+
+  // File header
+  lines.push(
+    "101 " + achPad(ACH.odfiRouting, 9, true, "0") + achPad(ACH.companyId, 10, true, " ") +
+    yymmdd + hhmm + "A" + "094" + "10" + "1" +
+    achPad(ACH.destName, 23) + achPad(ACH.companyName, 23) + achPad("PAYROLL", 8)
+  );
+  // Batch header
+  lines.push(
+    "5220" + achPad(ACH.companyName, 16) + achPad("", 20) + achPad(ACH.companyId, 10) +
+    "PPD" + achPad("PAYROLL", 10) + achPad(yymmdd, 6) + effDate + "   " + "1" +
+    ACH.odfiRouting.slice(0, 8) + "0000001"
+  );
+  // Entries
+  let hash = 0, totalCents = 0;
+  entries.forEach((e, i) => {
+    const rt = e.routing.replace(/\D/g, "").padStart(9, "0");
+    hash += parseInt(rt.slice(0, 8), 10);
+    totalCents += e.amountCents;
+    const txn = e.accountType === "savings" ? "32" : "22";
+    lines.push(
+      "6" + txn + rt +
+      achPad(e.account.replace(/\s/g, ""), 17) +
+      achPad(e.amountCents, 10, true, "0") +
+      achPad(e.empId, 15) +
+      achPad(e.name.toUpperCase(), 22) + "  " + "0" +
+      ACH.odfiRouting.slice(0, 8) + achPad(i + 1, 7, true, "0")
+    );
+  });
+  const hash10 = String(hash).slice(-10).padStart(10, "0");
+  // Batch control
+  lines.push(
+    "8220" + achPad(entries.length, 6, true, "0") + hash10 +
+    achPad(0, 12, true, "0") + achPad(totalCents, 12, true, "0") +
+    achPad(ACH.companyId, 10) + achPad("", 19) + achPad("", 6) +
+    ACH.odfiRouting.slice(0, 8) + "0000001"
+  );
+  // File control
+  const preBlock = lines.length + 1;
+  const blockCount = Math.ceil(preBlock / 10);
+  lines.push(
+    "9" + achPad(1, 6, true, "0") + achPad(blockCount, 6, true, "0") +
+    achPad(entries.length, 8, true, "0") + hash10 +
+    achPad(0, 12, true, "0") + achPad(totalCents, 12, true, "0") + achPad("", 39)
+  );
+  // Pad to a full block of 10 lines
+  while (lines.length % 10 !== 0) lines.push("9".repeat(94));
+  return lines.map(l => achPad(l, 94)).join("\r\n");
+}
+
 // ── Main Payroll Component ────────────────────────────────────────────────────
 export default function Payroll() {
   const [runs, setRuns] = useState([]);
@@ -246,6 +319,8 @@ export default function Payroll() {
   const [approvingId, setApprovingId] = useState(null);
   const [toast, setToast] = useState("");
   const [runFilter, setRunFilter] = useState("all"); // all | paid | pending
+  const [approverMap, setApproverMap] = useState({});
+  const [exportingId, setExportingId] = useState(null);
   const { isMobile } = useBreakpoint();
 
   useEffect(() => { loadRuns(); }, []);
@@ -256,7 +331,53 @@ export default function Payroll() {
       .select("*")
       .order("pay_date", { ascending: false });
     setRuns(data || []);
+    // Resolve approver names for display
+    const ids = [...new Set((data || []).map(r => r.approved_by).filter(Boolean))];
+    if (ids.length) {
+      const { data: profs } = await supabase.from("profiles").select("id, full_name").in("id", ids);
+      setApproverMap((profs || []).reduce((m, p) => { m[p.id] = p.full_name; return m; }, {}));
+    }
     setLoading(false);
+  }
+
+  // Generate and download the NACHA ACH file for an approved/paid run.
+  async function downloadAch(run) {
+    setExportingId(run.id);
+    try {
+      const [{ data: stubs }, { data: docs }] = await Promise.all([
+        supabase.from("pay_stubs").select("employee_id, net_pay, employees(full_name)").eq("payroll_run_id", run.id),
+        supabase.from("employee_onboarding_docs").select("employee_id, dd_routing_number, dd_account_number, dd_account_type"),
+      ]);
+      const ddMap = (docs || []).reduce((m, d) => { if (d.dd_routing_number && d.dd_account_number && !m[d.employee_id]) m[d.employee_id] = d; return m; }, {});
+      const entries = [];
+      const skipped = [];
+      (stubs || []).forEach(s => {
+        const dd = ddMap[s.employee_id];
+        const name = s.employees?.full_name || "Unknown";
+        if (!dd) { skipped.push(name); return; }
+        entries.push({
+          name,
+          routing: dd.dd_routing_number,
+          account: dd.dd_account_number,
+          accountType: dd.dd_account_type,
+          amountCents: Math.round(Number(s.net_pay || 0) * 100),
+          empId: s.employee_id.slice(0, 15),
+        });
+      });
+      if (entries.length === 0) { showToast("No employees with direct deposit on file — nothing to export."); setExportingId(null); return; }
+      const file = buildAchFile(run, entries);
+      const blob = new Blob([file], { type: "text/plain;charset=ascii" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `QumulusAI_ACH_${run.pay_date}.ach`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`ACH file generated — ${entries.length} credit${entries.length !== 1 ? "s" : ""}, ${fmt$(entries.reduce((s, e) => s + e.amountCents, 0) / 100)} total.${skipped.length ? ` Skipped (no direct deposit): ${skipped.join(", ")}` : ""}`);
+    } catch (e) {
+      showToast("ACH export failed: " + e.message);
+    }
+    setExportingId(null);
   }
 
   function showToast(msg) {
@@ -419,6 +540,12 @@ export default function Payroll() {
                   <button onClick={() => setSelectedRun(run)} style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, padding: "8px 0", fontSize: 12, color: C.textMid, cursor: "pointer", fontFamily: "inherit" }}>
                     View Stubs
                   </button>
+                  {["approved", "paid"].includes(run.status) && (
+                    <button onClick={() => downloadAch(run)} disabled={exportingId === run.id}
+                      style={{ flex: 1, background: "#EEF2FF", border: "1px solid #C7D2FE", borderRadius: 7, padding: "8px 0", fontSize: 12, fontWeight: 700, color: "#4338CA", cursor: "pointer", fontFamily: "inherit", opacity: exportingId === run.id ? 0.6 : 1 }}>
+                      {exportingId === run.id ? "…" : "⬇ ACH"}
+                    </button>
+                  )}
                   {ACTION_LABEL[run.status] && (
                     <button
                       onClick={() => advanceStatus(run)}
@@ -453,8 +580,8 @@ export default function Payroll() {
                       {fmtDate(run.pay_period_start)} – {fmtDate(run.pay_period_end)}
                     </div>
                     <div style={{ fontSize: 11, color: C.textMuted, marginTop: 1 }}>
-                      {run.status === "approved" && run.approved_at && `Approved ${fmtDateTime(run.approved_at)}`}
-                      {run.status === "paid"     && run.paid_at     && `Paid ${fmtDateTime(run.paid_at)}`}
+                      {run.status === "approved" && run.approved_at && `Approved${run.approved_by && approverMap[run.approved_by] ? ` by ${approverMap[run.approved_by]}` : ""} ${fmtDateTime(run.approved_at)}`}
+                      {run.status === "paid"     && run.paid_at     && `Paid${run.approved_by && approverMap[run.approved_by] ? ` · approved by ${approverMap[run.approved_by]}` : ""} ${fmtDateTime(run.paid_at)}`}
                     </div>
                   </td>
                   <td onClick={open} title="View pay stubs" style={{ padding: "12px 12px", color: C.textMid, fontSize: 13, whiteSpace: "nowrap", ...numCell, textDecorationColor: "#CBD5E1" }}>{fmtDate(run.pay_date)}</td>
@@ -470,10 +597,20 @@ export default function Payroll() {
                         style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: "6px 12px", fontSize: 12, color: C.textMid, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
                         View Stubs
                       </button>
+                      {["approved", "paid"].includes(run.status) && (
+                        <button
+                          onClick={() => downloadAch(run)}
+                          disabled={exportingId === run.id}
+                          title="Download bank-ready NACHA ACH file for this run"
+                          style={{ background: "#EEF2FF", border: "1px solid #C7D2FE", borderRadius: 6, padding: "6px 12px", fontSize: 12, fontWeight: 700, color: "#4338CA", cursor: exportingId === run.id ? "default" : "pointer", fontFamily: "inherit", whiteSpace: "nowrap", opacity: exportingId === run.id ? 0.6 : 1 }}>
+                          {exportingId === run.id ? "…" : "⬇ ACH File"}
+                        </button>
+                      )}
                       {ACTION_LABEL[run.status] && (
                         <button
                           onClick={() => advanceStatus(run)}
                           disabled={approvingId === run.id}
+                          title={["review"].includes(run.status) ? "Requires an executive role" : undefined}
                           style={{ background: ACTION_COLOR[run.status], border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 12, fontWeight: 700, color: "#fff", cursor: approvingId === run.id ? "default" : "pointer", opacity: approvingId === run.id ? 0.7 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
                           {approvingId === run.id ? "…" : ACTION_LABEL[run.status]}
                         </button>

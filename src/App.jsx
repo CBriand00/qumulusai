@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useBreakpoint } from "./useBreakpoint";
 import Auth, { getPreviousLogin } from "./Auth";
 import { supabase } from "./supabase";
+import { brand } from "./brand";
 import CommandCenter from "./CommandCenter";
 import CareersPortal from "./Careers";
 import TalentInbox from "./TalentInbox";
@@ -3491,6 +3492,15 @@ export default function App() {
   const [active, setActive] = useState("home");
   const [focusEmpId, setFocusEmpId] = useState(null);
   const [previewEmployee, setPreviewEmployee] = useState(false);
+  const [previewEmpId, setPreviewEmpId] = useState("");
+  const [previewEmps, setPreviewEmps] = useState([]);
+
+  useEffect(() => {
+    if (previewEmployee && previewEmps.length === 0) {
+      supabase.from("employees").select("id, full_name, role_title").eq("status", "active").order("full_name")
+        .then(({ data }) => setPreviewEmps(data || []));
+    }
+  }, [previewEmployee]);
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
@@ -3582,11 +3592,16 @@ export default function App() {
   // Admin previewing the employee experience — shows the real portal with an exit bar.
   if (session && previewEmployee) return (
     <div>
-      <div style={{ position: "sticky", top: 0, zIndex: 100, background: C.navy, color: "#fff", padding: "9px 20px", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, fontSize: 13, fontWeight: 600 }}>
-        <span style={{ opacity: 0.85 }}>👁 Previewing the employee experience</span>
-        <button onClick={() => setPreviewEmployee(false)} style={{ background: "#fff", color: C.navy, border: "none", borderRadius: 7, padding: "5px 14px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Exit preview</button>
+      <div style={{ position: "sticky", top: 0, zIndex: 100, background: C.navy, color: "#fff", padding: "9px 20px", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, fontSize: 13, fontWeight: 600, flexWrap: "wrap" }}>
+        <span style={{ opacity: 0.85 }}>👁 Previewing as</span>
+        <select value={previewEmpId} onChange={e => setPreviewEmpId(e.target.value)}
+          style={{ background: "rgba(255,255,255,0.12)", color: "#fff", border: "1px solid rgba(255,255,255,0.25)", borderRadius: 7, padding: "5px 10px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", outline: "none" }}>
+          <option value="" style={{ color: "#0A2540" }}>Yourself</option>
+          {previewEmps.map(e => <option key={e.id} value={e.id} style={{ color: "#0A2540" }}>{e.full_name} · {e.role_title}</option>)}
+        </select>
+        <button onClick={() => { setPreviewEmployee(false); setPreviewEmpId(""); }} style={{ background: "#fff", color: C.navy, border: "none", borderRadius: 7, padding: "5px 14px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Exit preview</button>
       </div>
-      <EmployeePortal user={session.user} />
+      <EmployeePortal key={previewEmpId} user={session.user} overrideEmpId={previewEmpId || null} />
     </div>
   );
 
@@ -3629,9 +3644,9 @@ export default function App() {
           <span style={{ fontSize: 15, fontWeight: 700, color: C.textOnDark, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {currentPageLabel}
           </span>
-          <span style={{ fontWeight: 900, fontSize: 15, color: C.textOnDark, letterSpacing: "-0.02em", flexShrink: 0 }}>
-            <span style={{ color: C.cyan }}>Q</span>AI
-          </span>
+          <a href={brand.website} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 900, fontSize: 15, color: C.textOnDark, letterSpacing: "-0.02em", flexShrink: 0, textDecoration: "none" }}>
+            <span style={{ color: C.cyan }}>{brand.wordmark.lead}</span>{brand.wordmark.tail}
+          </a>
         </div>
       )}
 
@@ -3661,12 +3676,12 @@ export default function App() {
       }}>
         {/* Logo + close */}
         <div style={{ padding: "22px 20px 16px", borderBottom: `1px solid ${C.borderDark}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-          <div>
+          <a href={brand.website} target="_blank" rel="noopener noreferrer" title={`Visit ${brand.name}`} style={{ textDecoration: "none", display: "block" }}>
             <div style={{ fontWeight: 900, fontSize: 16, color: C.textOnDark, letterSpacing: "-0.02em" }}>
-              <span style={{ color: C.cyan }}>Q</span>umulus<span style={{ color: C.cyan }}>AI</span>
+              <span style={{ color: C.cyan }}>{brand.wordmark.lead}</span>{brand.wordmark.body}<span style={{ color: C.cyan }}>{brand.wordmark.tail}</span>
             </div>
-            <div style={{ fontSize: 9, color: C.textMutedDark, marginTop: 3, letterSpacing: "0.1em", textTransform: "uppercase" }}>People Operating System</div>
-          </div>
+            <div style={{ fontSize: 9, color: C.textMutedDark, marginTop: 3, letterSpacing: "0.1em", textTransform: "uppercase" }}>{brand.tagline}</div>
+          </a>
           {isMobile && (
             <button
               onClick={() => setSidebarOpen(false)}

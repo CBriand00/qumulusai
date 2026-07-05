@@ -13,7 +13,7 @@ function courseApplies(course, roleTitle, state) {
 
 const isManager = (title) => /lead|manager|head|director|chief|vp|architect/.test((title || "").toLowerCase());
 
-export default function EmployeePortal({ user }) {
+export default function EmployeePortal({ user, overrideEmpId }) {
   const [emp, setEmp] = useState(null);
   const [data, setData] = useState({ courses: [], done: new Set(), stub: null, goals: [], team: [], manager: null });
   const [loading, setLoading] = useState(true);
@@ -23,7 +23,9 @@ export default function EmployeePortal({ user }) {
     async function load() {
       const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", user.id).single();
       const { data: emps } = await supabase.from("employees").select("*").eq("status", "active");
-      const me = (emps || []).find(e => e.email?.toLowerCase() === user.email?.toLowerCase())
+      // Admin preview can override which employee we render as.
+      const me = (overrideEmpId ? (emps || []).find(e => e.id === overrideEmpId) : null)
+        || (emps || []).find(e => e.email?.toLowerCase() === user.email?.toLowerCase())
         || { full_name: prof?.full_name || user.email.split("@")[0], role_title: "Employee", department_id: null, id: null, start_date: null };
       setEmp(me);
 
@@ -47,7 +49,7 @@ export default function EmployeePortal({ user }) {
       setLoading(false);
     }
     load();
-  }, [user]);
+  }, [user, overrideEmpId]);
 
   if (loading) return <div style={S.loading}>Loading your workspace…</div>;
 

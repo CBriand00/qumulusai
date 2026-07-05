@@ -115,7 +115,7 @@ const OPEN_ROLES = [
 ];
 
 const METRICS = [
-  { label: "Headcount",     value: "18",  delta: "+6",   trend: "up",   page: "employee" },
+  { label: "Headcount",     value: "15",  delta: "+3",   trend: "up",   page: "employee" },
   { label: "Open Roles",    value: "21",  delta: "+12",  trend: "up",   page: "recruit"  },
   { label: "Time-to-Hire",  value: "38d", delta: "+10d", trend: "down", page: "recruit"  },
   { label: "Engagement",    value: "81",  delta: "+6",   trend: "up",   page: "executive"},

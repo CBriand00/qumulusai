@@ -245,6 +245,7 @@ export default function Payroll() {
   const [selectedRun, setSelectedRun] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
   const [toast, setToast] = useState("");
+  const [runFilter, setRunFilter] = useState("all"); // all | paid | pending
   const { isMobile } = useBreakpoint();
 
   useEffect(() => { loadRuns(); }, []);
@@ -295,6 +296,13 @@ export default function Payroll() {
   const pendingCount = runs.filter(r => ["draft","review","approved"].includes(r.status)).length;
   const lastRun      = runs[0];
 
+  // Metric-card drill-down filter
+  const visibleRuns = runs.filter(r =>
+    runFilter === "paid"    ? r.status === "paid" :
+    runFilter === "pending" ? ["draft","review","approved"].includes(r.status) :
+    true
+  );
+
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, sans-serif", color: C.textDark }}>
 
@@ -334,17 +342,27 @@ export default function Payroll() {
         </div>
       </div>
 
-      {/* Metric cards */}
+      {/* Metric cards — every number drills into its data */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 14, marginBottom: 28 }}>
         {[
-          { label: "Total Paid YTD",    value: fmt$(totalPaid),                       color: C.emerald },
-          { label: "Pending Runs",      value: String(pendingCount),                  color: C.amber   },
-          { label: "Last Pay Date",     value: lastRun ? fmtDate(lastRun.pay_date) : "—", color: C.blue },
-          { label: "Last Run Employees",value: lastRun ? String(lastRun.employee_count) : "—", color: C.teal },
+          { label: "Total Paid YTD",    value: fmt$(totalPaid),                       color: C.emerald, hint: "View paid runs",
+            active: runFilter === "paid",
+            onClick: () => setRunFilter(f => f === "paid" ? "all" : "paid") },
+          { label: "Pending Runs",      value: String(pendingCount),                  color: C.amber,   hint: "View pending runs",
+            active: runFilter === "pending",
+            onClick: () => setRunFilter(f => f === "pending" ? "all" : "pending") },
+          { label: "Last Pay Date",     value: lastRun ? fmtDate(lastRun.pay_date) : "—", color: C.blue, hint: "Open last run",
+            onClick: lastRun ? () => setSelectedRun(lastRun) : null },
+          { label: "Last Run Employees",value: lastRun ? String(lastRun.employee_count) : "—", color: C.teal, hint: "View pay stubs",
+            onClick: lastRun ? () => setSelectedRun(lastRun) : null },
         ].map((m, i) => (
-          <div key={i} style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: "18px 20px" }}>
+          <div key={i} onClick={m.onClick || undefined} title={m.onClick ? m.hint : undefined}
+            style={{ background: m.active ? `${m.color}0C` : C.bgCard, border: `1px solid ${m.active ? m.color : C.border}`, borderRadius: 12, padding: "18px 20px", cursor: m.onClick ? "pointer" : "default", transition: "border-color 0.15s, box-shadow 0.15s" }}
+            onMouseEnter={e => { if (m.onClick) { e.currentTarget.style.borderColor = m.color; e.currentTarget.style.boxShadow = `0 2px 10px ${m.color}25`; } }}
+            onMouseLeave={e => { if (!m.active) { e.currentTarget.style.borderColor = C.border; } e.currentTarget.style.boxShadow = "none"; }}>
             <div style={{ fontSize: 10, fontWeight: 800, color: C.textMuted, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8 }}>{m.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: m.color, letterSpacing: "-0.02em" }}>{m.value}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: m.color, letterSpacing: "-0.02em", textDecoration: m.onClick ? "underline" : "none", textDecorationColor: `${m.color}50`, textUnderlineOffset: 3 }}>{m.value}</div>
+            {m.active && <div style={{ fontSize: 10, fontWeight: 700, color: m.color, marginTop: 6 }}>Filtering · click to clear</div>}
           </div>
         ))}
       </div>
@@ -352,12 +370,24 @@ export default function Payroll() {
       {/* Pay Runs table */}
       <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
         <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark }}>Payroll Runs</div>
-          <div style={{ fontSize: 12, color: C.textMuted }}>{runs.length} run{runs.length !== 1 ? "s" : ""}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark }}>
+            Payroll Runs
+            {runFilter !== "all" && (
+              <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: runFilter === "paid" ? C.emerald : C.amber, background: runFilter === "paid" ? "#ECFDF5" : "#FFFBEB", borderRadius: 20, padding: "2px 10px", textTransform: "capitalize" }}>
+                {runFilter} only
+                <span onClick={() => setRunFilter("all")} style={{ marginLeft: 6, cursor: "pointer" }}>✕</span>
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: C.textMuted }}>{visibleRuns.length} run{visibleRuns.length !== 1 ? "s" : ""}</div>
         </div>
 
         {loading ? (
           <div style={{ padding: 48, textAlign: "center", color: C.textMuted, fontSize: 14 }}>Loading payroll runs…</div>
+        ) : visibleRuns.length === 0 && runs.length > 0 ? (
+          <div style={{ padding: 40, textAlign: "center", color: C.textMuted, fontSize: 13 }}>
+            No {runFilter} runs. <span onClick={() => setRunFilter("all")} style={{ color: C.blue, fontWeight: 600, cursor: "pointer" }}>Show all runs</span>
+          </div>
         ) : runs.length === 0 ? (
           <div style={{ padding: 56, textAlign: "center" }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>◎</div>
@@ -370,7 +400,7 @@ export default function Payroll() {
         ) : isMobile ? (
           /* Mobile: card list */
           <div style={{ padding: "8px 0" }}>
-            {runs.map(run => (
+            {visibleRuns.map(run => (
               <div key={run.id} style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
                   <div>
@@ -413,9 +443,12 @@ export default function Payroll() {
               </tr>
             </thead>
             <tbody>
-              {runs.map((run, i) => (
+              {visibleRuns.map((run, i) => {
+                const numCell = { cursor: "pointer", textDecorationLine: "underline", textDecorationStyle: "dotted", textUnderlineOffset: 3 };
+                const open = () => setSelectedRun(run);
+                return (
                 <tr key={run.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? "#fff" : "#FAFBFC" }}>
-                  <td style={{ padding: "12px 12px", whiteSpace: "nowrap" }}>
+                  <td style={{ padding: "12px 12px", whiteSpace: "nowrap", cursor: "pointer" }} onClick={open} title="View pay stubs">
                     <div style={{ fontWeight: 600, color: C.textDark, fontSize: 13 }}>
                       {fmtDate(run.pay_period_start)} – {fmtDate(run.pay_period_end)}
                     </div>
@@ -424,11 +457,11 @@ export default function Payroll() {
                       {run.status === "paid"     && run.paid_at     && `Paid ${fmtDateTime(run.paid_at)}`}
                     </div>
                   </td>
-                  <td style={{ padding: "12px 12px", color: C.textMid, fontSize: 13, whiteSpace: "nowrap" }}>{fmtDate(run.pay_date)}</td>
-                  <td style={{ padding: "12px 12px", color: C.textMid, fontSize: 13, textAlign: "center" }}>{run.employee_count}</td>
-                  <td style={{ padding: "12px 12px", fontWeight: 600, color: C.textDark, fontSize: 13, textAlign: "right", whiteSpace: "nowrap" }}>{fmt$(run.total_gross)}</td>
-                  <td style={{ padding: "12px 12px", color: C.rose, fontSize: 13, textAlign: "right", whiteSpace: "nowrap" }}>{fmt$(run.total_tax_withheld)}</td>
-                  <td style={{ padding: "12px 12px", fontWeight: 700, color: C.emerald, fontSize: 13, textAlign: "right", whiteSpace: "nowrap" }}>{fmt$(run.total_net)}</td>
+                  <td onClick={open} title="View pay stubs" style={{ padding: "12px 12px", color: C.textMid, fontSize: 13, whiteSpace: "nowrap", ...numCell, textDecorationColor: "#CBD5E1" }}>{fmtDate(run.pay_date)}</td>
+                  <td onClick={open} title="View pay stubs" style={{ padding: "12px 12px", color: C.blue, fontWeight: 600, fontSize: 13, textAlign: "center", ...numCell, textDecorationColor: `${C.blue}50` }}>{run.employee_count}</td>
+                  <td onClick={open} title="View pay stubs" style={{ padding: "12px 12px", fontWeight: 600, color: C.textDark, fontSize: 13, textAlign: "right", whiteSpace: "nowrap", ...numCell, textDecorationColor: "#CBD5E1" }}>{fmt$(run.total_gross)}</td>
+                  <td onClick={open} title="View pay stubs" style={{ padding: "12px 12px", color: C.rose, fontSize: 13, textAlign: "right", whiteSpace: "nowrap", ...numCell, textDecorationColor: `${C.rose}50` }}>{fmt$(run.total_tax_withheld)}</td>
+                  <td onClick={open} title="View pay stubs" style={{ padding: "12px 12px", fontWeight: 700, color: C.emerald, fontSize: 13, textAlign: "right", whiteSpace: "nowrap", ...numCell, textDecorationColor: `${C.emerald}50` }}>{fmt$(run.total_net)}</td>
                   <td style={{ padding: "12px 12px" }}><StatusBadge status={run.status} /></td>
                   <td style={{ padding: "12px 12px" }}>
                     <div style={{ display: "flex", gap: 7 }}>
@@ -448,7 +481,8 @@ export default function Payroll() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           </div>

@@ -80,6 +80,7 @@ const NAV_GROUPS = [
       { id: "manager",   label: "Manager Coach",       icon: "◇", accent: C.blue },
       { id: "payroll",   label: "Payroll",             icon: "◈", accent: C.teal },
       { id: "comp",      label: "Compensation",        icon: "◆", accent: C.amber },
+      { id: "relations", label: "Employee Relations",  icon: "◉", accent: C.rose },
       { id: "compliance",label: "Compliance",          icon: "⚖", accent: C.amber },
       { id: "security",  label: "Security Center",     icon: "⚔", accent: C.blue },
     ],
@@ -2295,6 +2296,198 @@ function Compensation({ onNavigate }) {
   );
 }
 
+// ─── EMPLOYEE RELATIONS ───────────────────────────────────────────────────────
+const ER_TYPES = { investigation: "Investigation", accommodation: "Accommodation", grievance: "Grievance", disciplinary: "Disciplinary", mediation: "Mediation", exit_interview: "Exit Interview" };
+const ER_STATUS = {
+  open:          { label: "Open",          color: "#D97706", bg: "#FFFBEB" },
+  investigating: { label: "Investigating", color: "#DC2626", bg: "#FEF2F2" },
+  resolved:      { label: "Resolved",      color: "#2563EB", bg: "#EFF6FF" },
+  closed:        { label: "Closed",        color: "#059669", bg: "#ECFDF5" },
+};
+
+function EmployeeRelations({ onNavigate, userRole }) {
+  const { isMobile } = useBreakpoint();
+  const [cases, setCases] = useState(null);
+  const [emps, setEmps] = useState([]);
+  const [filter, setFilter] = useState("active"); // active | all | high
+  const [openCase, setOpenCase] = useState(null);
+  const [showNew, setShowNew] = useState(false);
+  const [form, setForm] = useState({ case_type: "grievance", severity: "medium", employee_id: "", summary: "" });
+  const [saving, setSaving] = useState(false);
+
+  const allowed = ["executive", "ceo", "chro", "admin", "recruiter"].includes(userRole);
+
+  function load() {
+    Promise.all([
+      supabase.from("er_cases").select("*").order("opened_at", { ascending: false }),
+      supabase.from("employees").select("id, full_name, role_title").eq("status", "active").order("full_name"),
+    ]).then(([{ data: c }, { data: e }]) => { setCases(c || []); setEmps(e || []); });
+  }
+  useEffect(() => { if (allowed) load(); }, [allowed]);
+
+  if (!allowed) {
+    return (
+      <div>
+        <SectionHeader icon="◉" accent={C.rose} title="Employee Relations" subtitle="Case management for workplace matters." />
+        <Card><p style={{ fontSize: 13, color: C.textMid, margin: 0 }}>🔒 Restricted. Employee relations cases are visible only to HR leadership.</p></Card>
+      </div>
+    );
+  }
+  if (!cases) return <div><SectionHeader icon="◉" accent={C.rose} title="Employee Relations" subtitle="Case management for workplace matters." /><Card><p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading cases…</p></Card></div>;
+
+  const empMap = emps.reduce((m, e) => { m[e.id] = e; return m; }, {});
+  const daysOpen = c => Math.max(0, Math.round(((c.closed_at ? new Date(c.closed_at) : new Date()) - new Date(c.opened_at)) / 86400000));
+  const active = cases.filter(c => ["open", "investigating"].includes(c.status));
+  const closedCases = cases.filter(c => ["resolved", "closed"].includes(c.status));
+  const avgClose = closedCases.length ? Math.round(closedCases.reduce((s, c) => s + daysOpen(c), 0) / closedCases.length) : null;
+  const high = cases.filter(c => c.severity === "high" && ["open", "investigating"].includes(c.status));
+
+  const visible = filter === "active" ? active : filter === "high" ? high : cases;
+
+  async function createCase() {
+    if (!form.summary.trim()) return;
+    setSaving(true);
+    const num = `ER-${new Date().getFullYear()}-${String(cases.length + 1).padStart(3, "0")}`;
+    await supabase.from("er_cases").insert({
+      case_number: num,
+      case_type: form.case_type,
+      severity: form.severity,
+      employee_id: form.employee_id || null,
+      summary: form.summary.trim(),
+      status: "open",
+      owner: "Chateau Briand",
+    });
+    setSaving(false);
+    setShowNew(false);
+    setForm({ case_type: "grievance", severity: "medium", employee_id: "", summary: "" });
+    load();
+  }
+
+  async function advanceCase(c, status) {
+    await supabase.from("er_cases").update({ status, closed_at: ["resolved", "closed"].includes(status) ? new Date().toISOString() : null }).eq("id", c.id);
+    load();
+  }
+
+  const kpis = [
+    { label: "Active Cases", value: active.length, color: active.length ? C.amber : C.emerald, f: "active" },
+    { label: "High Severity", value: high.length, color: high.length ? C.rose : C.emerald, f: "high" },
+    { label: "Avg Days to Close", value: avgClose ?? "—", color: C.blue, f: "all" },
+    { label: "Total Cases YTD", value: cases.length, color: C.textDark, f: "all" },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+        <SectionHeader icon="◉" accent={C.rose} title="Employee Relations" subtitle="Confidential case management — documentation, timelines, and outcomes." />
+        <button onClick={() => setShowNew(v => !v)}
+          style={{ background: showNew ? C.bg : C.rose, color: showNew ? C.textMid : "#fff", border: showNew ? `1px solid ${C.border}` : "none", borderRadius: 9, padding: "10px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+          {showNew ? "✕ Cancel" : "＋ Open Case"}
+        </button>
+      </div>
+
+      <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: 10, padding: "10px 16px", marginBottom: 14, fontSize: 12, color: "#92400E" }}>
+        🔒 Restricted to HR leadership. Case details are confidential; investigation specifics live with the case owner, not in this system.
+      </div>
+
+      {showNew && (
+        <Card style={{ marginBottom: 14, borderColor: `${C.rose}40` }}>
+          <Label color={C.rose}>Open New Case</Label>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Type</label>
+              <select value={form.case_type} onChange={e => setForm(f => ({ ...f, case_type: e.target.value }))}
+                style={{ width: "100%", boxSizing: "border-box", marginTop: 5, padding: "9px 11px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, background: C.bg, outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
+                {Object.entries(ER_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Severity</label>
+              <select value={form.severity} onChange={e => setForm(f => ({ ...f, severity: e.target.value }))}
+                style={{ width: "100%", boxSizing: "border-box", marginTop: 5, padding: "9px 11px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, background: C.bg, outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
+                <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Employee (optional — omit to restrict)</label>
+              <select value={form.employee_id} onChange={e => setForm(f => ({ ...f, employee_id: e.target.value }))}
+                style={{ width: "100%", boxSizing: "border-box", marginTop: 5, padding: "9px 11px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, background: C.bg, outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
+                <option value="">Restricted / not named</option>
+                {emps.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+              </select>
+            </div>
+          </div>
+          <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Summary (keep neutral — facts, not conclusions)</label>
+          <textarea value={form.summary} onChange={e => setForm(f => ({ ...f, summary: e.target.value }))}
+            placeholder="One or two neutral sentences describing the matter…"
+            style={{ width: "100%", boxSizing: "border-box", marginTop: 5, height: 70, padding: "9px 11px", borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13, background: C.bg, resize: "vertical", outline: "none", fontFamily: "inherit", marginBottom: 12 }} />
+          <button onClick={createCase} disabled={saving || !form.summary.trim()}
+            style={{ background: C.rose, color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: form.summary.trim() ? 1 : 0.5 }}>
+            {saving ? "Opening…" : "Open Case"}
+          </button>
+        </Card>
+      )}
+
+      {/* KPIs — click to filter */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 14 }}>
+        {kpis.map(m => (
+          <Card key={m.label} onClick={() => setFilter(m.f)} title="Filter cases"
+            style={{ padding: "16px 18px", textAlign: "center", cursor: "pointer", borderColor: filter === m.f ? m.color : C.border, transition: "border-color 0.15s" }}>
+            <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>{m.label}</div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: m.color, textDecoration: "underline", textDecorationColor: `${m.color}50`, textUnderlineOffset: 3 }}>{m.value}</div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Case list */}
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "16px 22px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.textDark }}>
+            {filter === "active" ? "Active Cases" : filter === "high" ? "High-Severity Active Cases" : "All Cases"}
+          </span>
+          <span style={{ fontSize: 12, color: C.textMuted }}>{visible.length} case{visible.length !== 1 ? "s" : ""}</span>
+        </div>
+        {visible.length === 0 && <p style={{ fontSize: 13, color: C.emerald, fontWeight: 600, padding: "18px 22px", margin: 0 }}>✓ Nothing here — no cases match this view.</p>}
+        {visible.map((c, i) => {
+          const st = ER_STATUS[c.status];
+          const emp = c.employee_id ? empMap[c.employee_id] : null;
+          const expanded = openCase === c.id;
+          return (
+            <div key={c.id} style={{ borderBottom: i < visible.length - 1 ? `1px solid ${C.border}` : "none" }}>
+              <div onClick={() => setOpenCase(expanded ? null : c.id)}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 22px", cursor: "pointer", background: expanded ? "#FAFBFD" : "transparent" }}
+                onMouseEnter={e => { if (!expanded) e.currentTarget.style.background = "#FAFBFD"; }}
+                onMouseLeave={e => { if (!expanded) e.currentTarget.style.background = "transparent"; }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.textMuted, fontFamily: "monospace", flexShrink: 0 }}>{c.case_number}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: C.textDark, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {ER_TYPES[c.case_type]}{emp ? ` · ${emp.full_name}` : " · 🔒 Restricted"}
+                </span>
+                {c.severity === "high" && <span style={{ fontSize: 10, fontWeight: 800, color: C.rose, flexShrink: 0 }}>HIGH</span>}
+                <span style={{ fontSize: 12, color: C.textMuted, whiteSpace: "nowrap", flexShrink: 0 }}>{daysOpen(c)}d</span>
+                <span style={{ fontSize: 10.5, fontWeight: 700, background: st.bg, color: st.color, borderRadius: 20, padding: "3px 10px", flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.03em" }}>{st.label}</span>
+                <span style={{ color: "#CBD5E1", fontSize: 12, transform: expanded ? "rotate(90deg)" : "none", transition: "transform 0.15s", flexShrink: 0 }}>›</span>
+              </div>
+              {expanded && (
+                <div style={{ padding: "2px 22px 16px 22px" }}>
+                  <p style={{ fontSize: 13, color: C.textMid, lineHeight: 1.6, margin: "0 0 8px" }}>{c.summary}</p>
+                  {c.resolution && <p style={{ fontSize: 12.5, color: C.emerald, lineHeight: 1.6, margin: "0 0 8px" }}><strong>Resolution:</strong> {c.resolution}</p>}
+                  <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", fontSize: 12, color: C.textMuted }}>
+                    <span>Owner: <strong style={{ color: C.textDark }}>{c.owner}</strong></span>
+                    <span>Opened {new Date(c.opened_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                    {emp && <button onClick={() => onNavigate && onNavigate("employee", emp.id)} style={{ background: "none", border: "none", padding: 0, fontSize: 12, fontWeight: 600, color: C.blue, cursor: "pointer", fontFamily: "inherit" }}>View profile</button>}
+                    {c.status === "open" && <button onClick={() => advanceCase(c, "investigating")} style={{ background: "none", border: "none", padding: 0, fontSize: 12, fontWeight: 600, color: C.rose, cursor: "pointer", fontFamily: "inherit" }}>→ Begin investigation</button>}
+                    {["open", "investigating"].includes(c.status) && <button onClick={() => advanceCase(c, "resolved")} style={{ background: "none", border: "none", padding: 0, fontSize: 12, fontWeight: 600, color: C.blue, cursor: "pointer", fontFamily: "inherit" }}>→ Mark resolved</button>}
+                    {c.status === "resolved" && <button onClick={() => advanceCase(c, "closed")} style={{ background: "none", border: "none", padding: 0, fontSize: 12, fontWeight: 600, color: C.emerald, cursor: "pointer", fontFamily: "inherit" }}>→ Close case</button>}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </Card>
+    </div>
+  );
+}
+
 // ─── HR COMPLIANCE & EEO REPORTING ────────────────────────────────────────────
 function eeoCategory(title) {
   const t = (title || "").toLowerCase();
@@ -2750,6 +2943,7 @@ export default function App() {
     diversity: <Diversity onNavigate={navigate} />,
     learning:  <Learning onNavigate={navigate} focus={focusEmpId} />,
     comp:      <Compensation onNavigate={navigate} />,
+    relations: <EmployeeRelations onNavigate={navigate} userRole={userRole} />,
     compliance:<HRCompliance onNavigate={navigate} />,
     executive: <WorkforceIntel onNavigate={navigate} />,
     careers:   <CareersPortal />,

@@ -26,7 +26,7 @@ const ROLES = [
     location: "Atlanta, GA / Remote",
     type: "Full-Time",
     level: "Executive",
-    summary: "Build and lead the People function from the ground up at one of the fastest-growing AI infrastructure companies in the country. You will be QumulusAI's first CHRO, creating the systems, culture, and talent strategy that will take us from 43 to 300+ employees.",
+    summary: "Build and lead the People function from the ground up at one of the fastest-growing AI infrastructure companies in the country. You will be QumulusAI's first CHRO, creating the systems, culture, and talent strategy that will take us from 18 to 300+ employees.",
     requirements: ["15+ years HR leadership experience", "Experience scaling a company through hyper-growth", "Strong background in technical recruiting", "Compensation and total rewards expertise", "AI-native mindset"],
     nice: ["Experience at an AI or infrastructure company", "CHRO or VP People title at a funded startup"],
     comp: "$250,000 – $320,000 + equity",
@@ -315,7 +315,7 @@ export default function CareersPortal() {
     }
 
     await ask(
-      `You are QumulusAI's AI recruiting screener. QumulusAI is a 43-person bare-metal GPU cloud company in Atlanta, GA with $500M in financing, scaling to 300+ employees. CEO: Mike Maniscalco. Mission: universalize access to AI compute.
+      `You are QumulusAI's AI recruiting screener. QumulusAI is an 18-person bare-metal GPU cloud company in Atlanta, GA with $500M in financing, scaling to 300+ employees. CEO: Mike Maniscalco. Mission: universalize access to AI compute.
 
 Screen this candidate and respond with:
 MATCH SCORE: [X/100]
@@ -377,7 +377,7 @@ Resume/Background: ${formData.resume}`
                 Build the future of<br /><span style={{ color: C.cyan }}>AI infrastructure.</span>
               </h1>
               <p style={{ color: C.textMid, fontSize: 16, maxWidth: 480, margin: "0 auto", lineHeight: 1.75 }}>
-                QumulusAI is scaling from 43 to 300+ people. Join us and help universalize access to AI compute.
+                QumulusAI is scaling from 18 to 300+ people. Join us and help universalize access to AI compute.
               </p>
             </div>
 

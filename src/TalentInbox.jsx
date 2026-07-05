@@ -656,7 +656,8 @@ function initials(name = "") {
   return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 }
 
-const C = { bg: "#F7F8FA", surface: "#FFFFFF", border: "#E5E7EB", accent: "#7C3AED", text: "#0F172A", muted: "#64748B" };
+// Aligned to the design system (src/theme.js)
+const C = { bg: "#F6F7F9", surface: "#FFFFFF", border: "#E9ECF1", accent: "#7C3AED", text: "#0D1117", muted: "#8A97A8" };
 
 const board = {
   shell: { display: "flex", flexDirection: "column", gap: 18, fontFamily: "'Inter', 'Helvetica Neue', sans-serif" },

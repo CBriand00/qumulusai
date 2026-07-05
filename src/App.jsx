@@ -2016,6 +2016,19 @@ function HRCompliance({ onNavigate }) {
   const [data, setData] = useState(null);
   const [trainData] = useTrainingData();
   const [eeoDrill, setEeoDrill] = useState(null); // { key, title, members }
+  const [flashId, setFlashId] = useState(null);
+
+  // Scroll to a section card and flash it so the destination is unmistakable.
+  function goTo(id) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFlashId(id);
+    setTimeout(() => setFlashId(null), 1800);
+  }
+  const flashWrap = (id, color) => ({
+    borderRadius: 12,
+    transition: "box-shadow 0.3s",
+    boxShadow: flashId === id ? `0 0 0 3px ${color}` : "none",
+  });
 
   useEffect(() => {
     async function load() {
@@ -2068,11 +2081,11 @@ function HRCompliance({ onNavigate }) {
 
   const kpis = [
     { label: "Missing Documents", value: missingDocs.length, color: missingDocs.length ? C.rose : C.emerald,
-      onClick: () => document.getElementById("hrc-docs")?.scrollIntoView({ behavior: "smooth" }) },
+      onClick: () => goTo("hrc-docs") },
     { label: "Certs Expiring ≤90d", value: expiring.length, color: expiring.length ? C.amber : C.emerald,
-      onClick: () => document.getElementById("hrc-certs")?.scrollIntoView({ behavior: "smooth" }) },
+      onClick: () => goTo("hrc-certs") },
     { label: "I-9 Incomplete", value: i9Missing.length, color: i9Missing.length ? C.rose : C.emerald,
-      onClick: () => document.getElementById("hrc-certs")?.scrollIntoView({ behavior: "smooth" }) },
+      onClick: () => goTo("hrc-i9") },
     { label: "Training Gaps", value: trainingGaps == null ? "…" : trainingGaps, color: trainingGaps ? C.amber : C.emerald,
       onClick: () => onNavigate && onNavigate("learning") },
   ];
@@ -2094,8 +2107,8 @@ function HRCompliance({ onNavigate }) {
       </div>
 
       {/* Missing documents */}
-      <div id="hrc-docs" />
-      <Card style={{ marginBottom: 14 }}>
+      <div id="hrc-docs" style={{ ...flashWrap("hrc-docs", C.rose), marginBottom: 14 }}>
+      <Card>
         <Label color={C.rose}>Missing Documents</Label>
         {missingDocs.length === 0 ? <p style={{ fontSize: 13, color: C.emerald, fontWeight: 600, margin: 0 }}>✓ All required documents are on file.</p> :
           missingDocs.map((d, i) => (
@@ -2107,11 +2120,12 @@ function HRCompliance({ onNavigate }) {
             </div>
           ))}
       </Card>
+      </div>
 
       {/* Certifications + I-9 side by side */}
-      <div id="hrc-certs" />
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
-        <Card>
+        <div id="hrc-certs" style={flashWrap("hrc-certs", C.amber)}>
+        <Card style={{ height: "100%", boxSizing: "border-box" }}>
           <Label color={C.amber}>Certifications Expiring ≤ 90 Days</Label>
           {expiring.length === 0 ? <p style={{ fontSize: 13, color: C.emerald, fontWeight: 600, margin: 0 }}>✓ No upcoming expirations.</p> :
             expiring.map((c, i) => (
@@ -2121,7 +2135,9 @@ function HRCompliance({ onNavigate }) {
               </div>
             ))}
         </Card>
-        <Card>
+        </div>
+        <div id="hrc-i9" style={flashWrap("hrc-i9", C.blue)}>
+        <Card style={{ height: "100%", boxSizing: "border-box" }}>
           <Label color={C.blue}>I-9 Employment Verification</Label>
           {i9Missing.length === 0 ? <p style={{ fontSize: 13, color: C.emerald, fontWeight: 600, margin: 0 }}>✓ All active employees have completed I-9 Section 1.</p> :
             i9Missing.map((e, i) => (
@@ -2131,6 +2147,7 @@ function HRCompliance({ onNavigate }) {
               </div>
             ))}
         </Card>
+        </div>
       </div>
 
       {/* EEO reporting */}

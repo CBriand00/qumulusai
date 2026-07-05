@@ -184,11 +184,6 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
     }
   }
 
-  async function sendGoalReminder(emp) {
-    var subject = encodeURIComponent("Goal Check-In Reminder");
-    var body = encodeURIComponent("Hi " + emp.full_name.split(" ")[0] + ",\n\nJust a quick check-in on your outstanding goals. Please update your progress in QumulusAI when you get a chance.\n\nThanks!");
-    window.open("mailto:" + emp.email + "?subject=" + subject + "&body=" + body);
-  }
 
   useEffect(function() {
     async function loadAll() {
@@ -434,47 +429,40 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
           ) : drilldown === "goals" ? (
             <div>
               {drillData.length === 0 ? <p style={{ color: C.textMuted, fontSize: 13 }}>No goals found.</p> : (function() {
-                var done = drillData.filter(function(r) { return r.allDone; });
                 var pending = drillData.filter(function(r) { return !r.allDone; });
-                function EmpRow(row, i, arr, showReminder) {
-                  var emp = row.emp;
-                  var completedCount = row.goals.filter(function(g) { return g.status === "completed"; }).length;
-                  return (
-                    <div key={emp.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < arr.length - 1 ? "1px solid " + C.border : "none", flexWrap: "wrap", gap: 8 }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark }}>{emp.full_name}</div>
-                        <div style={{ fontSize: 11, color: C.textMuted }}>{emp.role_title} · {completedCount}/{row.goals.length} goals completed</div>
-                      </div>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 6,
-                          background: showReminder ? "#FEF2F2" : "#ECFDF5",
-                          color: showReminder ? C.rose : C.emerald }}>
-                          {showReminder ? (row.goals.length - completedCount) + " pending" : "All complete"}
-                        </span>
-                        {showReminder && emp.email && (
-                          <button onClick={function() { sendGoalReminder(emp); }}
-                            style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 6, background: C.blue + "12", color: C.blue, border: "1px solid " + C.blue + "30", cursor: "pointer", fontFamily: "inherit" }}>
-                            Send Reminder →
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
+                if (pending.length === 0) return <p style={{ color: C.emerald, fontSize: 13, fontWeight: 600 }}>✓ All employees have completed their goals.</p>;
+                var allEmails = pending.map(function(r) { return r.emp.email; }).filter(Boolean);
+                var names = pending.map(function(r) { return r.emp.full_name.split(" ")[0]; }).join(", ");
+                var subject = encodeURIComponent("Action Required: Complete Your Goals Before the Deadline");
+                var body = encodeURIComponent("Hi " + names + ",\n\nThis is a reminder that you have outstanding goals that need to be completed. Please log in to QumulusAI and update your progress before the deadline.\n\nIf you have any questions, feel free to reach out.\n\nThank you!");
                 return (
                   <div>
-                    {pending.length > 0 && (
-                      <div style={{ marginBottom: done.length > 0 ? 16 : 0 }}>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: C.rose, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Goals Incomplete — {pending.length}</div>
-                        {pending.map(function(r, i) { return EmpRow(r, i, pending, true); })}
-                      </div>
-                    )}
-                    {done.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: C.emerald, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8, marginTop: pending.length > 0 ? 8 : 0 }}>Goals Complete — {done.length}</div>
-                        {done.map(function(r, i) { return EmpRow(r, i, done, false); })}
-                      </div>
-                    )}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
+                      <div style={{ fontSize: 12, color: C.textMuted }}>{pending.length} employee{pending.length !== 1 ? "s" : ""} with incomplete goals</div>
+                      <a href={"mailto:" + allEmails.join(",") + "?subject=" + subject + "&body=" + body}
+                        style={{ fontSize: 12, fontWeight: 700, padding: "7px 16px", borderRadius: 8, background: C.blue, color: "#fff", textDecoration: "none", display: "inline-block" }}>
+                        Send Reminder to All ({pending.length}) →
+                      </a>
+                    </div>
+                    {pending.map(function(row, i) {
+                      var emp = row.emp;
+                      var completedCount = row.goals.filter(function(g) { return g.status === "completed"; }).length;
+                      var pendingCount = row.goals.length - completedCount;
+                      var singleSubject = encodeURIComponent("Goal Reminder — Action Needed");
+                      var singleBody = encodeURIComponent("Hi " + emp.full_name.split(" ")[0] + ",\n\nYou have " + pendingCount + " outstanding goal" + (pendingCount !== 1 ? "s" : "") + " that need to be completed. Please log in to QumulusAI and update your progress before the deadline.\n\nThanks!");
+                      return (
+                        <div key={emp.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < pending.length - 1 ? "1px solid " + C.border : "none", flexWrap: "wrap", gap: 8 }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark }}>{emp.full_name}</div>
+                            <div style={{ fontSize: 11, color: C.textMuted }}>{emp.role_title} · {completedCount}/{row.goals.length} completed · {pendingCount} remaining</div>
+                          </div>
+                          <a href={"mailto:" + emp.email + "?subject=" + singleSubject + "&body=" + singleBody}
+                            style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 6, background: C.blue + "12", color: C.blue, border: "1px solid " + C.blue + "30", textDecoration: "none" }}>
+                            Remind →
+                          </a>
+                        </div>
+                      );
+                    })}
                   </div>
                 );
               })()}

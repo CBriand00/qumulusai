@@ -169,9 +169,25 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
       var { data } = await supabase.from("flight_risk_scores").select("risk_score, risk_level, employees(id, full_name, role_title, email)").in("risk_level", ["high", "medium"]).order("risk_score", { ascending: false });
       setDrillData(data || []);
     } else if (type === "goals") {
-      var { data } = await supabase.from("goals").select("title, status, due_date, employees(id, full_name, role_title)").order("due_date");
-      setDrillData(data || []);
+      var { data: goals } = await supabase.from("goals").select("title, status, due_date, employee_id, employees(id, full_name, role_title, email)").order("due_date");
+      var byEmp = {};
+      (goals || []).forEach(function(g) {
+        var emp = g.employees;
+        if (!emp) return;
+        var key = emp.id;
+        if (!byEmp[key]) byEmp[key] = { emp, goals: [], allDone: true };
+        byEmp[key].goals.push(g);
+        if (g.status !== "completed") byEmp[key].allDone = false;
+      });
+      var rows = Object.values(byEmp).sort(function(a, b) { return a.allDone === b.allDone ? 0 : a.allDone ? -1 : 1; });
+      setDrillData(rows);
     }
+  }
+
+  async function sendGoalReminder(emp) {
+    var subject = encodeURIComponent("Goal Check-In Reminder");
+    var body = encodeURIComponent("Hi " + emp.full_name.split(" ")[0] + ",\n\nJust a quick check-in on your outstanding goals. Please update your progress in QumulusAI when you get a chance.\n\nThanks!");
+    window.open("mailto:" + emp.email + "?subject=" + subject + "&body=" + body);
   }
 
   useEffect(function() {
@@ -417,19 +433,51 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
             </div>
           ) : drilldown === "goals" ? (
             <div>
-              {drillData.length === 0 ? <p style={{ color: C.textMuted, fontSize: 13 }}>No goals found.</p> : drillData.map(function(row, i) {
-                var emp = row.employees;
-                var statusColor = row.status === "completed" ? C.emerald : row.status === "at_risk" ? C.rose : C.amber;
-                return (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < drillData.length - 1 ? "1px solid " + C.border : "none", flexWrap: "wrap", gap: 8 }}>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.title}</div>
-                      <div style={{ fontSize: 11, color: C.textMuted }}>{emp ? emp.full_name + " · " + emp.role_title : ""}{row.due_date ? " · Due " + new Date(row.due_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}</div>
+              {drillData.length === 0 ? <p style={{ color: C.textMuted, fontSize: 13 }}>No goals found.</p> : (function() {
+                var done = drillData.filter(function(r) { return r.allDone; });
+                var pending = drillData.filter(function(r) { return !r.allDone; });
+                function EmpRow(row, i, arr, showReminder) {
+                  var emp = row.emp;
+                  var completedCount = row.goals.filter(function(g) { return g.status === "completed"; }).length;
+                  return (
+                    <div key={emp.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: i < arr.length - 1 ? "1px solid " + C.border : "none", flexWrap: "wrap", gap: 8 }}>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark }}>{emp.full_name}</div>
+                        <div style={{ fontSize: 11, color: C.textMuted }}>{emp.role_title} · {completedCount}/{row.goals.length} goals completed</div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 6,
+                          background: showReminder ? "#FEF2F2" : "#ECFDF5",
+                          color: showReminder ? C.rose : C.emerald }}>
+                          {showReminder ? (row.goals.length - completedCount) + " pending" : "All complete"}
+                        </span>
+                        {showReminder && emp.email && (
+                          <button onClick={function() { sendGoalReminder(emp); }}
+                            style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 6, background: C.blue + "12", color: C.blue, border: "1px solid " + C.blue + "30", cursor: "pointer", fontFamily: "inherit" }}>
+                            Send Reminder →
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, background: statusColor + "15", color: statusColor, borderRadius: 6, padding: "3px 9px", textTransform: "capitalize", flexShrink: 0 }}>{row.status || "in_progress"}</span>
+                  );
+                }
+                return (
+                  <div>
+                    {pending.length > 0 && (
+                      <div style={{ marginBottom: done.length > 0 ? 16 : 0 }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: C.rose, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Goals Incomplete — {pending.length}</div>
+                        {pending.map(function(r, i) { return EmpRow(r, i, pending, true); })}
+                      </div>
+                    )}
+                    {done.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: C.emerald, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8, marginTop: pending.length > 0 ? 8 : 0 }}>Goals Complete — {done.length}</div>
+                        {done.map(function(r, i) { return EmpRow(r, i, done, false); })}
+                      </div>
+                    )}
                   </div>
                 );
-              })}
+              })()}
             </div>
           ) : null}
         </SectionCard>

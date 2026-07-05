@@ -2093,18 +2093,6 @@ function Learning({ onNavigate, focus }) {
 }
 
 // ─── COMPENSATION & EQUITY GOVERNANCE ─────────────────────────────────────────
-// Job level derived from title; equity targets are the framework's guidance
-// bands (demo values pending comp-committee ratification).
-const COMP_LEVELS = [
-  { key: "E",  label: "Executive",              test: t => /chief|vp|vice president/.test(t),            equityTarget: "0.50% – 1.50%" },
-  { key: "L3", label: "Lead / Manager",         test: t => /lead|architect|head|director|manager/.test(t), equityTarget: "0.10% – 0.25%" },
-  { key: "L2", label: "Senior IC",              test: t => /senior/.test(t),                             equityTarget: "0.05% – 0.10%" },
-  { key: "L1", label: "Individual Contributor", test: () => true,                                        equityTarget: "0.02% – 0.05%" },
-];
-function compLevel(title) {
-  const t = (title || "").toLowerCase();
-  return COMP_LEVELS.find(l => l.test(t));
-}
 // Standard 4-year monthly vest with a 1-year cliff, from start date.
 function vestedFraction(startDate) {
   if (!startDate) return 0;
@@ -2113,30 +2101,37 @@ function vestedFraction(startDate) {
   return Math.min(1, months / 48);
 }
 
+// Slot an employee into the official salary structure by title, then salary.
+function slotLevel(emp) {
+  const t = (emp.role_title || "").toLowerCase();
+  const s = Number(emp.base_salary || 0);
+  if (/chief|vp|vice president/.test(t)) return s > 270000 ? "E2" : "E1";
+  if (/director/.test(t)) return "M2";
+  if (/lead|manager|head/.test(t)) return "M1";
+  if (/architect|staff|principal/.test(t)) return "L4";
+  if (/senior/.test(t)) return "L3";
+  return s >= 115000 ? "L2" : "L1";
+}
+
 function Compensation({ onNavigate }) {
   const { isMobile } = useBreakpoint();
   const [emps, setEmps] = useState(null);
   const [bands, setBands] = useState([]);
+  const [structure, setStructure] = useState([]);
   const [drill, setDrill] = useState(null); // { key, title, members: [{emp, extra}] }
 
   useEffect(() => {
     Promise.all([
       supabase.from("employees").select("*").eq("status", "active").order("full_name"),
       supabase.from("compensation_bands").select("*"),
-    ]).then(([{ data: e }, { data: b }]) => { setEmps(e || []); setBands(b || []); });
+      supabase.from("salary_structure").select("*").order("sort_order"),
+    ]).then(([{ data: e }, { data: b }, { data: s }]) => { setEmps(e || []); setBands(b || []); setStructure(s || []); });
   }, []);
 
   if (!emps) return <div><SectionHeader icon="◈" accent={C.amber} title="Compensation" subtitle="Levels, pay bands, equity, and vesting." /><Card><p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading compensation data…</p></Card></div>;
 
   const fmt$ = n => n != null ? "$" + Math.round(Number(n)).toLocaleString("en-US") : "—";
   const bandFor = title => bands.find(b => b.role_title === title);
-
-  // Level framework rows
-  const levelRows = COMP_LEVELS.map(l => {
-    const members = emps.filter(e => compLevel(e.role_title)?.key === l.key);
-    const sals = members.map(e => Number(e.base_salary)).filter(Boolean);
-    return { ...l, members, low: sals.length ? Math.min(...sals) : null, high: sals.length ? Math.max(...sals) : null };
-  });
 
   // Pay band rows (one per role with a band)
   const roleRows = [...new Set(emps.map(e => e.role_title))].map(title => {
@@ -2199,31 +2194,42 @@ function Compensation({ onNavigate }) {
         </Card>
       )}
 
-      {/* Leveling framework */}
+      {/* Official salary structure */}
       <Card style={{ marginBottom: 14 }}>
-        <Label color={C.amber}>Leveling Framework</Label>
+        <Label color={C.amber}>Salary Structure — Official Guide</Label>
+        <p style={{ fontSize: 11.5, color: C.textMuted, margin: "0 0 12px" }}>
+          The governing framework for offers and comp reviews. Recruiters pull offer packages from these levels; RSU grants vest 4 years with a 1-year cliff. Headcount shows who currently slots into each level — ⚠ marks anyone paid outside their band.
+        </p>
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#F8FAFC" }}>
-                {["Level", "Definition", "Headcount", "Salary Range (actual)", "Equity Target"].map((h, hi) => (
-                  <th key={h} style={{ padding: "10px 12px", textAlign: hi >= 2 ? "center" : "left", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                {["Level", "Title", "Track", "Min", "Mid", "Max", "Bonus", "RSU Grant", "HC"].map((h, hi) => (
+                  <th key={h} style={{ padding: "10px 12px", textAlign: hi >= 3 ? "center" : "left", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {levelRows.map(l => (
-                <tr key={l.key} style={{ borderBottom: `1px solid ${C.border}` }}>
-                  <td style={{ padding: "11px 12px", fontWeight: 800, color: C.amber }}>{l.key}</td>
-                  <td style={{ padding: "11px 12px", color: C.textDark, fontWeight: 600 }}>{l.label}</td>
-                  <td onClick={() => l.members.length && openDrill(`lvl-${l.key}`, `${l.label} (${l.key})`, l.members.map(e => ({ emp: e, extra: fmt$(e.base_salary) })))}
-                    style={{ padding: "11px 12px", textAlign: "center", color: C.blue, fontWeight: 700, cursor: l.members.length ? "pointer" : "default", textDecoration: l.members.length ? "underline" : "none", textDecorationStyle: "dotted", textUnderlineOffset: 3 }}>
-                    {l.members.length || "—"}
-                  </td>
-                  <td style={{ padding: "11px 12px", textAlign: "center", color: C.textMid, whiteSpace: "nowrap" }}>{l.low ? `${fmt$(l.low)} – ${fmt$(l.high)}` : "—"}</td>
-                  <td style={{ padding: "11px 12px", textAlign: "center", color: C.violet, fontWeight: 600, whiteSpace: "nowrap" }}>{l.equityTarget}</td>
-                </tr>
-              ))}
+              {structure.map(l => {
+                const members = emps.filter(e => slotLevel(e) === l.level_code);
+                const outOfBand = e => Number(e.base_salary) < Number(l.min_salary) || Number(e.base_salary) > Number(l.max_salary);
+                return (
+                  <tr key={l.level_code} style={{ borderBottom: `1px solid ${C.border}` }}>
+                    <td style={{ padding: "11px 12px", fontWeight: 800, color: C.amber, whiteSpace: "nowrap" }}>{l.level_code}</td>
+                    <td style={{ padding: "11px 12px", color: C.textDark, fontWeight: 600, whiteSpace: "nowrap" }} title={l.notes}>{l.level_name}</td>
+                    <td style={{ padding: "11px 12px", color: C.textMuted, fontSize: 12 }}>{l.track}</td>
+                    <td style={{ padding: "11px 12px", textAlign: "center", color: C.textMid, whiteSpace: "nowrap" }}>{fmt$(l.min_salary)}</td>
+                    <td style={{ padding: "11px 12px", textAlign: "center", fontWeight: 700, color: C.textDark, whiteSpace: "nowrap" }}>{fmt$(l.mid_salary)}</td>
+                    <td style={{ padding: "11px 12px", textAlign: "center", color: C.textMid, whiteSpace: "nowrap" }}>{fmt$(l.max_salary)}</td>
+                    <td style={{ padding: "11px 12px", textAlign: "center", color: C.teal, fontWeight: 700 }}>{Number(l.bonus_target_pct)}%</td>
+                    <td style={{ padding: "11px 12px", textAlign: "center", color: C.violet, fontWeight: 600, whiteSpace: "nowrap" }}>{Number(l.rsu_low).toLocaleString()}–{Number(l.rsu_high).toLocaleString()}</td>
+                    <td onClick={() => members.length && openDrill(`sl-${l.level_code}`, `${l.level_code} · ${l.level_name} — band ${fmt$(l.min_salary)}–${fmt$(l.max_salary)}`, members.map(e => ({ emp: e, extra: `${fmt$(e.base_salary)}${outOfBand(e) ? " ⚠" : ""}` })))}
+                      style={{ padding: "11px 12px", textAlign: "center", color: members.length ? C.blue : "#CBD5E1", fontWeight: 700, cursor: members.length ? "pointer" : "default", textDecoration: members.length ? "underline" : "none", textDecorationStyle: "dotted", textUnderlineOffset: 3 }}>
+                      {members.length || "—"}{members.some(outOfBand) ? " ⚠" : ""}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

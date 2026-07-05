@@ -524,6 +524,25 @@ function OfferLetter({ app }) {
   const [rsu, setRsu] = useState("");
   const [signOnBonus, setSignOnBonus] = useState("");
   const [relocation, setRelocation] = useState("");
+  const [structure, setStructure] = useState([]);
+  const [levelCode, setLevelCode] = useState("");
+
+  useEffect(() => {
+    supabase.from("salary_structure").select("*").order("sort_order")
+      .then(({ data }) => setStructure(data || []));
+  }, []);
+
+  // Pull the comp package from the official salary structure for the chosen level.
+  function applyLevel(code) {
+    setLevelCode(code);
+    const l = structure.find(s => s.level_code === code);
+    if (!l) return;
+    const fmt = n => "$" + Number(n).toLocaleString("en-US");
+    const midBonus = Math.round(Number(l.mid_salary) * Number(l.bonus_target_pct) / 100);
+    setSalary(fmt(l.mid_salary));
+    setBonus(`${Number(l.bonus_target_pct)}% annual target (~${fmt(midBonus)})`);
+    setRsu(`${Number(l.rsu_low).toLocaleString()} RSUs vesting over 4 years (1-year cliff)`);
+  }
 
   async function generateLetter() {
     if (!salary || !startDate) return;
@@ -574,8 +593,28 @@ function OfferLetter({ app }) {
     setSaved(true);
   }
 
+  const selectedLevel = structure.find(s => s.level_code === levelCode);
+
   return (
     <Section title="Generate Offer Letter">
+      {structure.length > 0 && (
+        <>
+          <select value={levelCode} onChange={e => applyLevel(e.target.value)}
+            style={{ ...styles.input, cursor: "pointer", fontWeight: levelCode ? 600 : 400 }}>
+            <option value="">Pull comp from salary structure…</option>
+            {structure.map(l => (
+              <option key={l.level_code} value={l.level_code}>
+                {l.level_code} · {l.level_name} ({l.track}) — ${Number(l.min_salary).toLocaleString()}–${Number(l.max_salary).toLocaleString()}
+              </option>
+            ))}
+          </select>
+          {selectedLevel && (
+            <div style={{ fontSize: 11.5, color: "#059669", background: "#ECFDF5", border: "1px solid #BBF7D0", borderRadius: 8, padding: "8px 12px" }}>
+              ✓ Filled from {selectedLevel.level_code} at band midpoint — adjust below for experience and market. Band: ${Number(selectedLevel.min_salary).toLocaleString()}–${Number(selectedLevel.max_salary).toLocaleString()} · Bonus {Number(selectedLevel.bonus_target_pct)}% · RSU {Number(selectedLevel.rsu_low).toLocaleString()}–{Number(selectedLevel.rsu_high).toLocaleString()}
+            </div>
+          )}
+        </>
+      )}
       <input style={styles.input} placeholder="Salary (e.g. $120,000)" value={salary} onChange={e => setSalary(e.target.value)} />
       <input style={styles.input} type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
       <input style={styles.input} placeholder="Annual Bonus (optional, e.g. $20,000)" value={bonus} onChange={e => setBonus(e.target.value)} />

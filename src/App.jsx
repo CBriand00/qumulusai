@@ -1057,11 +1057,38 @@ function EmployeeHub({ focusEmpId }) {
   const [savedNote, setSavedNote] = useState(false);
 
   const profileRef = useRef(null);
+  const [showTerminate, setShowTerminate] = useState(false);
+  const [termForm, setTermForm] = useState({ date: new Date().toISOString().slice(0, 10), type: "voluntary", reason: "" });
+  const [terminating, setTerminating] = useState(false);
+  const [terminatedName, setTerminatedName] = useState("");
 
-  useEffect(() => {
-    supabase.from("employees").select("*").eq("status", "active")
+  function loadEmployees() {
+    return supabase.from("employees").select("*").eq("status", "active")
       .then(({ data }) => setEmployees(data || []));
-  }, []);
+  }
+
+  useEffect(() => { loadEmployees(); }, []);
+
+  async function terminateEmployee() {
+    if (!selectedEmp || !termForm.reason.trim()) return;
+    setTerminating(true);
+    // Reassign the departing person's direct reports to their manager so the org chart stays intact.
+    await supabase.from("employees").update({ manager_id: selectedEmp.manager_id || null }).eq("manager_id", selectedEmp.id);
+    // Soft-delete: flip status out of active and record the termination details.
+    await supabase.from("employees").update({
+      status: "terminated",
+      termination_date: termForm.date,
+      termination_type: termForm.type,
+      termination_reason: termForm.reason,
+      terminated_at: new Date().toISOString(),
+    }).eq("id", selectedEmp.id);
+    setTerminatedName(selectedEmp.full_name);
+    setTerminating(false);
+    setShowTerminate(false);
+    setSelectedEmp(null);
+    setTermForm({ date: new Date().toISOString().slice(0, 10), type: "voluntary", reason: "" });
+    await loadEmployees();
+  }
 
   // Deep-link: when arriving with a focused employee id, select and scroll to them.
   useEffect(() => {
@@ -1118,6 +1145,13 @@ function EmployeeHub({ focusEmpId }) {
   return (
     <div>
       <SectionHeader icon="○" accent={C.blueLight} title="Employee Hub & Performance" subtitle="Performance reviews, goal tracking, and instant HR answers." />
+
+      {terminatedName && (
+        <div style={{ background: "#FEF2F2", border: `1px solid ${C.rose}30`, borderRadius: 10, padding: "12px 16px", marginBottom: 14, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, color: C.rose, fontWeight: 600 }}>✓ {terminatedName} has been offboarded and removed from active rosters.</span>
+          <button onClick={() => setTerminatedName("")} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>✕</button>
+        </div>
+      )}
 
       <Card style={{ marginBottom: 14 }}>
         <Label color={C.blueLight}>Team Roster</Label>
@@ -1231,6 +1265,63 @@ function EmployeeHub({ focusEmpId }) {
                 style={{ marginTop: 8, background: C.blueLight, color: "#fff", border: "none", borderRadius: 8, padding: "9px 20px", fontSize: 13, fontWeight: 700, cursor: (savingNote || !perfNote.trim()) ? "default" : "pointer", opacity: (savingNote || !perfNote.trim()) ? 0.6 : 1, fontFamily: "inherit" }}>
                 {savedNote ? "✓ Saved!" : savingNote ? "Saving..." : "Save Note"}
               </button>
+            </div>
+
+            {/* Offboarding / termination */}
+            <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${C.border}` }}>
+              {!showTerminate ? (
+                <button onClick={() => setShowTerminate(true)}
+                  style={{ background: "transparent", color: C.rose, border: `1px solid ${C.rose}40`, borderRadius: 8, padding: "9px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                  ⚠ Offboard / Terminate {selectedEmp.full_name.split(" ")[0]}
+                </button>
+              ) : (
+                <div style={{ background: "#FEF2F2", border: `1px solid ${C.rose}30`, borderRadius: 10, padding: 18 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: C.rose, marginBottom: 4 }}>Offboard {selectedEmp.full_name}</div>
+                  <p style={{ fontSize: 12, color: C.textMid, margin: "0 0 14px", lineHeight: 1.6 }}>
+                    This sets the employee to <strong>terminated</strong>, removing them from active rosters, headcount, the org chart, and payroll runs. Their record is retained for compliance. Any direct reports will be reassigned to {selectedEmp.manager_id ? "this employee's manager" : "no manager (department head)"}.
+                  </p>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Termination Date</label>
+                      <input type="date" value={termForm.date} onChange={e => setTermForm(p => ({ ...p, date: e.target.value }))}
+                        style={{ width: "100%", boxSizing: "border-box", marginTop: 5, padding: "8px 10px", borderRadius: 7, border: `1px solid ${C.border}`, fontSize: 13, color: C.textDark, background: "#fff", outline: "none", fontFamily: "inherit" }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Type</label>
+                      <select value={termForm.type} onChange={e => setTermForm(p => ({ ...p, type: e.target.value }))}
+                        style={{ width: "100%", boxSizing: "border-box", marginTop: 5, padding: "8px 10px", borderRadius: 7, border: `1px solid ${C.border}`, fontSize: 13, color: C.textDark, background: "#fff", outline: "none", fontFamily: "inherit", cursor: "pointer" }}>
+                        <option value="voluntary">Voluntary (resignation)</option>
+                        <option value="involuntary">Involuntary (for cause)</option>
+                        <option value="layoff">Layoff / Reduction in force</option>
+                        <option value="end_of_contract">End of contract</option>
+                        <option value="retirement">Retirement</option>
+                      </select>
+                    </div>
+                  </div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Reason / Notes</label>
+                  <textarea value={termForm.reason} onChange={e => setTermForm(p => ({ ...p, reason: e.target.value }))}
+                    placeholder="Document the reason for this termination…"
+                    style={{ width: "100%", boxSizing: "border-box", marginTop: 5, height: 72, padding: "9px 11px", borderRadius: 7, border: `1px solid ${C.border}`, fontSize: 13, color: C.textDark, background: "#fff", resize: "vertical", outline: "none", fontFamily: "inherit" }} />
+
+                  <div style={{ background: "#fff", borderRadius: 8, padding: "10px 14px", margin: "12px 0", fontSize: 12, color: C.textMid }}>
+                    <div style={{ fontWeight: 700, color: C.textDark, marginBottom: 6 }}>Offboarding checklist (manual)</div>
+                    {["Process final paycheck & unused PTO payout", "Revoke system access & disable accounts", "Collect company equipment", "Remove from benefits & payroll", "Conduct exit interview"].map(item => (
+                      <div key={item} style={{ display: "flex", gap: 8, padding: "2px 0" }}><span style={{ color: C.rose }}>○</span> {item}</div>
+                    ))}
+                  </div>
+
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button onClick={terminateEmployee} disabled={terminating || !termForm.reason.trim()}
+                      style={{ background: C.rose, color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: (terminating || !termForm.reason.trim()) ? "default" : "pointer", opacity: (terminating || !termForm.reason.trim()) ? 0.5 : 1, fontFamily: "inherit" }}>
+                      {terminating ? "Processing…" : "Confirm Termination"}
+                    </button>
+                    <button onClick={() => setShowTerminate(false)} disabled={terminating}
+                      style={{ background: "transparent", color: C.textMid, border: `1px solid ${C.border}`, borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}

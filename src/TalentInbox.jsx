@@ -89,8 +89,8 @@ export default function TalentInbox() {
       {!isMobile && (
         <aside style={styles.sidebar}>
           <div style={styles.sidebarHeader}>
-            <span style={styles.wordmark}>Qumulus<span style={styles.ai}>AI</span></span>
-            <span style={styles.inboxLabel}>TALENT INBOX</span>
+            <span style={styles.inboxTitle}>Talent Inbox</span>
+            <span style={styles.inboxLabel}>{apps.length} candidate{apps.length !== 1 ? "s" : ""} in pipeline</span>
           </div>
           <div style={styles.searchWrap}>
             <input style={styles.search} placeholder="Search applicants…" value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -112,8 +112,9 @@ export default function TalentInbox() {
         </div>
         {!loading && visible.length === 0 && (
           <div style={styles.empty}>
-            <p style={styles.emptyIcon}>✦</p>
+            <div style={styles.emptyCircle}>✦</div>
             <p style={styles.emptyText}>No applications match this filter.</p>
+            <p style={styles.emptySub}>Try a different status or clear your search.</p>
           </div>
         )}
         {visible.map((app) => (
@@ -132,8 +133,9 @@ export default function TalentInbox() {
         )}
         {!selected ? (
           <div style={styles.empty}>
-            <p style={styles.emptyIcon}>→</p>
+            <div style={styles.emptyCircle}>◎</div>
             <p style={styles.emptyText}>Select an application to review it.</p>
+            <p style={styles.emptySub}>Choose a candidate to see their profile, assessment scores, interview intelligence, and pipeline actions.</p>
           </div>
         ) : (
           <DetailPanel app={selected} onUpdateStatus={updateStatus} updating={updating === selected.id} />
@@ -144,9 +146,15 @@ export default function TalentInbox() {
 }
 
 function NavItem({ label, count, active, onClick, color }) {
+  const [hover, setHover] = useState(false);
   return (
-    <button onClick={onClick} style={{ ...styles.navItem, ...(active ? { background: "#F5F3FF", color: "#0F172A" } : {}) }}>
-      <span>{label}</span>
+    <button onClick={onClick}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ ...styles.navItem, ...(active ? { background: `${color}14`, color: "#0F172A", fontWeight: 600 } : hover ? { background: "#F8FAFC", color: "#334155" } : {}) }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 9 }}>
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: active ? color : "#CBD5E1", flexShrink: 0, transition: "background 0.15s" }} />
+        {label}
+      </span>
       <span style={{ ...styles.badge, background: active ? color : "#F1F5F9", color: active ? "#fff" : "#64748B" }}>{count}</span>
     </button>
   );
@@ -154,19 +162,22 @@ function NavItem({ label, count, active, onClick, color }) {
 
 function ApplicationRow({ app, selected, onClick }) {
   const m = STATUS_META[app.status] ?? STATUS_META.new;
+  const [hover, setHover] = useState(false);
   const date = new Date(app.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   return (
-    <div onClick={onClick} style={{ ...styles.row, ...(selected ? styles.rowSelected : {}) }}>
-      <div style={styles.rowAvatar}>{initials(app.full_name)}</div>
+    <div onClick={onClick}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ ...styles.row, borderLeft: `3px solid ${selected ? m.color : "transparent"}`, ...(selected ? styles.rowSelected : hover ? { background: "#FAFAFE" } : {}) }}>
+      <div style={{ ...styles.rowAvatar, background: m.bg, color: m.color }}>{initials(app.full_name)}</div>
       <div style={styles.rowBody}>
         <div style={styles.rowTop}>
           <span style={styles.rowName}>{app.full_name}</span>
           <span style={{ ...styles.statusPill, background: m.bg, color: m.color }}>{m.label}</span>
         </div>
         <div style={styles.rowMeta}>
-          <span>{app.role_title}</span>
+          <span style={styles.rowRole}>{app.role_title}</span>
           <span style={{ color: "#CBD5E1" }}>·</span>
-          <span>{date}</span>
+          <span style={{ flexShrink: 0 }}>{date}</span>
         </div>
       </div>
     </div>
@@ -179,13 +190,13 @@ function DetailPanel({ app, onUpdateStatus, updating }) {
   return (
     <div style={styles.detailInner}>
       <div style={styles.detailHeader}>
-        <div style={styles.detailAvatar}>{initials(app.full_name)}</div>
-        <div>
+        <div style={{ ...styles.detailAvatar, background: m.bg, color: m.color }}>{initials(app.full_name)}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h2 style={styles.detailName}>{app.full_name}</h2>
           <p style={styles.detailRole}>{app.role_title} · {app.department}</p>
         </div>
+        <div style={{ ...styles.statusBadge, background: m.bg, color: m.color, alignSelf: "flex-start", margin: 0 }}>{m.label}</div>
       </div>
-      <div style={{ ...styles.statusBadge, background: m.bg, color: m.color }}>{m.label}</div>
       <Section title="Contact">
         <DetailRow label="Email" value={<a href={`mailto:${app.email}`} style={styles.link}>{app.email}</a>} />
         {app.phone && <DetailRow label="Phone" value={app.phone} />}
@@ -591,31 +602,33 @@ const C = { bg: "#F7F8FA", surface: "#FFFFFF", border: "#E5E7EB", accent: "#7C3A
 const styles = {
   shell: { display: "grid", gridTemplateColumns: "220px 340px 1fr", height: "100vh", background: C.bg, color: C.text, fontFamily: "'Inter', 'Helvetica Neue', sans-serif", overflow: "hidden" },
   sidebar: { borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", background: C.surface },
-  sidebarHeader: { padding: "24px 20px 16px", display: "flex", flexDirection: "column", gap: 4, borderBottom: `1px solid ${C.border}` },
+  sidebarHeader: { padding: "24px 20px 16px", display: "flex", flexDirection: "column", gap: 5, borderBottom: `1px solid ${C.border}` },
   wordmark: { fontSize: 16, fontWeight: 700, letterSpacing: "-0.03em", color: "#0A2540" },
   ai: { color: C.accent },
-  inboxLabel: { fontSize: 11, color: C.muted, fontWeight: 500, letterSpacing: "0.08em" },
+  inboxTitle: { fontSize: 17, fontWeight: 800, letterSpacing: "-0.02em", color: "#0F172A" },
+  inboxLabel: { fontSize: 12, color: C.muted, fontWeight: 500 },
   searchWrap: { padding: "16px 12px 8px" },
   search: { width: "100%", boxSizing: "border-box", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "9px 12px", color: C.text, fontSize: 13, outline: "none" },
   nav: { display: "flex", flexDirection: "column", gap: 2, padding: "8px 12px", overflowY: "auto" },
-  navItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 12px", borderRadius: 8, border: "none", background: "transparent", color: C.muted, fontSize: 13, cursor: "pointer", textAlign: "left" },
-  badge: { fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "2px 8px", minWidth: 24, textAlign: "center" },
+  navItem: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderRadius: 9, border: "none", background: "transparent", color: C.muted, fontSize: 13, cursor: "pointer", textAlign: "left", fontFamily: "inherit", transition: "background 0.12s, color 0.12s" },
+  badge: { fontSize: 11, fontWeight: 700, borderRadius: 20, padding: "2px 9px", minWidth: 24, textAlign: "center" },
   list: { borderRight: `1px solid ${C.border}`, overflowY: "auto", display: "flex", flexDirection: "column", background: C.surface },
   listHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, background: C.surface, zIndex: 1 },
   listCount: { fontSize: 12, color: C.muted, fontWeight: 500 },
-  refreshBtn: { background: "none", border: `1px solid ${C.border}`, borderRadius: 6, color: C.muted, fontSize: 12, padding: "4px 10px", cursor: "pointer" },
-  row: { display: "flex", gap: 12, padding: "16px 20px", borderBottom: `1px solid ${C.border}`, cursor: "pointer", transition: "background 0.1s" },
+  refreshBtn: { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.muted, fontSize: 12, fontWeight: 600, padding: "7px 14px", cursor: "pointer", fontFamily: "inherit", transition: "border-color 0.12s, color 0.12s" },
+  row: { display: "flex", gap: 12, padding: "15px 20px", borderBottom: `1px solid ${C.border}`, cursor: "pointer", transition: "background 0.12s", alignItems: "center" },
   rowSelected: { background: "#F5F3FF" },
-  rowAvatar: { width: 36, height: 36, borderRadius: "50%", background: "#F5F3FF", color: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 },
+  rowAvatar: { width: 38, height: 38, borderRadius: "50%", background: "#F5F3FF", color: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, flexShrink: 0 },
   rowBody: { flex: 1, minWidth: 0 },
-  rowTop: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
-  rowName: { fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-  rowMeta: { fontSize: 12, color: C.muted, display: "flex", gap: 6 },
-  statusPill: { fontSize: 11, fontWeight: 600, borderRadius: 20, padding: "2px 8px", flexShrink: 0 },
+  rowTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 4 },
+  rowName: { fontSize: 14, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  rowMeta: { fontSize: 12, color: C.muted, display: "flex", gap: 6, alignItems: "center" },
+  rowRole: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 },
+  statusPill: { fontSize: 10, fontWeight: 700, borderRadius: 20, padding: "3px 9px", flexShrink: 0, textTransform: "uppercase", letterSpacing: "0.03em" },
   detail: { overflowY: "auto", background: C.bg },
   detailInner: { padding: 32, display: "flex", flexDirection: "column", gap: 28 },
   detailHeader: { display: "flex", gap: 16, alignItems: "center" },
-  detailAvatar: { width: 52, height: 52, borderRadius: "50%", background: "#F5F3FF", color: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, flexShrink: 0 },
+  detailAvatar: { width: 54, height: 54, borderRadius: "50%", background: "#F5F3FF", color: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 19, fontWeight: 800, flexShrink: 0 },
   detailName: { fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" },
   detailRole: { fontSize: 13, color: C.muted, margin: "4px 0 0" },
   statusBadge: { alignSelf: "flex-start", fontSize: 12, fontWeight: 600, borderRadius: 20, padding: "4px 14px" },
@@ -629,7 +642,8 @@ const styles = {
   pipelineGrid: { display: "flex", flexWrap: "wrap", gap: 8 },
   pipeBtn: { padding: "8px 14px", fontSize: 12, fontWeight: 600, borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.muted, cursor: "pointer" },
   input: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "9px 12px", color: C.text, fontSize: 13, outline: "none", width: "100%", boxSizing: "border-box" },
-  empty: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: 48 },
-  emptyIcon: { fontSize: 32, color: C.muted, margin: 0 },
-  emptyText: { fontSize: 14, color: C.muted, margin: 0, textAlign: "center" },
+  empty: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, padding: 48, minHeight: 320 },
+  emptyCircle: { width: 64, height: 64, borderRadius: "50%", background: "#F5F3FF", color: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, marginBottom: 4 },
+  emptyText: { fontSize: 15, fontWeight: 600, color: "#334155", margin: 0, textAlign: "center" },
+  emptySub: { fontSize: 13, color: C.muted, margin: 0, textAlign: "center", maxWidth: 300, lineHeight: 1.6 },
 };

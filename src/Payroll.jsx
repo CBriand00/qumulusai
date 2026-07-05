@@ -403,18 +403,19 @@ export default function Payroll() {
           </div>
         ) : (
           /* Desktop: table */
+          <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#F8FAFC" }}>
-                {["Pay Period", "Pay Date", "Employees", "Total Gross", "Tax Withheld", "Total Net", "Status", "Actions"].map(h => (
-                  <th key={h} style={{ padding: "11px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                {["Pay Period", "Pay Date", "Emp.", "Gross", "Tax", "Net", "Status", "Actions"].map((h, hi) => (
+                  <th key={h} style={{ padding: "11px 12px", textAlign: hi >= 3 && hi <= 5 ? "right" : "left", fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {runs.map((run, i) => (
                 <tr key={run.id} style={{ borderBottom: `1px solid ${C.border}`, background: i % 2 === 0 ? "#fff" : "#FAFBFC" }}>
-                  <td style={{ padding: "13px 16px" }}>
+                  <td style={{ padding: "12px 12px", whiteSpace: "nowrap" }}>
                     <div style={{ fontWeight: 600, color: C.textDark, fontSize: 13 }}>
                       {fmtDate(run.pay_period_start)} – {fmtDate(run.pay_period_end)}
                     </div>
@@ -423,13 +424,13 @@ export default function Payroll() {
                       {run.status === "paid"     && run.paid_at     && `Paid ${fmtDateTime(run.paid_at)}`}
                     </div>
                   </td>
-                  <td style={{ padding: "13px 16px", color: C.textMid, fontSize: 13 }}>{fmtDate(run.pay_date)}</td>
-                  <td style={{ padding: "13px 16px", color: C.textMid, fontSize: 13, textAlign: "center" }}>{run.employee_count}</td>
-                  <td style={{ padding: "13px 16px", fontWeight: 600, color: C.textDark, fontSize: 13 }}>{fmt$(run.total_gross)}</td>
-                  <td style={{ padding: "13px 16px", color: C.rose, fontSize: 13 }}>{fmt$(run.total_tax_withheld)}</td>
-                  <td style={{ padding: "13px 16px", fontWeight: 700, color: C.emerald, fontSize: 13 }}>{fmt$(run.total_net)}</td>
-                  <td style={{ padding: "13px 16px" }}><StatusBadge status={run.status} /></td>
-                  <td style={{ padding: "13px 16px" }}>
+                  <td style={{ padding: "12px 12px", color: C.textMid, fontSize: 13, whiteSpace: "nowrap" }}>{fmtDate(run.pay_date)}</td>
+                  <td style={{ padding: "12px 12px", color: C.textMid, fontSize: 13, textAlign: "center" }}>{run.employee_count}</td>
+                  <td style={{ padding: "12px 12px", fontWeight: 600, color: C.textDark, fontSize: 13, textAlign: "right", whiteSpace: "nowrap" }}>{fmt$(run.total_gross)}</td>
+                  <td style={{ padding: "12px 12px", color: C.rose, fontSize: 13, textAlign: "right", whiteSpace: "nowrap" }}>{fmt$(run.total_tax_withheld)}</td>
+                  <td style={{ padding: "12px 12px", fontWeight: 700, color: C.emerald, fontSize: 13, textAlign: "right", whiteSpace: "nowrap" }}>{fmt$(run.total_net)}</td>
+                  <td style={{ padding: "12px 12px" }}><StatusBadge status={run.status} /></td>
+                  <td style={{ padding: "12px 12px" }}>
                     <div style={{ display: "flex", gap: 7 }}>
                       <button
                         onClick={() => setSelectedRun(run)}
@@ -450,6 +451,7 @@ export default function Payroll() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

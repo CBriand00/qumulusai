@@ -189,7 +189,7 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
     setExporting(true);
     try {
       var results = await Promise.all([
-        supabase.from("employees").select("id, full_name, email, role_title, department_id, status, start_date").order("full_name"),
+        supabase.from("employees").select("*").order("full_name"),
         supabase.from("departments").select("id, name"),
         supabase.from("compensation_bands").select("role_title, min_salary, max_salary, currency"),
         supabase.from("employee_onboarding_docs").select("employee_id, w4_filing_status, w4_dependents, dd_bank_name, dd_account_type, i9_address, i9_city, i9_state, i9_zip, i9_dob, i9_ssn_last4, i9_phone, i9_email, i9_attestation, status"),
@@ -212,7 +212,8 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
         "Employee ID", "Full Name", "Work Email", "Personal Email", "Phone", "Date of Birth", "SSN (Last 4)",
         "Home Address", "City", "State", "ZIP", "Work Authorization",
         "Department", "Job Title", "Employment Status", "Start Date", "Tenure (Years)",
-        "Salary Band Min", "Salary Band Max", "Est. Annual Salary", "Currency",
+        "Pay Type", "Base Salary", "Bonus Target %", "Equity Units",
+        "Salary Band Min", "Salary Band Max", "Compa-Ratio", "Currency",
         "Latest Gross Pay", "Federal Tax", "State Tax", "Social Security", "Medicare", "Latest Net Pay",
         "W-4 Filing Status", "W-4 Dependents", "Direct Deposit Bank", "Account Type",
         "Engagement Score", "Flight Risk Level", "Flight Risk Score", "Onboarding Doc Status",
@@ -225,14 +226,20 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
         var eng = engMap[e.id] || {};
         var risk = riskMap[e.id] || {};
         var tenure = e.start_date ? ((today - new Date(e.start_date)) / (365.25 * 86400000)).toFixed(1) : "";
-        var estSalary = stub.gross_pay ? Math.round(stub.gross_pay * 12) : (band.min_salary && band.max_salary ? Math.round((band.min_salary + band.max_salary) / 2) : "");
+        // Prefer real base salary; else annualize latest gross; else band midpoint.
+        var baseSalary = e.base_salary != null ? Math.round(e.base_salary)
+          : stub.gross_pay ? Math.round(stub.gross_pay * 12)
+          : (band.min_salary && band.max_salary ? Math.round((band.min_salary + band.max_salary) / 2) : "");
+        var midpoint = band.min_salary && band.max_salary ? (band.min_salary + band.max_salary) / 2 : null;
+        var compaRatio = (baseSalary && midpoint) ? (baseSalary / midpoint).toFixed(2) : "";
         return [
           e.id, e.full_name, e.email, doc.i9_email || "", doc.i9_phone || "",
           doc.i9_dob || "", doc.i9_ssn_last4 ? "XXX-XX-" + doc.i9_ssn_last4 : "",
           doc.i9_address || "", doc.i9_city || "", doc.i9_state || "", doc.i9_zip || "",
           attestLabels[doc.i9_attestation] || "",
           deptMap[e.department_id] || "", e.role_title, e.status, e.start_date || "", tenure,
-          band.min_salary || "", band.max_salary || "", estSalary, band.currency || "USD",
+          e.pay_type || "salary", baseSalary, e.bonus_target_pct != null ? e.bonus_target_pct : "", e.equity_units != null ? e.equity_units : "",
+          band.min_salary || "", band.max_salary || "", compaRatio, band.currency || "USD",
           stub.gross_pay || "", stub.federal_tax || "", stub.state_tax || "", stub.social_security || "", stub.medicare || "", stub.net_pay || "",
           doc.w4_filing_status || "", doc.w4_dependents != null ? doc.w4_dependents : "", doc.dd_bank_name || "", doc.dd_account_type || "",
           eng.score != null ? eng.score : "", risk.risk_level || "", risk.risk_score != null ? risk.risk_score : "", doc.status || "not started",

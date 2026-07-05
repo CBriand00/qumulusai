@@ -73,6 +73,7 @@ const NAV_GROUPS = [
     label: "People",
     items: [
       { id: "employee",  label: "Employee Hub",        icon: "○", accent: C.blueLight },
+      { id: "orgchart",  label: "Org Chart",           icon: "◫", accent: C.violet },
       { id: "onboard",   label: "Onboarding",          icon: "◎", accent: C.teal },
       { id: "manager",   label: "Manager Coach",       icon: "◇", accent: C.blue },
     ],
@@ -1247,6 +1248,133 @@ function EmployeeHub({ focusEmpId }) {
   );
 }
 
+// ─── ORG CHART ────────────────────────────────────────────────────────────────
+const ORG_DEPT_COLORS = [C.violet, C.teal, C.blue, C.emerald, C.amber, C.rose, C.cyan, C.blueLight];
+
+function OrgNode({ emp, childrenMap, deptColorMap, onNavigate }) {
+  const kids = childrenMap[emp.id] || [];
+  const isCeo = emp.id === "__ceo__";
+  const accent = isCeo ? C.textDark : (deptColorMap[emp.department_id] || C.blueLight);
+  const initials = emp.full_name ? emp.full_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() : "?";
+  return (
+    <li>
+      <div
+        className="qai-org-node"
+        onClick={() => { if (!isCeo && onNavigate) onNavigate("employee", emp.id); }}
+        style={{ borderTop: `3px solid ${accent}`, cursor: isCeo ? "default" : "pointer" }}
+        title={isCeo ? emp.full_name : "View profile"}>
+        <div className="qai-org-avatar" style={{ background: `${accent}20`, color: accent }}>{initials}</div>
+        <div className="qai-org-name">{emp.full_name}</div>
+        <div className="qai-org-role">{emp.role_title}</div>
+        {kids.length > 0 && <div className="qai-org-count" style={{ color: accent }}>{kids.length} report{kids.length !== 1 ? "s" : ""}</div>}
+      </div>
+      {kids.length > 0 && (
+        <ul>
+          {kids.map(k => <OrgNode key={k.id} emp={k} childrenMap={childrenMap} deptColorMap={deptColorMap} onNavigate={onNavigate} />)}
+        </ul>
+      )}
+    </li>
+  );
+}
+
+function OrgChart({ onNavigate }) {
+  const [employees, setEmployees] = useState([]);
+  const [deptColorMap, setDeptColorMap] = useState({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const [{ data: emps }, { data: depts }] = await Promise.all([
+        supabase.from("employees").select("*").eq("status", "active"),
+        supabase.from("departments").select("id, name"),
+      ]);
+      const cmap = {};
+      (depts || []).forEach((d, i) => { cmap[d.id] = ORG_DEPT_COLORS[i % ORG_DEPT_COLORS.length]; });
+      setDeptColorMap(cmap);
+      setEmployees(emps || []);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const childrenMap = {};
+  const roots = [];
+  employees.forEach(e => {
+    if (e.manager_id) {
+      (childrenMap[e.manager_id] = childrenMap[e.manager_id] || []).push(e);
+    } else {
+      roots.push(e);
+    }
+  });
+  // Synthetic CEO at the top; department heads (roots) report to them.
+  const ceo = { id: "__ceo__", full_name: "Mike Maniscalco", role_title: "Chief Executive Officer", department_id: null };
+  childrenMap["__ceo__"] = roots;
+
+  const hasReporting = employees.some(e => e.manager_id);
+
+  return (
+    <div>
+      <SectionHeader icon="◫" accent={C.violet} title="Org Chart" subtitle="Company reporting structure. Click any person to open their profile." />
+
+      {!hasReporting && !loading && employees.length > 0 && (
+        <Card style={{ marginBottom: 14 }}>
+          <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>
+            No reporting relationships are set yet, so everyone is shown reporting directly to the CEO. Run the manager migration to build the full hierarchy.
+          </p>
+        </Card>
+      )}
+
+      <Card style={{ overflowX: "auto" }}>
+        {loading ? (
+          <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading org chart…</p>
+        ) : (
+          <div className="qai-org-tree">
+            <ul>
+              <OrgNode emp={ceo} childrenMap={childrenMap} deptColorMap={deptColorMap} onNavigate={onNavigate} />
+            </ul>
+          </div>
+        )}
+      </Card>
+
+      <style>{`
+        .qai-org-tree { display: inline-block; min-width: 100%; padding-top: 4px; }
+        .qai-org-tree ul { position: relative; display: flex; justify-content: center; padding: 22px 0 0; margin: 0; list-style: none; }
+        .qai-org-tree li { position: relative; padding: 22px 10px 0; text-align: center; list-style: none; }
+        .qai-org-tree li::before, .qai-org-tree li::after {
+          content: ''; position: absolute; top: 0; right: 50%; width: 50%; height: 22px;
+          border-top: 2px solid ${C.border};
+        }
+        .qai-org-tree li::after { right: auto; left: 50%; border-left: 2px solid ${C.border}; }
+        .qai-org-tree li:only-child::after, .qai-org-tree li:only-child::before { display: none; }
+        .qai-org-tree li:only-child { padding-top: 22px; }
+        .qai-org-tree li:first-child::before, .qai-org-tree li:last-child::after { border: 0 none; }
+        .qai-org-tree li:last-child::before { border-right: 2px solid ${C.border}; border-radius: 0 6px 0 0; }
+        .qai-org-tree li:first-child::after { border-radius: 6px 0 0 0; }
+        .qai-org-tree ul ul::before {
+          content: ''; position: absolute; top: 0; left: 50%; width: 0; height: 22px;
+          border-left: 2px solid ${C.border};
+        }
+        .qai-org-tree > ul { padding-top: 0; }
+        .qai-org-tree > ul > li:only-child { padding-top: 0; }
+        .qai-org-node {
+          display: inline-flex; flex-direction: column; align-items: center; gap: 3px;
+          background: ${C.bgCard}; border: 1px solid ${C.border}; border-radius: 12px;
+          padding: 12px 16px; min-width: 150px; box-shadow: 0 1px 3px rgba(15,23,42,0.06);
+          transition: box-shadow 0.15s, transform 0.15s;
+        }
+        .qai-org-node:hover { box-shadow: 0 4px 14px rgba(15,23,42,0.12); transform: translateY(-1px); }
+        .qai-org-avatar {
+          width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center;
+          justify-content: center; font-size: 13px; font-weight: 800; margin-bottom: 2px;
+        }
+        .qai-org-name { font-size: 13px; font-weight: 700; color: ${C.textDark}; white-space: nowrap; }
+        .qai-org-role { font-size: 11px; color: ${C.textMuted}; max-width: 160px; }
+        .qai-org-count { font-size: 10px; font-weight: 700; margin-top: 2px; }
+      `}</style>
+    </div>
+  );
+}
+
 // ─── WORKFORCE INTEL ──────────────────────────────────────────────────────────
 function WorkforceIntel({ onNavigate }) {
   const { ask, loading, response } = useAI();
@@ -1426,6 +1554,7 @@ export default function App() {
     onboard:   <OnboardingConcierge onNavigate={navigate} />,
     manager:   <ManagerCoach />,
     employee:  <EmployeeHub focusEmpId={focusEmpId} />,
+    orgchart:  <OrgChart onNavigate={navigate} />,
     executive: <WorkforceIntel onNavigate={navigate} />,
     careers:   <CareersPortal />,
     inbox:     <TalentInbox />,

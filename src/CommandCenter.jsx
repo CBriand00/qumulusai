@@ -434,7 +434,7 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
             { label: "Overview",    dest: null },
             { label: "Hiring",      dest: "recruit" },
             { label: "Retention",   dest: "executive" },
-            { label: "Diversity",   dest: "executive" },
+            { label: "Diversity",   dest: "diversity" },
             { label: "Payroll",     dest: "payroll" },
             { label: "Performance", dest: "employee" },
           ].map(function(tab, i) {

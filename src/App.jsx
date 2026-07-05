@@ -57,6 +57,7 @@ const NAV_GROUPS = [
     items: [
       { id: "home",      label: "Command Center",      icon: "❖", accent: C.cyan },
       { id: "executive", label: "Workforce Intelligence", icon: "◆", accent: C.amber },
+      { id: "diversity", label: "Diversity & Composition", icon: "◐", accent: C.violet },
     ],
   },
   {
@@ -1375,6 +1376,187 @@ function OrgChart({ onNavigate }) {
   );
 }
 
+// ─── DIVERSITY & COMPOSITION ──────────────────────────────────────────────────
+function BreakdownBar({ label, count, total, color }) {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  return (
+    <div style={{ marginBottom: 11 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+        <span style={{ fontSize: 13, color: C.textMid, fontWeight: 500 }}>{label}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 13, color: C.textDark, fontWeight: 700 }}>{count}</span>
+          <span style={{ fontSize: 11, color: C.textMuted, minWidth: 32, textAlign: "right" }}>{pct}%</span>
+        </div>
+      </div>
+      <div style={{ height: 7, background: C.border, borderRadius: 4 }}>
+        <div style={{ width: `${pct}%`, height: "100%", borderRadius: 4, background: color }} />
+      </div>
+    </div>
+  );
+}
+
+function BreakdownCard({ title, accent, data, total, note, isMobile }) {
+  return (
+    <Card>
+      <Label color={accent}>{title}</Label>
+      {data.length === 0
+        ? <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>No data available.</p>
+        : data.map(d => <BreakdownBar key={d.label} label={d.label} count={d.count} total={total} color={accent} />)}
+      {note && <p style={{ fontSize: 11, color: C.textMuted, margin: "10px 0 0", lineHeight: 1.5 }}>{note}</p>}
+    </Card>
+  );
+}
+
+function Diversity({ onNavigate }) {
+  const { isMobile } = useBreakpoint();
+  const [employees, setEmployees] = useState([]);
+  const [deptMap, setDeptMap] = useState({});
+  const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const [{ data: emps }, { data: depts }, { data: onbDocs }] = await Promise.all([
+        supabase.from("employees").select("*").eq("status", "active"),
+        supabase.from("departments").select("id, name"),
+        supabase.from("employee_onboarding_docs").select("employee_id, i9_dob, i9_state, i9_attestation"),
+      ]);
+      const dm = {};
+      (depts || []).forEach(d => { dm[d.id] = d.name; });
+      setDeptMap(dm);
+      setEmployees(emps || []);
+      setDocs(onbDocs || []);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const total = employees.length;
+
+  function tally(keyFn) {
+    const m = {};
+    employees.forEach(e => { const k = keyFn(e); if (k == null || k === "") return; m[k] = (m[k] || 0) + 1; });
+    return Object.entries(m).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
+  }
+
+  const byDept = tally(e => deptMap[e.department_id] || "Unassigned");
+
+  const seniorityRank = e => {
+    const t = (e.role_title || "").toLowerCase();
+    if (t.includes("lead") || t.includes("architect") || t.includes("head") || t.includes("director") || t.includes("vp") || t.includes("chief")) return "Leadership";
+    if (t.includes("senior")) return "Senior";
+    return "Individual Contributor";
+  };
+  const bySeniority = ["Leadership", "Senior", "Individual Contributor"]
+    .map(label => ({ label, count: employees.filter(e => seniorityRank(e) === label).length }))
+    .filter(d => d.count > 0);
+
+  const tenureBucket = e => {
+    if (!e.start_date) return null;
+    const yrs = (Date.now() - new Date(e.start_date)) / (365.25 * 86400000);
+    if (yrs < 1) return "< 1 year";
+    if (yrs < 2) return "1–2 years";
+    if (yrs < 3) return "2–3 years";
+    return "3+ years";
+  };
+  const tenureOrder = ["< 1 year", "1–2 years", "2–3 years", "3+ years"];
+  const byTenure = tenureOrder
+    .map(label => ({ label, count: employees.filter(e => tenureBucket(e) === label).length }))
+    .filter(d => d.count > 0);
+
+  // Demographic data comes from onboarding docs (new hires) — often partial.
+  const docMap = docs.reduce((m, d) => { m[d.employee_id] = d; return m; }, {});
+  const withDob = employees.filter(e => docMap[e.id]?.i9_dob);
+  const ageBucket = dob => {
+    const age = (Date.now() - new Date(dob)) / (365.25 * 86400000);
+    if (age < 30) return "Under 30";
+    if (age < 40) return "30–39";
+    if (age < 50) return "40–49";
+    return "50+";
+  };
+  const ageOrder = ["Under 30", "30–39", "40–49", "50+"];
+  const byAge = ageOrder
+    .map(label => ({ label, count: withDob.filter(e => ageBucket(docMap[e.id].i9_dob) === label).length }))
+    .filter(d => d.count > 0);
+
+  const withState = employees.filter(e => docMap[e.id]?.i9_state);
+  const byState = (() => {
+    const m = {};
+    withState.forEach(e => { const s = docMap[e.id].i9_state; m[s] = (m[s] || 0) + 1; });
+    return Object.entries(m).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
+  })();
+
+  const attestLabels = { citizen: "U.S. Citizen", noncitizen_national: "Noncitizen National", lawful_permanent_resident: "Permanent Resident", alien_authorized: "Authorized Alien" };
+  const withAuth = employees.filter(e => docMap[e.id]?.i9_attestation);
+  const byAuth = (() => {
+    const m = {};
+    withAuth.forEach(e => { const a = attestLabels[docMap[e.id].i9_attestation] || docMap[e.id].i9_attestation; m[a] = (m[a] || 0) + 1; });
+    return Object.entries(m).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
+  })();
+
+  // Pay equity: average base salary by department (only where salary exists)
+  const payByDept = (() => {
+    const sums = {};
+    employees.forEach(e => {
+      if (e.base_salary == null) return;
+      const d = deptMap[e.department_id] || "Unassigned";
+      if (!sums[d]) sums[d] = { total: 0, n: 0 };
+      sums[d].total += Number(e.base_salary); sums[d].n += 1;
+    });
+    return Object.entries(sums).map(([label, v]) => ({ label, avg: Math.round(v.total / v.n) })).sort((a, b) => b.avg - a.avg);
+  })();
+  const maxPay = payByDept.reduce((mx, d) => Math.max(mx, d.avg), 0);
+
+  return (
+    <div>
+      <SectionHeader icon="◐" accent={C.violet} title="Diversity & Composition" subtitle="Workforce breakdown by department, seniority, tenure, age, location, and pay equity." />
+
+      {loading ? (
+        <Card><p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading composition data…</p></Card>
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
+            <BreakdownCard title={`Department · ${total} total`} accent={C.violet} data={byDept} total={total} isMobile={isMobile} />
+            <BreakdownCard title="Seniority Level" accent={C.blue} data={bySeniority} total={total} isMobile={isMobile}
+              note="Derived from job titles (Leadership = Lead/Architect/Director/VP/Chief)." />
+            <BreakdownCard title="Tenure" accent={C.teal} data={byTenure} total={total} isMobile={isMobile} />
+            <BreakdownCard title={`Age · ${withDob.length} of ${total} reporting`} accent={C.amber} data={byAge} total={withDob.length} isMobile={isMobile}
+              note={withDob.length < total ? "Age is captured on I-9 during onboarding; not all employees have completed it." : null} />
+            <BreakdownCard title={`Location by State · ${withState.length} of ${total} reporting`} accent={C.emerald} data={byState} total={withState.length} isMobile={isMobile}
+              note={withState.length < total ? "Location is captured on I-9 during onboarding." : null} />
+            <BreakdownCard title={`Work Authorization · ${withAuth.length} of ${total} reporting`} accent={C.cyan} data={byAuth} total={withAuth.length} isMobile={isMobile}
+              note={withAuth.length < total ? "Attestation is captured on I-9 during onboarding." : null} />
+          </div>
+
+          {payByDept.length > 0 && (
+            <Card style={{ marginBottom: 14 }}>
+              <Label color={C.rose}>Pay Equity — Avg Base Salary by Department</Label>
+              {payByDept.map(d => (
+                <div key={d.label} style={{ marginBottom: 11 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                    <span style={{ fontSize: 13, color: C.textMid, fontWeight: 500 }}>{d.label}</span>
+                    <span style={{ fontSize: 13, color: C.textDark, fontWeight: 700 }}>${d.avg.toLocaleString()}</span>
+                  </div>
+                  <div style={{ height: 7, background: C.border, borderRadius: 4 }}>
+                    <div style={{ width: `${maxPay > 0 ? Math.round((d.avg / maxPay) * 100) : 0}%`, height: "100%", borderRadius: 4, background: C.rose }} />
+                  </div>
+                </div>
+              ))}
+            </Card>
+          )}
+
+          <Card>
+            <Label color={C.textMuted}>A note on EEO reporting</Label>
+            <p style={{ fontSize: 13, color: C.textMid, lineHeight: 1.7, margin: 0 }}>
+              QumulusAI does not currently collect protected-class demographic data (gender, race/ethnicity, veteran or disability status). The breakdowns above reflect organizational composition from HR records. To enable full EEO-1 / diversity reporting, add voluntary self-identification fields to the onboarding flow.
+            </p>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── WORKFORCE INTEL ──────────────────────────────────────────────────────────
 function WorkforceIntel({ onNavigate }) {
   const { ask, loading, response } = useAI();
@@ -1555,6 +1737,7 @@ export default function App() {
     manager:   <ManagerCoach />,
     employee:  <EmployeeHub focusEmpId={focusEmpId} />,
     orgchart:  <OrgChart onNavigate={navigate} />,
+    diversity: <Diversity onNavigate={navigate} />,
     executive: <WorkforceIntel onNavigate={navigate} />,
     careers:   <CareersPortal />,
     inbox:     <TalentInbox />,

@@ -255,10 +255,12 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 14 }}>
         <SectionCard title="Top Requisitions" action="View all" onClick={function() { if (onNavigate) onNavigate("recruit"); }} style={{ cursor: "pointer" }}>
           {hiring && hiring.pipelineByStage ? Object.entries(hiring.pipelineByStage).slice(0, 4).map(function(entry, i) {
+            var stageLabels = { new: "New", reviewing: "Reviewing", interview: "Interviewing", offer: "Offer Extended", hired: "Hired", rejected: "Rejected" };
+            var stageLabel = stageLabels[entry[0]] || (entry[0].charAt(0).toUpperCase() + entry[0].slice(1));
             return (
               <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid " + C.border }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.textDark }}>{entry[0]}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: C.textDark }}>{stageLabel}</div>
                   <div style={{ fontSize: 11, color: C.textMuted }}>Pipeline stage</div>
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: C.textDark }}>{entry[1]}</div>

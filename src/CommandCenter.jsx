@@ -124,10 +124,12 @@ function InsightItem({ text }) {
   );
 }
 
-function MiniStat({ label, value, trend }) {
+function MiniStat({ label, value, trend, onClick }) {
   return (
-    <div style={{ textAlign: "center", flex: 1 }}>
-      <div style={{ fontSize: 22, fontWeight: 800, color: C.textDark }}>{value}</div>
+    <div onClick={onClick} style={{ textAlign: "center", flex: 1, cursor: onClick ? "pointer" : "default", borderRadius: 8, padding: "8px 4px", transition: "background 0.15s" }}
+      onMouseEnter={e => { if (onClick) e.currentTarget.style.background = "#F0F4FF"; }}
+      onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+      <div style={{ fontSize: 22, fontWeight: 800, color: onClick ? C.blue : C.textDark }}>{value}</div>
       <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>{label}</div>
       {trend && <div style={{ fontSize: 11, color: trend.indexOf("+") >= 0 || trend.indexOf("new") >= 0 || trend.indexOf("stable") >= 0 ? C.emerald : C.rose, marginTop: 2, fontWeight: 600 }}>{trend}</div>}
     </div>
@@ -317,11 +319,11 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
           })}
         </div>
         <div style={{ display: "flex", gap: 16, overflowX: "auto" }}>
-          <MiniStat label="New Hires" value={workforce ? workforce.newHiresLast30Days : "--"} trend="+new this month" />
-          <MiniStat label="Headcount" value={workforce ? workforce.totalHeadcount : "--"} />
-          <MiniStat label="Goals Done" value={performance ? performance.completedGoals : "--"} trend={performance && performance.totalGoals ? "of " + performance.totalGoals : null} />
-          <MiniStat label="Flight Risk" value={retention ? retention.highRiskCount : "0"} trend={retention && retention.highRiskCount > 0 ? "needs attention" : "stable"} />
-          <MiniStat label="Missing Docs" value={compliance ? compliance.missingDocuments : "0"} trend={compliance && compliance.missingDocuments > 0 ? "action needed" : "clear"} />
+          <MiniStat label="New Hires" value={workforce ? workforce.newHiresLast30Days : "--"} trend="+new this month" onClick={function() { if (onNavigate) onNavigate("onboard"); }} />
+          <MiniStat label="Headcount" value={workforce ? workforce.totalHeadcount : "--"} onClick={function() { if (onNavigate) onNavigate("employee"); }} />
+          <MiniStat label="Goals Done" value={performance ? performance.completedGoals : "--"} trend={performance && performance.totalGoals ? "of " + performance.totalGoals : null} onClick={function() { if (onNavigate) onNavigate("executive"); }} />
+          <MiniStat label="Flight Risk" value={retention ? retention.highRiskCount : "0"} trend={retention && retention.highRiskCount > 0 ? "needs attention" : "stable"} onClick={function() { if (onNavigate) onNavigate("executive"); }} />
+          <MiniStat label="Missing Docs" value={compliance ? compliance.missingDocuments : "0"} trend={compliance && compliance.missingDocuments > 0 ? "action needed" : "clear"} onClick={function() { if (onNavigate) onNavigate("security"); }} />
         </div>
       </SectionCard>
 

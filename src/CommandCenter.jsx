@@ -3,17 +3,21 @@ import { useBreakpoint } from "./useBreakpoint";
 import { ensureModulesRegistered, hiringService, workforceService, retentionService, performanceService, financialService, complianceService } from "./services/registerModules";
 import { askIntelligenceEngine, getChiefOfStaffBriefing } from "./services/intelligenceEngine";
 import { supabase } from "./supabase";
+import * as T from "./theme";
 
 ensureModulesRegistered();
 
+// Legacy alias kept so existing drill-down markup keeps working; values now
+// resolve to the design-system tokens.
 const C = {
-  bg: "#F0F2F7", bgCard: "#FFFFFF", textDark: "#0D1117", textMid: "#3D4B5C",
-  textMuted: "#7E8FA3", border: "#E2E8F0", cyan: "#00C2E0", navy: "#0A2540",
-  blue: "#2563EB", violet: "#7C3AED", teal: "#0D9488", amber: "#D97706",
-  rose: "#DC2626", emerald: "#059669", blueLight: "#3B82F6",
+  bg: T.color.bg, bgCard: T.color.surface, textDark: T.color.text, textMid: T.color.textMid,
+  textMuted: T.color.textMuted, border: T.color.border, cyan: T.color.cyan, navy: T.color.navy,
+  blue: T.color.brand, violet: T.color.violet, teal: T.color.teal, amber: T.color.amber,
+  rose: T.color.rose, emerald: T.color.emerald, blueLight: "#3B82F6",
 };
 
-function KPICard({ icon, label, value, subtitle, accent, onClick }) {
+// Calm metric card — one question, one number, one trend.
+function KPICard({ label, value, trend, tone, onClick }) {
   const [hover, setHover] = useState(false);
   return (
     <div
@@ -21,40 +25,37 @@ function KPICard({ icon, label, value, subtitle, accent, onClick }) {
       onMouseLeave={() => setHover(false)}
       onClick={onClick}
       style={{
-        background: "#fff",
-        border: "1px solid " + (hover && onClick ? (accent || C.blue) : C.border),
-        borderRadius: 12,
-        padding: "20px 18px",
+        ...T.card({ padding: "16px 18px" }),
         cursor: onClick ? "pointer" : "default",
-        transition: "all 0.15s ease",
-        transform: hover && onClick ? "translateY(-1px)" : "none",
-        boxShadow: hover && onClick ? "0 4px 12px rgba(0,0,0,0.06)" : "none",
-        flex: 1,
-        minWidth: 140,
+        transition: `border-color ${T.dur.base} ${T.ease}, box-shadow ${T.dur.base} ${T.ease}, transform ${T.dur.base} ${T.ease}`,
+        transform: hover && onClick ? "translateY(-2px)" : "none",
+        boxShadow: hover && onClick ? T.shadow.md : T.shadow.sm,
+        borderColor: hover && onClick ? T.color.borderStrong : T.color.border,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 8, background: (accent || C.blue) + "12", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, color: accent || C.blue }}>{icon}</div>
-        <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 500 }}>{label}</div>
-      </div>
-      <div style={{ fontSize: 28, fontWeight: 800, color: C.textDark, letterSpacing: "-0.02em" }}>{value}</div>
-      {subtitle && <div style={{ fontSize: 12, color: C.emerald, marginTop: 6, fontWeight: 500 }}>{subtitle}</div>}
+      <div style={{ ...T.font.label, color: T.color.textMuted, marginBottom: 10 }}>{label}</div>
+      <div style={{ ...T.font.metric, color: T.color.text }}>{value}</div>
+      {trend && <div style={{ ...T.chipStyle(tone || "neutral"), marginTop: 10 }}>{trend}</div>}
     </div>
   );
 }
 
-function SectionCard({ title, action, children, style, onClick }) {
+function SectionCard({ title, action, children, style, onClick, actionOnClick }) {
   return (
-    <div onClick={onClick} style={{ background: "#fff", border: "1px solid " + C.border, borderRadius: 12, padding: "20px 22px", ...style }}>
+    <div onClick={onClick} style={{ ...T.card({ padding: T.space[5] }), ...style }}>
       {(title || action) && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          {title && <div style={{ fontSize: 15, fontWeight: 700, color: C.textDark }}>{title}</div>}
-          {action && <div style={{ fontSize: 12, color: C.blue, fontWeight: 600, cursor: "pointer" }}>{action}</div>}
+          {title && <div style={{ ...T.font.h2, color: T.color.text }}>{title}</div>}
+          {action && <div onClick={actionOnClick} style={{ fontSize: 12.5, color: T.color.brand, fontWeight: 600, cursor: "pointer" }}>{action}</div>}
         </div>
       )}
       {children}
     </div>
   );
+}
+
+function Skeleton({ h = 100, w = "100%" }) {
+  return <div style={{ height: h, width: w, borderRadius: T.radius.md, background: "#EDF0F4", animation: "qai-pulse 1.4s ease-in-out infinite" }} />;
 }
 
 function FunnelBar({ label, value, max, color }) {
@@ -353,136 +354,108 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
   }
 
   var now = new Date();
-  var timeStr = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  var hour = now.getHours();
+  var daypart = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
+  var dateLine = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
   var funnel = hiring ? (hiring.pipelineByStage || {}) : {};
   var funnelMax = Math.max(hiring ? hiring.totalApplications || 1 : 1, 1);
 
-  var deptData = [];
-  if (workforce && workforce.headcountByDepartment) {
-    deptData = Object.entries(workforce.headcountByDepartment).map(function(entry) { return { name: entry[0], value: entry[1] }; }).sort(function(a, b) { return b.value - a.value; }).slice(0, 6);
-  }
+  // Health strip — one question per card
+  var kpis = [
+    { label: "Headcount", value: workforce ? workforce.totalHeadcount : "—", trend: workforce && workforce.newHiresLast30Days ? "↑ " + workforce.newHiresLast30Days + " new" : null, tone: "good", onClick: function() { if (onNavigate) onNavigate("employee"); } },
+    { label: "Open Roles", value: hiring ? hiring.openRequisitions : "—", trend: hiring ? hiring.totalApplications + " applicants" : null, tone: "info", onClick: function() { if (onNavigate) onNavigate("recruit"); } },
+    { label: "Time to Fill", value: hiring && hiring.avgDaysOpen ? hiring.avgDaysOpen + "d" : "—", onClick: function() { if (onNavigate) onNavigate("recruit"); } },
+    { label: "Monthly Cost", value: financial && financial.latestLaborCost ? "$" + Math.round(financial.latestLaborCost / 1000) + "k" : "—", onClick: function() { if (onNavigate) onNavigate("payroll"); } },
+    { label: "Attrition Risk", value: retention && retention.highRiskCount ? retention.highRiskCount : "0", trend: retention && retention.highRiskCount ? "needs review" : "stable", tone: retention && retention.highRiskCount ? "bad" : "good", onClick: function() { openDrilldown("flight_risk"); } },
+    { label: "Engagement", value: retention && retention.avgEngagementScore ? retention.avgEngagementScore : "—", trend: retention && retention.avgEngagementScore ? "of 100" : null, tone: retention && retention.avgEngagementScore >= 75 ? "good" : "warn" },
+  ];
+
+  // AI priorities — proactive "what needs attention"
+  var priorities = [];
+  if (retention && retention.highRiskCount > 0) priorities.push({ tone: "bad", title: retention.highRiskCount + " employee" + (retention.highRiskCount > 1 ? "s" : "") + " at flight risk", sub: "Retention signals elevated over the next 60 days", action: "Review", onClick: function() { openDrilldown("flight_risk"); } });
+  if (compliance && compliance.missingDocuments > 0) priorities.push({ tone: "warn", title: compliance.missingDocuments + " compliance document" + (compliance.missingDocuments > 1 ? "s" : "") + " missing", sub: "Required paperwork outstanding", action: "Resolve", onClick: function() { if (onNavigate) onNavigate("compliance"); } });
+  if (hiring && hiring.offerAcceptRate != null && hiring.offerAcceptRate < 80) priorities.push({ tone: "warn", title: "Offer acceptance at " + hiring.offerAcceptRate + "%", sub: "Below benchmark — review compensation packages", action: "Recruiting", onClick: function() { if (onNavigate) onNavigate("recruit"); } });
+  if (performance && performance.totalGoals > 0 && performance.completedGoals < performance.totalGoals) priorities.push({ tone: "info", title: (performance.totalGoals - performance.completedGoals) + " goals still open", sub: performance.completedGoals + " of " + performance.totalGoals + " completed org-wide", action: "View", onClick: function() { openDrilldown("goals"); } });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: T.space[5], fontFamily: T.font.family }}>
+      <style>{"@keyframes qai-pulse{0%,100%{opacity:1}50%{opacity:0.5}}"}</style>
+
       {/* HEADER */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: C.textDark }}>Command Center</h1>
-          <p style={{ margin: "4px 0 0", color: C.textMuted, fontSize: 14 }}>Welcome back, Chateau. Here's what's happening across your workforce.</p>
+          <div style={{ ...T.font.label, color: T.color.textMuted, marginBottom: 7 }}>{dateLine}</div>
+          <h1 style={{ margin: 0, ...T.font.display, color: T.color.text }}>Good {daypart}, Chateau</h1>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 12, color: C.textMuted }}>Last updated: {timeStr}</span>
-          <button onClick={exportExecReport} disabled={loadingMetrics}
-            title="One-page board summary: headcount, hiring, attrition, compliance, labor cost"
-            style={{ background: C.navy, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: loadingMetrics ? 0.5 : 1 }}>
-            ⎙ Executive Report
-          </button>
-          <button onClick={function() { if (onNavigate) onNavigate("recruit"); }} style={{ background: C.blue, color: "#fff", border: "none", borderRadius: 8, padding: "10px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>+ New Requisition</button>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button onClick={exportExecReport} disabled={loadingMetrics} title="One-page board summary" style={{ ...T.btn("secondary"), opacity: loadingMetrics ? 0.5 : 1 }}>⎙ Board Report</button>
+          <button onClick={function() { if (onNavigate) onNavigate("recruit"); }} style={T.btn("primary")}>+ New Requisition</button>
         </div>
       </div>
 
-      {/* KPI ROW */}
-      <div style={{ display: "flex", gap: 12, overflowX: "auto", paddingBottom: 4 }}>
-        <KPICard icon="HC" label="Headcount" value={workforce ? workforce.totalHeadcount : "--"} subtitle={workforce && workforce.newHiresLast30Days ? "+ " + workforce.newHiresLast30Days + " new this month" : null} accent={C.blue} onClick={function() { if (onNavigate) onNavigate("employee"); }} />
-        <KPICard icon="RQ" label="Open Requisitions" value={hiring ? hiring.openRequisitions : "--"} subtitle={hiring ? hiring.totalApplications + " total applications" : null} accent={C.violet} onClick={function() { if (onNavigate) onNavigate("recruit"); }} />
-        <KPICard icon="TF" label="Time to Fill" value={hiring && hiring.avgDaysOpen ? hiring.avgDaysOpen + "d" : "--"} accent={C.teal} onClick={function() { if (onNavigate) onNavigate("recruit"); }} />
-        <KPICard icon="$" label="Labor Cost" value={financial && financial.latestLaborCost ? "$" + Math.round(financial.latestLaborCost / 1000) + "k" : "--"} accent={C.amber} onClick={function() { if (onNavigate) onNavigate("payroll"); }} />
-        <KPICard icon="AR" label="Attrition Risk" value={retention && retention.highRiskCount ? retention.highRiskCount + " high" : "Low"} accent={C.rose} />
-        <KPICard icon="EN" label="Engagement" value={retention && retention.avgEngagementScore ? retention.avgEngagementScore + "/100" : "--"} accent={C.emerald} />
+      {/* HEALTH STRIP */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(6, 1fr)", gap: 12 }}>
+        {loadingMetrics
+          ? [0, 1, 2, 3, 4, 5].map(function(i) { return <Skeleton key={i} h={104} />; })
+          : kpis.map(function(k) { return <KPICard key={k.label} {...k} />; })}
       </div>
 
-      {/* CHARTS ROW */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 14 }}>
-        <SectionCard title="Hiring Funnel">
-          <FunnelBar label="Applied" value={hiring ? hiring.totalApplications || 0 : 0} max={funnelMax} color={C.blue} />
+      {/* NEEDS ATTENTION — AI priorities */}
+      <div style={T.card({ padding: 0, overflow: "hidden" })}>
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid " + T.color.border, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 9, background: "linear-gradient(135deg," + T.color.brand + "," + T.color.violet + ")", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>✦</div>
+            <div style={{ ...T.font.h2, color: T.color.text }}>What needs your attention</div>
+          </div>
+          {!loadingMetrics && <span style={T.chipStyle(priorities.length ? "warn" : "good")}>{priorities.length ? priorities.length + " to review" : "All clear"}</span>}
+        </div>
+        {loadingMetrics ? (
+          <div style={{ padding: "22px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
+            <Skeleton h={16} w="70%" /><Skeleton h={16} w="55%" />
+          </div>
+        ) : priorities.length === 0 ? (
+          <div style={{ padding: "30px 20px", textAlign: "center", color: T.color.textMuted, fontSize: 13 }}>✓ No critical items. Everything is on track.</div>
+        ) : priorities.map(function(p, i) {
+          return (
+            <div key={i} onClick={p.onClick} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 20px", borderBottom: i < priorities.length - 1 ? "1px solid " + T.color.border : "none", cursor: "pointer", transition: "background " + T.dur.fast + " " + T.ease }}
+              onMouseEnter={function(e) { e.currentTarget.style.background = T.color.surfaceAlt; }}
+              onMouseLeave={function(e) { e.currentTarget.style.background = "transparent"; }}>
+              <span style={{ width: 8, height: 8, borderRadius: 999, background: p.tone === "bad" ? T.color.rose : p.tone === "warn" ? T.color.amber : T.color.brand, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: T.color.text }}>{p.title}</div>
+                <div style={{ fontSize: 12, color: T.color.textMuted }}>{p.sub}</div>
+              </div>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: T.color.brand, whiteSpace: "nowrap" }}>{p.action} →</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* SUPPORTING — pipeline + cost */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "3fr 2fr", gap: 14 }}>
+        <SectionCard title="Hiring pipeline" action="Recruiting →" actionOnClick={function() { if (onNavigate) onNavigate("recruit"); }}>
+          <FunnelBar label="Applied" value={hiring ? hiring.totalApplications || 0 : 0} max={funnelMax} color={T.color.brand} />
           <FunnelBar label="Screened" value={funnel.screened || funnel.screening || 0} max={funnelMax} color="#4F8CF7" />
-          <FunnelBar label="Interviewing" value={funnel.interviewing || funnel.interview || 0} max={funnelMax} color={C.violet} />
-          <FunnelBar label="Offered" value={funnel.offer || hiring && hiring.totalOffers || 0} max={funnelMax} color={C.emerald} />
-          <FunnelBar label="Hired" value={funnel.hired || 0} max={funnelMax} color={C.teal} />
+          <FunnelBar label="Interviewing" value={funnel.interviewing || funnel.interview || 0} max={funnelMax} color={T.color.violet} />
+          <FunnelBar label="Offered" value={funnel.offer || (hiring && hiring.totalOffers) || 0} max={funnelMax} color={T.color.emerald} />
+          <FunnelBar label="Hired" value={funnel.hired || 0} max={funnelMax} color={T.color.teal} />
         </SectionCard>
-
-        <SectionCard title="Requisitions by Department">
-          {deptData.length > 0 ? (
-            <DonutChart data={deptData} total={workforce ? workforce.totalHeadcount : 0} label="Total" />
-          ) : (
-            <div style={{ color: C.textMuted, fontSize: 13, padding: "20px 0", textAlign: "center" }}>Loading...</div>
-          )}
-        </SectionCard>
-
-        <SectionCard title="Live Activity" action="View all">
-          {recentHiring && recentHiring.newApplications && recentHiring.newApplications.slice(0, 5).map(function(app, i) {
-            return <ActivityItem key={i} text={<span><strong>{app.full_name}</strong> applied for {app.role_title}</span>} time={new Date(app.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} />;
-          })}
-          {recentHiring && recentHiring.newOffers && recentHiring.newOffers.slice(0, 2).map(function(offer, i) {
-            return <ActivityItem key={"o" + i} text={<span><strong>{offer.candidate_name}</strong> received offer for {offer.role}</span>} time={new Date(offer.created_at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} />;
-          })}
-          {(!recentHiring || (!recentHiring.newApplications || recentHiring.newApplications.length === 0) && (!recentHiring.newOffers || recentHiring.newOffers.length === 0)) && (
-            <div style={{ color: C.textMuted, fontSize: 12, padding: "16px 0", textAlign: "center" }}>No recent activity</div>
-          )}
-        </SectionCard>
-      </div>
-
-      {/* BOTTOM ROW */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: 14 }}>
-        <SectionCard title="Top Requisitions" action="View all" onClick={function() { if (onNavigate) onNavigate("recruit"); }} style={{ cursor: "pointer" }}>
-          {hiring && hiring.pipelineByStage ? Object.entries(hiring.pipelineByStage).slice(0, 4).map(function(entry, i) {
-            var stageLabels = { new: "New", reviewing: "Reviewing", interview: "Interviewing", offer: "Offer Extended", hired: "Hired", rejected: "Rejected" };
-            var stageLabel = stageLabels[entry[0]] || (entry[0].charAt(0).toUpperCase() + entry[0].slice(1));
+        <SectionCard title="Monthly cost" action="Payroll →" actionOnClick={function() { if (onNavigate) onNavigate("payroll"); }}>
+          <div style={{ ...T.font.metric, color: T.color.text, marginBottom: 14 }}>{financial && financial.latestLaborCost ? "$" + financial.latestLaborCost.toLocaleString() : "—"}</div>
+          {[["Payroll", 0.74], ["Benefits", 0.16], ["Contractors", 0.07], ["Other", 0.03]].map(function(rw) {
             return (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid " + C.border }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.textDark }}>{stageLabel}</div>
-                  <div style={{ fontSize: 11, color: C.textMuted }}>Pipeline stage</div>
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: C.textDark }}>{entry[1]}</div>
+              <div key={rw[0]} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, padding: "5px 0" }}>
+                <span style={{ color: T.color.textMuted }}>{rw[0]}</span>
+                <span style={{ color: T.color.text, fontWeight: 600 }}>{financial && financial.latestLaborCost ? "$" + Math.round(financial.latestLaborCost * rw[1]).toLocaleString() + " · " + Math.round(rw[1] * 100) + "%" : "—"}</span>
               </div>
             );
-          }) : <div style={{ color: C.textMuted, fontSize: 12 }}>Loading...</div>}
-        </SectionCard>
-
-        <SectionCard title="AI Insights">
-          {briefingLoading ? (
-            <div style={{ color: C.cyan, fontSize: 12, fontWeight: 600 }}>Generating insights...</div>
-          ) : (
-            <div>
-              {retention && retention.highRiskCount > 0 && <InsightItem text={"Retention risk detected for " + retention.highRiskCount + " employee" + (retention.highRiskCount > 1 ? "s" : "") + " in the next 60 days."} />}
-              {compliance && compliance.missingDocuments > 0 && <InsightItem text={compliance.missingDocuments + " missing compliance documents need attention."} />}
-              {hiring && hiring.offerAcceptRate && <InsightItem text={"Offer acceptance rate is " + hiring.offerAcceptRate + "%. " + (hiring.offerAcceptRate >= 80 ? "Strong performance." : "Below benchmark, review comp packages.")} />}
-              {performance && performance.totalGoals > 0 && <InsightItem text={performance.completedGoals + "/" + performance.totalGoals + " goals completed across the organization."} />}
-              {(!retention || !retention.highRiskCount) && (!compliance || !compliance.missingDocuments) && <InsightItem text="All systems nominal. No critical risks detected." />}
-            </div>
-          )}
-        </SectionCard>
-
-        <SectionCard title="Workforce Cost Overview" style={{ cursor: "pointer" }} onClick={function() { if (onNavigate) onNavigate("payroll"); }}>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 10, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em" }}>Total Cost</div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: C.textDark, marginTop: 4 }}>{financial && financial.latestLaborCost ? "$" + financial.latestLaborCost.toLocaleString() : "--"}</div>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: C.textMuted }}>Payroll</span>
-              <span style={{ color: C.textDark, fontWeight: 600 }}>{financial && financial.latestLaborCost ? "$" + Math.round(financial.latestLaborCost * 0.74).toLocaleString() + " (74%)" : "--"}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: C.textMuted }}>Benefits</span>
-              <span style={{ color: C.textDark, fontWeight: 600 }}>{financial && financial.latestLaborCost ? "$" + Math.round(financial.latestLaborCost * 0.16).toLocaleString() + " (16%)" : "--"}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: C.textMuted }}>Contractors</span>
-              <span style={{ color: C.textDark, fontWeight: 600 }}>{financial && financial.latestLaborCost ? "$" + Math.round(financial.latestLaborCost * 0.07).toLocaleString() + " (7%)" : "--"}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
-              <span style={{ color: C.textMuted }}>Other</span>
-              <span style={{ color: C.textDark, fontWeight: 600 }}>{financial && financial.latestLaborCost ? "$" + Math.round(financial.latestLaborCost * 0.03).toLocaleString() + " (3%)" : "--"}</span>
-            </div>
-          </div>
+          })}
         </SectionCard>
       </div>
 
       {/* WORKFORCE ANALYTICS */}
-      <SectionCard title="Workforce Analytics" action="Export">
+      <SectionCard title="Explore">
         <div style={{ display: "flex", gap: 24, borderBottom: "1px solid " + C.border, paddingBottom: 12, marginBottom: 16, overflowX: "auto" }}>
           {[
             { label: "Overview",    dest: null },
@@ -642,21 +615,21 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
       )}
 
       {/* AI ASSISTANT BAR */}
-      <div style={{ background: C.navy, borderRadius: 12, padding: "16px 20px", display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: "50%", background: C.cyan + "30", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, color: C.cyan, flexShrink: 0 }}>AI</div>
+      <div style={{ background: T.color.navy, borderRadius: T.radius.md, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, boxShadow: T.shadow.sm }}>
+        <div style={{ width: 30, height: 30, borderRadius: 9, background: "linear-gradient(135deg," + T.color.cyan + "," + T.color.brand + ")", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, color: "#fff", flexShrink: 0 }}>✦</div>
         <input
           value={question}
           onChange={function(e) { setQuestion(e.target.value); }}
           onKeyDown={function(e) { if (e.key === "Enter" && question.trim()) handleAsk(); }}
-          placeholder="Ask your AI Chief of Staff anything..."
-          style={{ flex: 1, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "11px 14px", color: "#fff", fontSize: 14, outline: "none", fontFamily: "inherit" }}
+          placeholder="Ask your AI Chief of Staff…"
+          style={{ flex: 1, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, padding: "11px 14px", color: "#fff", fontSize: 14, outline: "none", fontFamily: T.font.family }}
         />
-        <button onClick={handleAsk} disabled={asking || !question.trim()} style={{ background: C.cyan, color: "#fff", border: "none", borderRadius: 8, padding: "11px 20px", fontSize: 13, fontWeight: 700, cursor: asking ? "default" : "pointer", opacity: asking ? 0.6 : 1, fontFamily: "inherit" }}>{asking ? "..." : "Ask"}</button>
+        <button onClick={handleAsk} disabled={asking || !question.trim()} style={{ background: "#fff", color: T.color.navy, border: "none", borderRadius: 8, padding: "10px 20px", fontSize: 13, fontWeight: 700, cursor: asking ? "default" : "pointer", opacity: asking || !question.trim() ? 0.6 : 1, fontFamily: T.font.family }}>{asking ? "…" : "Ask"}</button>
       </div>
 
       {answer && (
         <SectionCard title="AI Response">
-          <div style={{ fontSize: 14, lineHeight: 1.8, color: C.textMid, whiteSpace: "pre-wrap" }}>{answer}</div>
+          <div style={{ fontSize: 14, lineHeight: 1.8, color: T.color.textMid, whiteSpace: "pre-wrap" }}>{answer}</div>
         </SectionCard>
       )}
     </div>

@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-const SUPABASE_URL = "https://oomdaguzvdheotrkqdxs.supabase.co";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
 
 const CORS = {
@@ -209,7 +209,7 @@ Deno.serve(async (req) => {
 
     // ── 1. Fetch all active employees ─────────────────────────────────────────
     const employees = await dbGet(
-      `employees?status=eq.active&organization_id=eq.${ORG_ID}&select=id,full_name,email,role_title,department_id`,
+      `employees?status=eq.active&organization_id=eq.${ORG_ID}&select=id,full_name,email,role_title,department_id,base_salary`,
     );
 
     if (!Array.isArray(employees) || employees.length === 0) {
@@ -288,8 +288,10 @@ Deno.serve(async (req) => {
     const missingBands: string[] = [];
 
     for (const emp of employees) {
-      const annualSalary = bandMap[emp.role_title];
-      if (!annualSalary) missingBands.push(`${emp.full_name} (${emp.role_title})`);
+      // Prefer the employee's actual base salary; fall back to their role's band midpoint.
+      const bandSalary = bandMap[emp.role_title];
+      const annualSalary = (emp.base_salary != null ? Number(emp.base_salary) : null) ?? bandSalary;
+      if (annualSalary == null) missingBands.push(`${emp.full_name} (${emp.role_title})`);
 
       const salary      = annualSalary ?? 100000;
       const grossPay    = round2(salary / periods);

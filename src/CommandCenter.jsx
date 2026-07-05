@@ -430,8 +430,22 @@ export default function CommandCenter({ greeting, userRole, onNavigate }) {
       {/* WORKFORCE ANALYTICS */}
       <SectionCard title="Workforce Analytics" action="Export">
         <div style={{ display: "flex", gap: 24, borderBottom: "1px solid " + C.border, paddingBottom: 12, marginBottom: 16, overflowX: "auto" }}>
-          {["Overview", "Hiring", "Retention", "Diversity", "Payroll", "Performance"].map(function(tab, i) {
-            return <span key={tab} style={{ fontSize: 13, fontWeight: i === 0 ? 700 : 400, color: i === 0 ? C.blue : C.textMuted, cursor: "pointer", whiteSpace: "nowrap", borderBottom: i === 0 ? "2px solid " + C.blue : "none", paddingBottom: 4 }}>{tab}</span>;
+          {[
+            { label: "Overview",    dest: null },
+            { label: "Hiring",      dest: "recruit" },
+            { label: "Retention",   dest: "executive" },
+            { label: "Diversity",   dest: "executive" },
+            { label: "Payroll",     dest: "payroll" },
+            { label: "Performance", dest: "employee" },
+          ].map(function(tab, i) {
+            var isActive = i === 0;
+            return <span key={tab.label}
+              onClick={function() { if (tab.dest && onNavigate) onNavigate(tab.dest); }}
+              style={{ fontSize: 13, fontWeight: isActive ? 700 : 400, color: isActive ? C.blue : C.textMuted, cursor: "pointer", whiteSpace: "nowrap", borderBottom: isActive ? "2px solid " + C.blue : "2px solid transparent", paddingBottom: 4, transition: "color 0.15s, border-color 0.15s" }}
+              onMouseEnter={function(e) { if (!isActive) { e.currentTarget.style.color = C.blue; e.currentTarget.style.borderBottomColor = C.border; } }}
+              onMouseLeave={function(e) { if (!isActive) { e.currentTarget.style.color = C.textMuted; e.currentTarget.style.borderBottomColor = "transparent"; } }}>
+              {tab.label}
+            </span>;
           })}
         </div>
         <div style={{ display: "flex", gap: 16, overflowX: "auto" }}>

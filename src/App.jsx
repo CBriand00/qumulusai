@@ -1778,6 +1778,7 @@ function Learning({ onNavigate, focus }) {
   const [drill, setDrill] = useState(null); // course name
   const [marking, setMarking] = useState(null);
   const [showGaps, setShowGaps] = useState(focus === "gaps");
+  const [gapOpen, setGapOpen] = useState(null); // expanded employee id in gap report
   const [showAssign, setShowAssign] = useState(false);
   const [assignCourse, setAssignCourse] = useState("");
   const [assignEmps, setAssignEmps] = useState({});
@@ -1975,42 +1976,64 @@ function Learning({ onNavigate, focus }) {
 
       {/* Gap report — what "training gaps" means, person by person */}
       {showGaps && (
-        <Card style={{ marginBottom: 14, borderColor: `${C.amber}50` }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
-            <Label color={C.amber} style={{ marginBottom: 0 }}>Training Gap Report — {totalGaps} open item{totalGaps !== 1 ? "s" : ""} across {gapRows.length} employee{gapRows.length !== 1 ? "s" : ""}</Label>
-            <button onClick={() => setShowGaps(false)} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>✕ Close</button>
+        <Card style={{ marginBottom: 14, padding: 0, overflow: "hidden" }}>
+          <div style={{ padding: "18px 22px 14px", borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.textDark }}>Training Gaps</div>
+              <button onClick={() => setShowGaps(false)} style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", fontFamily: "inherit", padding: 4 }}>✕</button>
+            </div>
+            <p style={{ fontSize: 12.5, color: C.textMuted, margin: "4px 0 0", lineHeight: 1.5 }}>
+              {totalGaps} required course{totalGaps !== 1 ? "s" : ""} not yet completed, across {gapRows.length} {gapRows.length === 1 ? "person" : "people"}. Select a person to see what they owe.
+            </p>
           </div>
-          <p style={{ fontSize: 12.5, color: C.textMid, lineHeight: 1.6, margin: "0 0 14px" }}>
-            A <strong>gap</strong> is one required course not yet completed by one employee. Each person below owes the listed courses — click a course chip to open its drill-down, or send them one email covering everything they owe.
-          </p>
           {gapRows.length === 0 ? (
-            <p style={{ fontSize: 13, color: C.emerald, fontWeight: 600, margin: 0 }}>✓ No training gaps — everyone is fully compliant.</p>
+            <p style={{ fontSize: 13, color: C.emerald, fontWeight: 600, margin: 0, padding: "18px 22px" }}>✓ No training gaps — everyone is fully compliant.</p>
           ) : (
-            gapRows.map((row, i) => (
-              <div key={row.emp.id} style={{ padding: "12px 0", borderBottom: i < gapRows.length - 1 ? `1px solid ${C.border}` : "none" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-                  <div>
-                    <span onClick={() => onNavigate && onNavigate("employee", row.emp.id)} style={{ fontSize: 13.5, fontWeight: 700, color: C.textDark, cursor: "pointer" }}>{row.emp.full_name}</span>
-                    <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 8 }}>{row.emp.role_title}</span>
-                    <span style={{ marginLeft: 10, fontSize: 10.5, fontWeight: 800, background: "#FFFBEB", color: C.amber, borderRadius: 20, padding: "2px 9px" }}>{row.courses.length} outstanding</span>
+            gapRows.map((row, i) => {
+              const open = gapOpen === row.emp.id;
+              const initials = row.emp.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+              return (
+                <div key={row.emp.id} style={{ borderBottom: i < gapRows.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                  <div onClick={() => setGapOpen(open ? null : row.emp.id)}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 22px", cursor: "pointer", background: open ? "#FAFBFD" : "transparent", transition: "background 0.12s" }}
+                    onMouseEnter={e => { if (!open) e.currentTarget.style.background = "#FAFBFD"; }}
+                    onMouseLeave={e => { if (!open) e.currentTarget.style.background = "transparent"; }}>
+                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#F1F5F9", color: C.textMid, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{initials}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: C.textDark }}>{row.emp.full_name}</div>
+                      <div style={{ fontSize: 11.5, color: C.textMuted }}>{row.emp.role_title}</div>
+                    </div>
+                    <span style={{ fontSize: 12.5, color: C.textMuted, whiteSpace: "nowrap" }}>{row.courses.length} course{row.courses.length !== 1 ? "s" : ""}</span>
+                    <span style={{ color: "#CBD5E1", fontSize: 12, transform: open ? "rotate(90deg)" : "none", transition: "transform 0.15s" }}>›</span>
                   </div>
-                  {row.emp.email && (
-                    <button onClick={() => remindPerson(row)}
-                      style={{ background: `${C.blue}10`, border: `1px solid ${C.blue}30`, borderRadius: 6, padding: "4px 12px", fontSize: 11, fontWeight: 700, color: C.blue, cursor: "pointer", fontFamily: "inherit" }}>
-                      ✉ Remind
-                    </button>
+                  {open && (
+                    <div style={{ padding: "2px 22px 14px 66px" }}>
+                      {row.courses.map(c => (
+                        <div key={c.id} onClick={() => { setDrill(c.name); setShowGaps(false); }} title="Open course details"
+                          style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", fontSize: 12.5, color: C.textMid, cursor: "pointer" }}
+                          onMouseEnter={e => { e.currentTarget.style.color = C.textDark; }}
+                          onMouseLeave={e => { e.currentTarget.style.color = C.textMid; }}>
+                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: c.category === "compliance" ? C.violet : C.teal, flexShrink: 0 }} />
+                          {c.name}
+                        </div>
+                      ))}
+                      <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
+                        {row.emp.email && (
+                          <button onClick={() => remindPerson(row)}
+                            style={{ background: "none", border: "none", padding: 0, fontSize: 12, fontWeight: 600, color: C.blue, cursor: "pointer", fontFamily: "inherit" }}>
+                            Send reminder
+                          </button>
+                        )}
+                        <button onClick={() => onNavigate && onNavigate("employee", row.emp.id)}
+                          style={{ background: "none", border: "none", padding: 0, fontSize: 12, fontWeight: 600, color: C.textMuted, cursor: "pointer", fontFamily: "inherit" }}>
+                          View profile
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {row.courses.map(c => (
-                    <span key={c.id} onClick={() => { setDrill(c.name); setShowGaps(false); }} title="Open course drill-down"
-                      style={{ fontSize: 11, fontWeight: 600, background: c.category === "compliance" ? `${C.violet}10` : `${C.teal}10`, color: c.category === "compliance" ? C.violet : C.teal, border: `1px solid ${c.category === "compliance" ? C.violet : C.teal}30`, borderRadius: 20, padding: "3px 10px", cursor: "pointer" }}>
-                      {c.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </Card>
       )}

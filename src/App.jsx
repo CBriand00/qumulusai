@@ -1377,14 +1377,16 @@ function OrgChart({ onNavigate }) {
 }
 
 // ─── DIVERSITY & COMPOSITION ──────────────────────────────────────────────────
-function BreakdownBar({ label, count, total, color }) {
+function BreakdownBar({ label, count, total, color, onClick, active }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
-    <div style={{ marginBottom: 11 }}>
+    <div onClick={onClick} style={{ marginBottom: 11, cursor: onClick ? "pointer" : "default", borderRadius: 6, padding: "4px 6px", margin: "0 -6px 7px", background: active ? `${color}0F` : "transparent", transition: "background 0.15s" }}
+      onMouseEnter={e => { if (onClick && !active) e.currentTarget.style.background = `${color}08`; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-        <span style={{ fontSize: 13, color: C.textMid, fontWeight: 500 }}>{label}</span>
+        <span style={{ fontSize: 13, color: active ? color : C.textMid, fontWeight: active ? 700 : 500 }}>{label}</span>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 13, color: C.textDark, fontWeight: 700 }}>{count}</span>
+          <span style={{ fontSize: 13, color: onClick ? color : C.textDark, fontWeight: 700, textDecoration: onClick ? "underline" : "none", textDecorationColor: `${color}60`, textUnderlineOffset: 2 }}>{count}</span>
           <span style={{ fontSize: 11, color: C.textMuted, minWidth: 32, textAlign: "right" }}>{pct}%</span>
         </div>
       </div>
@@ -1395,14 +1397,47 @@ function BreakdownBar({ label, count, total, color }) {
   );
 }
 
-function BreakdownCard({ title, accent, data, total, note, isMobile }) {
+function BreakdownCard({ title, accent, data, total, note, onSelect, activeKey }) {
   return (
     <Card>
       <Label color={accent}>{title}</Label>
       {data.length === 0
         ? <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>No data available.</p>
-        : data.map(d => <BreakdownBar key={d.label} label={d.label} count={d.count} total={total} color={accent} />)}
+        : data.map(d => (
+            <BreakdownBar key={d.label} label={d.label} count={d.count} total={total} color={accent}
+              active={activeKey === `${title}|${d.label}`}
+              onClick={onSelect && d.members ? () => onSelect(`${title}|${d.label}`, `${title.split(" · ")[0]} — ${d.label}`, d.members) : undefined} />
+          ))}
       {note && <p style={{ fontSize: 11, color: C.textMuted, margin: "10px 0 0", lineHeight: 1.5 }}>{note}</p>}
+    </Card>
+  );
+}
+
+function DiversityDrill({ title, members, deptMap, onNavigate, onClose }) {
+  return (
+    <Card style={{ marginBottom: 14, borderColor: C.violet + "40" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+        <Label color={C.violet} style={{ marginBottom: 0 }}>{title} · {members.length}</Label>
+        <button onClick={onClose} style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>✕ Close</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10 }}>
+        {members.map(e => {
+          const initials = e.full_name ? e.full_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase() : "?";
+          return (
+            <div key={e.id} onClick={() => onNavigate && onNavigate("employee", e.id)} title="View profile"
+              style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: C.bg, borderRadius: 8, cursor: "pointer", border: "1px solid transparent", transition: "border-color 0.15s" }}
+              onMouseEnter={ev => { ev.currentTarget.style.borderColor = C.violet + "50"; }}
+              onMouseLeave={ev => { ev.currentTarget.style.borderColor = "transparent"; }}>
+              <div style={{ width: 32, height: 32, borderRadius: "50%", background: `${C.violet}20`, color: C.violet, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{initials}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.textDark, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.full_name}</div>
+                <div style={{ fontSize: 11, color: C.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.role_title} · {deptMap[e.department_id] || "—"}</div>
+              </div>
+              <span style={{ fontSize: 13, color: C.violet, flexShrink: 0 }}>→</span>
+            </div>
+          );
+        })}
+      </div>
     </Card>
   );
 }
@@ -1413,6 +1448,7 @@ function Diversity({ onNavigate }) {
   const [deptMap, setDeptMap] = useState({});
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [drill, setDrill] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -1432,14 +1468,19 @@ function Diversity({ onNavigate }) {
   }, []);
 
   const total = employees.length;
+  const docMap = docs.reduce((m, d) => { m[d.employee_id] = d; return m; }, {});
 
-  function tally(keyFn) {
+  // Group employees by a key function; each segment carries its member list.
+  function group(pool, keyFn, order) {
     const m = {};
-    employees.forEach(e => { const k = keyFn(e); if (k == null || k === "") return; m[k] = (m[k] || 0) + 1; });
-    return Object.entries(m).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
+    pool.forEach(e => { const k = keyFn(e); if (k == null || k === "") return; (m[k] = m[k] || []).push(e); });
+    let entries = Object.entries(m).map(([label, members]) => ({ label, count: members.length, members }));
+    if (order) entries = order.map(label => m[label] ? { label, count: m[label].length, members: m[label] } : null).filter(Boolean);
+    else entries.sort((a, b) => b.count - a.count);
+    return entries;
   }
 
-  const byDept = tally(e => deptMap[e.department_id] || "Unassigned");
+  const byDept = group(employees, e => deptMap[e.department_id] || "Unassigned");
 
   const seniorityRank = e => {
     const t = (e.role_title || "").toLowerCase();
@@ -1447,9 +1488,7 @@ function Diversity({ onNavigate }) {
     if (t.includes("senior")) return "Senior";
     return "Individual Contributor";
   };
-  const bySeniority = ["Leadership", "Senior", "Individual Contributor"]
-    .map(label => ({ label, count: employees.filter(e => seniorityRank(e) === label).length }))
-    .filter(d => d.count > 0);
+  const bySeniority = group(employees, seniorityRank, ["Leadership", "Senior", "Individual Contributor"]);
 
   const tenureBucket = e => {
     if (!e.start_date) return null;
@@ -1459,55 +1498,37 @@ function Diversity({ onNavigate }) {
     if (yrs < 3) return "2–3 years";
     return "3+ years";
   };
-  const tenureOrder = ["< 1 year", "1–2 years", "2–3 years", "3+ years"];
-  const byTenure = tenureOrder
-    .map(label => ({ label, count: employees.filter(e => tenureBucket(e) === label).length }))
-    .filter(d => d.count > 0);
+  const byTenure = group(employees, tenureBucket, ["< 1 year", "1–2 years", "2–3 years", "3+ years"]);
 
   // Demographic data comes from onboarding docs (new hires) — often partial.
-  const docMap = docs.reduce((m, d) => { m[d.employee_id] = d; return m; }, {});
   const withDob = employees.filter(e => docMap[e.id]?.i9_dob);
-  const ageBucket = dob => {
+  const ageBucket = e => {
+    const dob = docMap[e.id]?.i9_dob;
+    if (!dob) return null;
     const age = (Date.now() - new Date(dob)) / (365.25 * 86400000);
     if (age < 30) return "Under 30";
     if (age < 40) return "30–39";
     if (age < 50) return "40–49";
     return "50+";
   };
-  const ageOrder = ["Under 30", "30–39", "40–49", "50+"];
-  const byAge = ageOrder
-    .map(label => ({ label, count: withDob.filter(e => ageBucket(docMap[e.id].i9_dob) === label).length }))
-    .filter(d => d.count > 0);
+  const byAge = group(withDob, ageBucket, ["Under 30", "30–39", "40–49", "50+"]);
 
   const withState = employees.filter(e => docMap[e.id]?.i9_state);
-  const byState = (() => {
-    const m = {};
-    withState.forEach(e => { const s = docMap[e.id].i9_state; m[s] = (m[s] || 0) + 1; });
-    return Object.entries(m).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
-  })();
+  const byState = group(withState, e => docMap[e.id].i9_state);
 
   const attestLabels = { citizen: "U.S. Citizen", noncitizen_national: "Noncitizen National", lawful_permanent_resident: "Permanent Resident", alien_authorized: "Authorized Alien" };
   const withAuth = employees.filter(e => docMap[e.id]?.i9_attestation);
-  const byAuth = (() => {
-    const m = {};
-    withAuth.forEach(e => { const a = attestLabels[docMap[e.id].i9_attestation] || docMap[e.id].i9_attestation; m[a] = (m[a] || 0) + 1; });
-    return Object.entries(m).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
-  })();
+  const byAuth = group(withAuth, e => attestLabels[docMap[e.id].i9_attestation] || docMap[e.id].i9_attestation);
 
   // Voluntary self-identification (EEO) breakdowns, from employee records.
-  function tallyLabeled(field, labels) {
-    const m = {};
-    employees.forEach(e => { const v = e[field]; if (!v) return; const label = labels[v] || v; m[label] = (m[label] || 0) + 1; });
-    return Object.entries(m).map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
-  }
   const genderLabels = { female: "Female", male: "Male", non_binary: "Non-binary", other: "Another identity", decline: "Declined" };
   const ethLabels = { hispanic_latino: "Hispanic or Latino", white: "White", black: "Black or African American", asian: "Asian", native_american: "American Indian / Alaska Native", pacific_islander: "Native Hawaiian / Pacific Islander", two_or_more: "Two or more races", decline: "Declined" };
   const vetLabels = { veteran: "Protected Veteran", not_veteran: "Not a Veteran", decline: "Declined" };
   const disLabels = { yes: "Has a Disability", no: "No Disability", decline: "Declined" };
-  const byGender = tallyLabeled("gender", genderLabels);
-  const byEthnicity = tallyLabeled("ethnicity", ethLabels);
-  const byVeteran = tallyLabeled("veteran_status", vetLabels);
-  const byDisability = tallyLabeled("disability_status", disLabels);
+  const byGender = group(employees, e => e.gender ? (genderLabels[e.gender] || e.gender) : null);
+  const byEthnicity = group(employees, e => e.ethnicity ? (ethLabels[e.ethnicity] || e.ethnicity) : null);
+  const byVeteran = group(employees, e => e.veteran_status ? (vetLabels[e.veteran_status] || e.veteran_status) : null);
+  const byDisability = group(employees, e => e.disability_status ? (disLabels[e.disability_status] || e.disability_status) : null);
   const withGender = employees.filter(e => e.gender).length;
   const withEth = employees.filter(e => e.ethnicity).length;
   const withVet = employees.filter(e => e.veteran_status).length;
@@ -1516,16 +1537,20 @@ function Diversity({ onNavigate }) {
 
   // Pay equity: average base salary by department (only where salary exists)
   const payByDept = (() => {
-    const sums = {};
+    const groups = {};
     employees.forEach(e => {
       if (e.base_salary == null) return;
       const d = deptMap[e.department_id] || "Unassigned";
-      if (!sums[d]) sums[d] = { total: 0, n: 0 };
-      sums[d].total += Number(e.base_salary); sums[d].n += 1;
+      if (!groups[d]) groups[d] = { total: 0, members: [] };
+      groups[d].total += Number(e.base_salary); groups[d].members.push(e);
     });
-    return Object.entries(sums).map(([label, v]) => ({ label, avg: Math.round(v.total / v.n) })).sort((a, b) => b.avg - a.avg);
+    return Object.entries(groups).map(([label, v]) => ({ label, avg: Math.round(v.total / v.members.length), members: v.members })).sort((a, b) => b.avg - a.avg);
   })();
   const maxPay = payByDept.reduce((mx, d) => Math.max(mx, d.avg), 0);
+
+  function selectDrill(key, title, members) {
+    setDrill(prev => prev && prev.key === key ? null : { key, title, members });
+  }
 
   return (
     <div>
@@ -1535,16 +1560,20 @@ function Diversity({ onNavigate }) {
         <Card><p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>Loading composition data…</p></Card>
       ) : (
         <>
+          {drill && (
+            <DiversityDrill title={drill.title} members={drill.members} deptMap={deptMap} onNavigate={onNavigate} onClose={() => setDrill(null)} />
+          )}
+
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
-            <BreakdownCard title={`Department · ${total} total`} accent={C.violet} data={byDept} total={total} isMobile={isMobile} />
-            <BreakdownCard title="Seniority Level" accent={C.blue} data={bySeniority} total={total} isMobile={isMobile}
+            <BreakdownCard title={`Department · ${total} total`} accent={C.violet} data={byDept} total={total} onSelect={selectDrill} activeKey={drill?.key} />
+            <BreakdownCard title="Seniority Level" accent={C.blue} data={bySeniority} total={total} onSelect={selectDrill} activeKey={drill?.key}
               note="Derived from job titles (Leadership = Lead/Architect/Director/VP/Chief)." />
-            <BreakdownCard title="Tenure" accent={C.teal} data={byTenure} total={total} isMobile={isMobile} />
-            <BreakdownCard title={`Age · ${withDob.length} of ${total} reporting`} accent={C.amber} data={byAge} total={withDob.length} isMobile={isMobile}
+            <BreakdownCard title="Tenure" accent={C.teal} data={byTenure} total={total} onSelect={selectDrill} activeKey={drill?.key} />
+            <BreakdownCard title={`Age · ${withDob.length} of ${total} reporting`} accent={C.amber} data={byAge} total={withDob.length} onSelect={selectDrill} activeKey={drill?.key}
               note={withDob.length < total ? "Age is captured on I-9 during onboarding; not all employees have completed it." : null} />
-            <BreakdownCard title={`Location by State · ${withState.length} of ${total} reporting`} accent={C.emerald} data={byState} total={withState.length} isMobile={isMobile}
+            <BreakdownCard title={`Location by State · ${withState.length} of ${total} reporting`} accent={C.emerald} data={byState} total={withState.length} onSelect={selectDrill} activeKey={drill?.key}
               note={withState.length < total ? "Location is captured on I-9 during onboarding." : null} />
-            <BreakdownCard title={`Work Authorization · ${withAuth.length} of ${total} reporting`} accent={C.cyan} data={byAuth} total={withAuth.length} isMobile={isMobile}
+            <BreakdownCard title={`Work Authorization · ${withAuth.length} of ${total} reporting`} accent={C.cyan} data={byAuth} total={withAuth.length} onSelect={selectDrill} activeKey={drill?.key}
               note={withAuth.length < total ? "Attestation is captured on I-9 during onboarding." : null} />
           </div>
 
@@ -1554,13 +1583,13 @@ function Diversity({ onNavigate }) {
                 Voluntary Self-Identification (EEO)
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 14, marginBottom: 14 }}>
-                <BreakdownCard title={`Gender · ${withGender} of ${total} reporting`} accent={C.violet} data={byGender} total={withGender} isMobile={isMobile}
+                <BreakdownCard title={`Gender · ${withGender} of ${total} reporting`} accent={C.violet} data={byGender} total={withGender} onSelect={selectDrill} activeKey={drill?.key}
                   note={withGender < total ? "Self-reported and voluntary; not all employees have responded." : null} />
-                <BreakdownCard title={`Race / Ethnicity · ${withEth} of ${total} reporting`} accent={C.blue} data={byEthnicity} total={withEth} isMobile={isMobile}
+                <BreakdownCard title={`Race / Ethnicity · ${withEth} of ${total} reporting`} accent={C.blue} data={byEthnicity} total={withEth} onSelect={selectDrill} activeKey={drill?.key}
                   note={withEth < total ? "Self-reported and voluntary." : null} />
-                <BreakdownCard title={`Veteran Status · ${withVet} of ${total} reporting`} accent={C.emerald} data={byVeteran} total={withVet} isMobile={isMobile}
+                <BreakdownCard title={`Veteran Status · ${withVet} of ${total} reporting`} accent={C.emerald} data={byVeteran} total={withVet} onSelect={selectDrill} activeKey={drill?.key}
                   note={withVet < total ? "Self-reported and voluntary." : null} />
-                <BreakdownCard title={`Disability Status · ${withDis} of ${total} reporting`} accent={C.amber} data={byDisability} total={withDis} isMobile={isMobile}
+                <BreakdownCard title={`Disability Status · ${withDis} of ${total} reporting`} accent={C.amber} data={byDisability} total={withDis} onSelect={selectDrill} activeKey={drill?.key}
                   note={withDis < total ? "Self-reported and voluntary." : null} />
               </div>
             </>
@@ -1569,17 +1598,24 @@ function Diversity({ onNavigate }) {
           {payByDept.length > 0 && (
             <Card style={{ marginBottom: 14 }}>
               <Label color={C.rose}>Pay Equity — Avg Base Salary by Department</Label>
-              {payByDept.map(d => (
-                <div key={d.label} style={{ marginBottom: 11 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-                    <span style={{ fontSize: 13, color: C.textMid, fontWeight: 500 }}>{d.label}</span>
-                    <span style={{ fontSize: 13, color: C.textDark, fontWeight: 700 }}>${d.avg.toLocaleString()}</span>
+              {payByDept.map(d => {
+                const key = `Pay Equity|${d.label}`;
+                const active = drill?.key === key;
+                return (
+                  <div key={d.label} onClick={() => selectDrill(key, `Pay Equity — ${d.label}`, d.members)}
+                    style={{ marginBottom: 7, cursor: "pointer", borderRadius: 6, padding: "4px 6px", margin: "0 -6px 7px", background: active ? `${C.rose}0F` : "transparent", transition: "background 0.15s" }}
+                    onMouseEnter={e => { if (!active) e.currentTarget.style.background = `${C.rose}08`; }}
+                    onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                      <span style={{ fontSize: 13, color: active ? C.rose : C.textMid, fontWeight: active ? 700 : 500 }}>{d.label} <span style={{ color: C.textMuted, fontWeight: 400 }}>· {d.members.length}</span></span>
+                      <span style={{ fontSize: 13, color: C.rose, fontWeight: 700, textDecoration: "underline", textDecorationColor: `${C.rose}60`, textUnderlineOffset: 2 }}>${d.avg.toLocaleString()}</span>
+                    </div>
+                    <div style={{ height: 7, background: C.border, borderRadius: 4 }}>
+                      <div style={{ width: `${maxPay > 0 ? Math.round((d.avg / maxPay) * 100) : 0}%`, height: "100%", borderRadius: 4, background: C.rose }} />
+                    </div>
                   </div>
-                  <div style={{ height: 7, background: C.border, borderRadius: 4 }}>
-                    <div style={{ width: `${maxPay > 0 ? Math.round((d.avg / maxPay) * 100) : 0}%`, height: "100%", borderRadius: 4, background: C.rose }} />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </Card>
           )}
 

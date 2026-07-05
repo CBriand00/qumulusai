@@ -63,6 +63,19 @@ Deno.serve(async (req) => {
     });
     if (banErr) return json({ error: banErr.message }, 400);
 
+    // Instant kill: revoke all active sessions server-side so refresh tokens die now.
+    try {
+      await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}/logout`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${SERVICE_ROLE_KEY}`,
+          "apikey": SERVICE_ROLE_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ scope: "global" }),
+      });
+    } catch (_) { /* best-effort; ban already blocks refresh */ }
+
     // Mark the profile so RLS/role checks treat them as terminated.
     await admin.from("profiles").update({ role: "terminated" }).eq("id", userId);
 

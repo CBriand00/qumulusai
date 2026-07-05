@@ -1881,6 +1881,26 @@ export default function App() {
     }
   }, [session]);
 
+  // Instant session-kill: revalidate against the server so a banned/terminated
+  // user is signed out within seconds (on tab focus + every 60s) rather than
+  // waiting for their access token to expire.
+  useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    async function checkValid() {
+      const { error } = await supabase.auth.getUser();
+      // 401/403 means the account was banned or the session revoked server-side.
+      if (!cancelled && error && (error.status === 401 || error.status === 403)) {
+        await supabase.auth.signOut();
+      }
+    }
+    const onFocus = () => checkValid();
+    window.addEventListener("focus", onFocus);
+    const iv = setInterval(checkValid, 60000);
+    checkValid();
+    return () => { cancelled = true; window.removeEventListener("focus", onFocus); clearInterval(iv); };
+  }, [session]);
+
   useEffect(() => {
     supabase.from("messages").select("channel").like("channel", "onboarding-%")
       .then(({ data }) => {

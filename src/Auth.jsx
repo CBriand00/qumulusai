@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
 import { useBreakpoint } from "./useBreakpoint";
+import { brand } from "./brand";
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -497,7 +498,7 @@ export default function Auth({ onAuth }) {
               <span style={{ color: C.brand, fontWeight: 900, fontSize: 16 }}>Q</span>
             </div>
             <h1 style={{ fontSize: 22, fontWeight: 900, color: C.text, letterSpacing: "-0.04em", margin: 0 }}>
-              Qumulus<span style={{ color: C.brand }}>AI</span>
+              {brand.wordmark.lead}{brand.wordmark.body}<span style={{ color: C.brand }}>{brand.wordmark.tail}</span>
             </h1>
           </div>
           <p style={{ fontSize: 11, color: C.textMuted, margin: 0, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>
@@ -519,7 +520,7 @@ export default function Auth({ onAuth }) {
             <>
               <div style={{ marginBottom: 26 }}>
                 <h2 style={{ fontSize: 20, fontWeight: 700, color: C.text, margin: "0 0 5px", letterSpacing: "-0.02em" }}>Welcome back</h2>
-                <p style={{ fontSize: 13, color: C.textSub, margin: 0 }}>Sign in to your QumulusAI workspace</p>
+                <p style={{ fontSize: 13, color: C.textSub, margin: 0 }}>Sign in to your {brand.name} workspace</p>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -566,7 +567,7 @@ export default function Auth({ onAuth }) {
             <>
               <div style={{ marginBottom: 26 }}>
                 <h2 style={{ fontSize: 20, fontWeight: 700, color: C.text, margin: "0 0 5px", letterSpacing: "-0.02em" }}>Create your account</h2>
-                <p style={{ fontSize: 13, color: C.textSub, margin: 0 }}>Join the QumulusAI enterprise platform</p>
+                <p style={{ fontSize: 13, color: C.textSub, margin: 0 }}>Join the {brand.name} enterprise platform</p>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -723,7 +724,7 @@ export default function Auth({ onAuth }) {
 
         {/* ── Footer ── */}
         <p style={{ textAlign: "center", marginTop: 20, fontSize: 11, color: C.textMuted }}>
-          © 2026 QumulusAI
+          © 2026 {brand.name}
         </p>
       </div>
     </div>

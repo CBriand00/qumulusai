@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useBreakpoint } from "./useBreakpoint";
 import { supabase } from "./supabase";
+import { brand } from "./brand";
 function renderMarkdown(text) {
  if (!text) return null;
  const lines = text.split("\n");
@@ -123,8 +124,8 @@ export default function OfferSigning({ token }) {
        candidateName: offer.candidate_name,
        role: offer.role,
        signingLink: onboardLink,
-       subject: "Complete Your New Hire Documents — QumulusAI",
-       bodyText: `Welcome to QumulusAI, ${offer.candidate_name}! Please complete your new hire documents (W-4, Direct Deposit, I-9) by clicking the link below. This should take about 5 minutes.`,
+       subject: `Complete Your New Hire Documents — ${brand.name}`,
+       bodyText: `Welcome to ${brand.name}, ${offer.candidate_name}! Please complete your new hire documents (W-4, Direct Deposit, I-9) by clicking the link below. This should take about 5 minutes.`,
      },
    });
    setSigning(false);
@@ -137,7 +138,7 @@ export default function OfferSigning({ token }) {
 <div style={styles.successCard}>
 <div style={styles.checkmark}>✓</div>
 <h2 style={styles.successTitle}>Offer Accepted!</h2>
-<p style={styles.successSub}>Welcome to QumulusAI! Your onboarding information will be sent shortly.</p>
+<p style={styles.successSub}>Welcome to {brand.name}! Your onboarding information will be sent shortly.</p>
 </div>
 </div>
  );
@@ -151,7 +152,7 @@ export default function OfferSigning({ token }) {
  return (
 <div style={styles.shell}>
 <div style={{...styles.header, padding: isMobile ? "16px" : "24px 32px"}}>
-<h1 style={styles.wordmark}>Qumulus<span style={styles.ai}>AI</span></h1>
+<h1 style={styles.wordmark}>{brand.wordmark.lead}{brand.wordmark.body}<span style={styles.ai}>{brand.wordmark.tail}</span></h1>
 <p style={styles.subtitle}>Offer Letter</p>
 </div>
 <div style={{...styles.content, padding: isMobile ? "20px 16px" : "40px 32px"}}>

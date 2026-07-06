@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
 import * as T from "./theme";
+import { brand } from "./brand";
 
 // Which training courses apply to this employee (mirror of the HR-side rule,
 // simplified: 'all' or a title-keyword match; state defaults to GA).
@@ -74,7 +75,7 @@ export default function EmployeePortal({ user, overrideEmpId }) {
       <header style={S.header}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={S.logo}>Q</div>
-          <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.02em", color: T.color.text }}>Qumulus<span style={{ color: T.color.brand }}>AI</span></span>
+          <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.02em", color: T.color.text }}>{brand.wordmark.lead}{brand.wordmark.body}<span style={{ color: T.color.brand }}>{brand.wordmark.tail}</span></span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={S.avatar}>{first[0]?.toUpperCase()}</div>

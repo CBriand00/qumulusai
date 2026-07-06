@@ -1,4 +1,5 @@
 import { supabase } from "../supabase";
+import { brand } from "../brand";
 
 const registry = [];
 
@@ -28,7 +29,7 @@ async function buildContext() {
   return summaries.join("\n\n");
 }
 
-const BASE_SYSTEM = `You are the AI Chief of Staff for QumulusAI's People Operating System. You have live data from every connected module. Be honest about what is and isn't known. Keep responses under 200 words unless asked for more.`;
+const BASE_SYSTEM = `You are the AI Chief of Staff for ${brand.name}'s People Operating System. You have live data from every connected module. Be honest about what is and isn't known. Keep responses under 200 words unless asked for more.`;
 
 export async function askIntelligenceEngine(question) {
   const context = await buildContext();

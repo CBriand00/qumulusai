@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
+import { brand } from "./brand";
 
 const C = {
   bg: "#F7F8FA", surface: "#FFFFFF", border: "#E5E7EB",
@@ -58,7 +59,7 @@ export default function AISourcing() {
       const { data, error } = await supabase.functions.invoke("ai-query", {
         body: {
           max_tokens: 1500,
-          system: `You are QumulusAI's AI Talent Sourcing engine. When given a role description, generate:
+          system: `You are ${brand.name}'s AI Talent Sourcing engine. When given a role description, generate:
 1. IDEAL CANDIDATE PROFILE: skills, experience, background
 2. WHERE TO FIND THEM: specific communities, companies, schools, events
 3. BOOLEAN SEARCH STRINGS: for LinkedIn Recruiter

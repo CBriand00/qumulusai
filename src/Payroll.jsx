@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
 import { useBreakpoint } from "./useBreakpoint";
+import { brand } from "./brand";
 
 // ── Design tokens (match App.jsx) ─────────────────────────────────────────────
 const C = {
@@ -361,7 +362,7 @@ function TaxLiability({ showToast }) {
     const ssEr = Q.ssEmp;                                   // employer matches employee SS
     const medEr = round2(Q.medErGross * 0.0145);            // employer Medicare (no addl 0.9%)
     const rows = [
-      ["QumulusAI — Quarterly Tax Liability Worksheet (941 / GA G-7 prep)", ""],
+      [brand.name + " — Quarterly Tax Liability Worksheet (941 / GA G-7 prep)", ""],
       ["Quarter", qk],
       ["", ""],
       ["Line", "Amount"],
@@ -384,7 +385,7 @@ function TaxLiability({ showToast }) {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `QumulusAI_TaxLiability_${qk.replace(" ", "_")}.csv`;
+    a.href = url; a.download = `${brand.name.replace(/s+/g,"")}_TaxLiability_${qk.replace(" ", "_")}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast(`Tax worksheet for ${qk} downloaded.`);
@@ -407,7 +408,7 @@ function TaxLiability({ showToast }) {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `QumulusAI_W2_Data_${new Date().getFullYear()}.csv`;
+    a.href = url; a.download = `${brand.name.replace(/s+/g,"")}_W2_Data_${new Date().getFullYear()}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showToast("W-2 wage data downloaded.");
@@ -528,7 +529,7 @@ export default function Payroll() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `QumulusAI_ACH_${run.pay_date}.ach`;
+      a.download = `${brand.name.replace(/s+/g,"")}_ACH_${run.pay_date}.ach`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
       showToast(`ACH file generated — ${entries.length} credit${entries.length !== 1 ? "s" : ""}, ${fmt$(entries.reduce((s, e) => s + e.amountCents, 0) / 100)} total.${skipped.length ? ` Skipped (no direct deposit): ${skipped.join(", ")}` : ""}`);
@@ -611,7 +612,7 @@ export default function Payroll() {
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
           <div>
             <h2 style={{ margin: 0, fontSize: isMobile ? 20 : 22, fontWeight: 800, color: C.textDark, letterSpacing: "-0.02em" }}>Payroll</h2>
-            <p style={{ margin: "4px 0 0", color: C.textMuted, fontSize: 13 }}>Calculate, review, and approve payroll runs for QumulusAI</p>
+            <p style={{ margin: "4px 0 0", color: C.textMuted, fontSize: 13 }}>Calculate, review, and approve payroll runs for {brand.name}</p>
           </div>
           <button
             onClick={() => setShowRunModal(true)}

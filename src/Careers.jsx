@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "./supabase";
+import { brand, companyBlurb } from "./brand";
  
 const C = {
   bg:        "#F7F8FA",
@@ -192,8 +193,8 @@ function ApplicationForm({ role, onBack, onSubmit }) {
       </div>
 
       <div style={{ marginBottom: 14 }}>
-        <label style={labelStyle}>Why QumulusAI? What excites you about this role? *</label>
-        <textarea value={form.why} onChange={e => set("why", e.target.value)} rows={4} placeholder="Tell us what draws you to QumulusAI and why you're the right person for this role…"
+        <label style={labelStyle}>Why {brand.name}? What excites you about this role? *</label>
+        <textarea value={form.why} onChange={e => set("why", e.target.value)} rows={4} placeholder={`Tell us what draws you to ${brand.name} and why you're the right person for this role…`}
           style={{ ...inputStyle, resize: "vertical", lineHeight: 1.6 }} />
       </div>
 
@@ -265,7 +266,7 @@ function AIScreeningResult({ role, form, aiResponse, loading }) {
           </div>
           <div style={{ background: `${C.emerald}10`, border: `1px solid ${C.emerald}25`, borderRadius: 10, padding: 16, textAlign: "left", marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: C.emerald, marginBottom: 6 }}>✓ What happens next</div>
-            <div style={{ fontSize: 13, color: C.textMid, lineHeight: 1.7 }}>Your application has been received and scored. A member of the QumulusAI recruiting team will review your result and reach out within 2–3 business days if your background is a strong match for this role.</div>
+            <div style={{ fontSize: 13, color: C.textMid, lineHeight: 1.7 }}>Your application has been received and scored. A member of the {brand.name} recruiting team will review your result and reach out within 2–3 business days if your background is a strong match for this role.</div>
           </div>
           <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: 10, padding: 16, textAlign: "left" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#2563EB", marginBottom: 6 }}>📋 Check your email for your skills assessment</div>
@@ -315,7 +316,7 @@ export default function CareersPortal() {
     }
 
     await ask(
-      `You are QumulusAI's AI recruiting screener. QumulusAI is an 18-person bare-metal GPU cloud company in Atlanta, GA with $500M in financing, scaling to 300+ employees. CEO: Mike Maniscalco. Mission: universalize access to AI compute.
+      `You are ${brand.name}'s AI recruiting screener. ${companyBlurb}
 
 Screen this candidate and respond with:
 MATCH SCORE: [X/100]
@@ -338,7 +339,7 @@ Location: ${formData.location}
 Experience: ${formData.experience}
 LinkedIn: ${formData.linkedin}
 
-Why QumulusAI: ${formData.why}
+Why ${brand.name}: ${formData.why}
 
 Resume/Background: ${formData.resume}`
     );
@@ -377,7 +378,7 @@ Resume/Background: ${formData.resume}`
                 Build the future of<br /><span style={{ color: C.cyan }}>AI infrastructure.</span>
               </h1>
               <p style={{ color: C.textMid, fontSize: 16, maxWidth: 480, margin: "0 auto", lineHeight: 1.75 }}>
-                QumulusAI is scaling from 18 to 300+ people. Join us and help universalize access to AI compute.
+                {brand.name} is scaling from 18 to 300+ people. Join us and help universalize access to AI compute.
               </p>
             </div>
 
@@ -401,7 +402,7 @@ Resume/Background: ${formData.resume}`
             <div style={{ textAlign: "center", marginTop: 48, padding: "32px", background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 14 }}>
               <div style={{ fontWeight: 800, fontSize: 18, color: C.text, marginBottom: 8 }}>Don't see your role?</div>
               <p style={{ color: C.textMid, fontSize: 14, marginBottom: 16 }}>We're growing fast. Send us your background and we'll reach out when the right role opens.</p>
-              <button onClick={() => { setSelectedRole({ id: 0, title: "General Application", dept: "QumulusAI", location: "Remote / Atlanta, GA", type: "Full-Time", level: "Open", comp: "Competitive + equity", summary: "Tell us who you are and what you're great at.", requirements: [], nice: [] }); setStep(2); }}
+              <button onClick={() => { setSelectedRole({ id: 0, title: "General Application", dept: brand.name, location: "Remote / Atlanta, GA", type: "Full-Time", level: "Open", comp: "Competitive + equity", summary: "Tell us who you are and what you're great at.", requirements: [], nice: [] }); setStep(2); }}
                 style={{ background: "transparent", border: `1px solid ${C.cyan}`, borderRadius: 8, padding: "11px 24px", color: C.cyan, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
                 Submit General Application
               </button>
@@ -470,7 +471,7 @@ Resume/Background: ${formData.resume}`
       </main>
 
       <footer style={{ borderTop: `1px solid ${C.border}`, padding: "24px 40px", textAlign: "center", color: C.textMuted, fontSize: 12, marginTop: 60 }}>
-        © 2026 QumulusAI · Marietta, GA · Universalizing access to AI compute
+        © 2026 {brand.name} · Marietta, GA · Universalizing access to AI compute
       </footer>
     </div>
   );

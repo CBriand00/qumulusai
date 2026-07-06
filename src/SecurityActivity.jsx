@@ -2,6 +2,7 @@ import { useState } from "react";
 import { supabase } from "./supabase";
 import { getLoginHistory } from "./Auth";
 import { useBreakpoint } from "./useBreakpoint";
+import { brand } from "./brand";
 
 const C = {
   bg: "#F0F2F7", bgCard: "#fff", text: "#0D1117", textMid: "#3D4B5C",
@@ -126,7 +127,7 @@ export default function SecurityActivity({ user }) {
       {/* RBAC architecture note */}
       <SectionCard title="Enterprise Access Control" style={{ background: "#F8FAFC" }}>
         <p style={{ fontSize: 13, color: C.textMuted, margin: "0 0 14px", lineHeight: 1.6 }}>
-          QumulusAI is architected for enterprise access control. The following capabilities are available for activation:
+          {brand.name} is architected for enterprise access control. The following capabilities are available for activation:
         </p>
         {[
           { label: "Role-Based Access Control (RBAC)", note: "Profile roles enforced at query level" },

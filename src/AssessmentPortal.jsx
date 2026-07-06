@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
+import { brand } from "./brand";
 
 const C = {
   bg: "#F0F2F7", bgCard: "#FFFFFF", textDark: "#0D1117", textMid: "#3D4B5C",
@@ -197,7 +198,7 @@ export default function AssessmentPortal({ token }) {
             {submitting ? "Submitting…" : "Submit Assessment →"}
           </button>
           <p style={{ color: C.textMuted, fontSize: 12, marginTop: 12, textAlign: "center" }}>
-            Your responses are shared only with the QumulusAI hiring team.
+            Your responses are shared only with the {brand.name} hiring team.
           </p>
         </div>
       </div>

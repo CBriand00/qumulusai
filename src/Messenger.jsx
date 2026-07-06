@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
+import { brand } from "./brand";
 
 function renderMarkdown(text) {
   if (!text) return null;
@@ -203,7 +204,7 @@ export default function Messenger() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg }}>
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 48, width: 360, display: "flex", flexDirection: "column", gap: 20, boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: C.text }}>
-            Qumulus<span style={{ color: C.accent }}>AI</span> Messenger
+            {brand.wordmark.lead}{brand.wordmark.body}<span style={{ color: C.accent }}>{brand.wordmark.tail}</span> Messenger
           </div>
           <p style={{ color: C.muted, fontSize: 14, margin: 0 }}>What's your name? This will show on your messages.</p>
           <input
@@ -257,7 +258,7 @@ export default function Messenger() {
       <aside style={{ borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", background: C.surface }}>
         <div style={{ padding: "24px 20px 16px", borderBottom: `1px solid ${C.border}` }}>
           <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.02em" }}>
-            Qumulus<span style={{ color: C.accent }}>AI</span>
+            {brand.wordmark.lead}{brand.wordmark.body}<span style={{ color: C.accent }}>{brand.wordmark.tail}</span>
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Messenger</div>
         </div>

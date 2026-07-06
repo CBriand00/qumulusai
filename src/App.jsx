@@ -311,7 +311,7 @@ function AIBox({ loading, response, accent }) {
   return (
     <div style={{ background: `${a}08`, border: `1px solid ${a}25`, borderLeft: `3px solid ${a}`, borderRadius: 8, padding: 18, marginTop: 14, color: C.textDark }}>
       {loading
-        ? <span style={{ color: a, fontSize: 13, fontWeight: 600 }}>◈ QumulusAI is thinking…</span>
+        ? <span style={{ color: a, fontSize: 13, fontWeight: 600 }}>◈ {brand.name} is thinking…</span>
         : <>
             <div style={{ fontSize: 9, fontWeight: 800, color: a, letterSpacing: "0.14em", marginBottom: 10 }}>✦ QUMULUSAI INTELLIGENCE</div>
             {renderMarkdown(response)}
@@ -531,7 +531,7 @@ RECRUITING STRATEGY:
 
 Be specific, practical, and tailored. This will be used by a recruiter immediately.`;
 
-  const interviewSys = `You are QumulusAI's Interview Intelligence engine. When given interview notes or a transcript, produce a structured debrief. Use these sections:
+  const interviewSys = `You are ${brand.name}'s Interview Intelligence engine. When given interview notes or a transcript, produce a structured debrief. Use these sections:
 
 CANDIDATE:
 ROLE:
@@ -546,7 +546,7 @@ COMPARATIVE NOTES (if multiple candidates mentioned):
 
 Be direct. Hiring managers need clarity, not hedging.`;
 
-  const candidateSys = `You are QumulusAI's Candidate Evaluation engine. When given candidate information (resume summary, background, interview notes), evaluate them against the role. Use:
+  const candidateSys = `You are ${brand.name}'s Candidate Evaluation engine. When given candidate information (resume summary, background, interview notes), evaluate them against the role. Use:
 
 CANDIDATE NAME:
 ROLE APPLIED:
@@ -617,7 +617,7 @@ Be specific. Avoid generic language.`;
             <>
               <Label color={C.violet}>Hiring Manager Intake Intelligence</Label>
               <p style={{ color: C.textMid, fontSize: 13, lineHeight: 1.7, marginBottom: 8 }}>
-                Describe the role or paste intake meeting notes. QumulusAI instantly generates a full recruiting package — job description, candidate profile, competency model, interview guide, and scorecard.
+                Describe the role or paste intake meeting notes. {brand.name} instantly generates a full recruiting package — job description, candidate profile, competency model, interview guide, and scorecard.
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 8 }}>
                 {[
@@ -637,7 +637,7 @@ Be specific. Avoid generic language.`;
             <>
               <Label color={C.violet}>Candidate Evaluator</Label>
               <p style={{ color: C.textMid, fontSize: 13, lineHeight: 1.7, marginBottom: 8 }}>
-                Paste a candidate's background, resume summary, or LinkedIn profile. QumulusAI scores them against the role and gives a clear advance/pass recommendation.
+                Paste a candidate's background, resume summary, or LinkedIn profile. {brand.name} scores them against the role and gives a clear advance/pass recommendation.
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 8 }}>
                 {[
@@ -655,7 +655,7 @@ Be specific. Avoid generic language.`;
             <>
               <Label color={C.violet}>Interview Intelligence</Label>
               <p style={{ color: C.textMid, fontSize: 13, lineHeight: 1.7, marginBottom: 8 }}>
-                Paste interview notes or a transcript. QumulusAI produces a structured debrief with competency ratings, hire recommendation, risks, and suggested follow-ups.
+                Paste interview notes or a transcript. {brand.name} produces a structured debrief with competency ratings, hire recommendation, risks, and suggested follow-ups.
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 8 }}>
                 {[
@@ -803,7 +803,7 @@ function OnboardingConcierge({ onNavigate }) {
     }
   }, [response, loading]);
 
-  const sys = `You are QumulusAI's Onboarding Concierge. Generate a personalized 30-60-90 day plan for the new hire described. Include specific milestones, key meetings, deliverables, and success criteria for each phase. Use clear markdown formatting with ## headings, bullet lists, and tables where appropriate.`;
+  const sys = `You are ${brand.name}'s Onboarding Concierge. Generate a personalized 30-60-90 day plan for the new hire described. Include specific milestones, key meetings, deliverables, and success criteria for each phase. Use clear markdown formatting with ## headings, bullet lists, and tables where appropriate.`;
 
   async function generate(prompt) {
     setDraft("");
@@ -819,7 +819,7 @@ function OnboardingConcierge({ onNavigate }) {
     const date = new Date().toISOString().split("T")[0];
     const inserts = [];
     if (recipients.newHire) inserts.push({ channel: `onboarding-${slug}-${date}`, content: draft, sender_name: "Hiring Manager", sent_at: new Date().toISOString() });
-    if (recipients.hiringManager) inserts.push({ channel: `hiring-manager-${slug}-${date}`, content: draft, sender_name: "QumulusAI", sent_at: new Date().toISOString() });
+    if (recipients.hiringManager) inserts.push({ channel: `hiring-manager-${slug}-${date}`, content: draft, sender_name: brand.name, sent_at: new Date().toISOString() });
     if (inserts.length) await supabase.from("messages").insert(inserts);
     setSending(false);
     setSent(true);
@@ -850,7 +850,7 @@ function OnboardingConcierge({ onNavigate }) {
                       {docStatus === "complete" ? "✅ Docs Complete" : "⏳ Docs Pending"}
                     </span>
                     <button
-                      onClick={() => { setHireDesc(emp.full_name); generate(`Generate a 30-60-90 day onboarding plan for ${emp.full_name}, ${emp.role_title} at QumulusAI, starting ${emp.start_date || "soon"}.`); }}
+                      onClick={() => { setHireDesc(emp.full_name); generate(`Generate a 30-60-90 day onboarding plan for ${emp.full_name}, ${emp.role_title} at ${brand.name}, starting ${emp.start_date || "soon"}.`); }}
                       style={{ background: `${C.teal}15`, border: `1px solid ${C.teal}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, color: C.teal, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, minHeight: 30 }}>
                       ✦ Generate 30-60-90
                     </button>
@@ -869,7 +869,7 @@ function OnboardingConcierge({ onNavigate }) {
 
       <Card style={{ marginBottom: draft ? 14 : 0 }}>
         <Label color={C.teal}>Generate Personalized Onboarding Plan</Label>
-        <p style={{ color: C.textMid, fontSize: 13, lineHeight: 1.7, marginBottom: 8 }}>Describe a new hire and QumulusAI builds their complete 90-day onboarding journey instantly.</p>
+        <p style={{ color: C.textMid, fontSize: 13, lineHeight: 1.7, marginBottom: 8 }}>Describe a new hire and {brand.name} builds their complete 90-day onboarding journey instantly.</p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 4 }}>
           {[
             "New hire: Sarah Chen, VP Engineering, starting Monday, will manage 40 engineers",
@@ -879,7 +879,7 @@ function OnboardingConcierge({ onNavigate }) {
         </div>
         <AIInput placeholder="Describe the new hire — role, team, location, background…" onSubmit={q => { setHireDesc(q); generate(q); }} loading={loading} accent={C.teal} />
         {loading && (
-          <div style={{ marginTop: 14, color: C.teal, fontSize: 13, fontWeight: 600 }}>◈ QumulusAI is building the onboarding plan…</div>
+          <div style={{ marginTop: 14, color: C.teal, fontSize: 13, fontWeight: 600 }}>◈ {brand.name} is building the onboarding plan…</div>
         )}
       </Card>
 
@@ -1152,7 +1152,7 @@ function EmployeeHub({ focusEmpId }) {
     setTimeout(() => setSavedNote(false), 3000);
   }
 
-  const sys = "You are QumulusAI's HR assistant. Answer employee HR questions clearly and specifically. Be warm, helpful, and under 150 words.";
+  const sys = "You are " + brand.name + "'s HR assistant. Answer employee HR questions clearly and specifically. Be warm, helpful, and under 150 words.";
   const chips = ["What's my PTO balance and how do I request time off?", "Explain our parental leave policy", "How do I update my 401k contribution?", "What internal roles are open that match my background?"];
 
   return (
@@ -1898,7 +1898,7 @@ function Learning({ onNavigate, focus }) {
         body: {
           max_tokens: 3000,
           system: `You write internal corporate training. Return ONLY valid JSON: an array of exactly 3 modules, each {"title": string, "content": string (markdown with ## heading, bold, bullet lists; 200-350 words), "quiz": null or array of 2 objects {"q": string, "options": [3 strings], "answer": index}}. The final module must include a quiz. No text outside the JSON.`,
-          messages: [{ role: "user", content: `Write the course "${course.name}" for QumulusAI, an AI-native GPU cloud (NeoCloud) infrastructure company preparing for public markets. Course description: ${course.description}. Audience: ${course.applies_to === "all" ? "all employees" : "employees in roles matching: " + course.applies_to}.` }],
+          messages: [{ role: "user", content: `Write the course "${course.name}" for ${brand.name}. ${companyBlurb} Company context is an AI-native GPU cloud (NeoCloud) infrastructure company preparing for public markets. Course description: ${course.description}. Audience: ${course.applies_to === "all" ? "all employees" : "employees in roles matching: " + course.applies_to}.` }],
         },
       });
       if (error) throw error;
@@ -1960,8 +1960,8 @@ function Learning({ onNavigate, focus }) {
       .sig div{border-top:1px solid #94A3B8;padding-top:6px;width:44%}
       @media print{body{background:#fff}}
     </style></head><body><div class="cert">
-      <div class="seal">Q</div>
-      <div class="co">QumulusAI · People Operating System</div>
+      <div class="seal">${brand.wordmark.lead}</div>
+      <div class="co">${brand.name} · ${brand.tagline}</div>
       <h1>Certificate of Completion</h1>
       <div class="to">This certifies that</div>
       <div class="name">${c.name}</div>
@@ -1969,7 +1969,7 @@ function Learning({ onNavigate, focus }) {
       <div class="to">has successfully completed</div>
       <div class="course">${c.course}</div>
       <div class="meta">${c.score ? `Final assessment: ${c.score} · ` : ""}Completed ${c.date} · Certificate ${c.id}</div>
-      <div class="sig"><div>Chateau Briand<br/>Chief Human Resources Officer</div><div>QumulusAI Learning<br/>Compliance Record</div></div>
+      <div class="sig"><div>${company.ceo}<br/>Chief Executive Officer</div><div>${brand.name} Learning<br/>Compliance Record</div></div>
     </div><script>window.print()</script></body></html>`;
     const w = window.open("", "_blank");
     if (w) { w.document.write(html); w.document.close(); }
@@ -2017,8 +2017,8 @@ function Learning({ onNavigate, focus }) {
           ← Back to Learning
         </button>
         <Card style={{ maxWidth: 620, margin: "0 auto", textAlign: "center", border: `3px double ${C.navy || "#0A2540"}`, padding: isMobile ? "36px 24px" : "48px 56px" }}>
-          <div style={{ width: 64, height: 64, borderRadius: "50%", background: `radial-gradient(circle, ${C.teal}, #0A2540)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 800, margin: "0 auto 18px" }}>Q</div>
-          <div style={{ fontSize: 11, letterSpacing: "0.3em", color: C.textMuted, textTransform: "uppercase", marginBottom: 6 }}>QumulusAI · People Operating System</div>
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: `radial-gradient(circle, ${C.teal}, #0A2540)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, fontWeight: 800, margin: "0 auto 18px" }}>{brand.wordmark.lead}</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.3em", color: C.textMuted, textTransform: "uppercase", marginBottom: 6 }}>{brand.name} · {brand.tagline}</div>
           <div style={{ fontSize: isMobile ? 22 : 28, color: "#0A2540", fontWeight: 800, letterSpacing: "-0.01em", marginBottom: 20 }}>Certificate of Completion</div>
           <div style={{ fontSize: 12.5, color: C.textMuted, marginBottom: 5 }}>This certifies that</div>
           <div style={{ fontSize: 24, color: C.teal, fontWeight: 800, marginBottom: 2 }}>{cert.name}</div>
@@ -2070,7 +2070,7 @@ function Learning({ onNavigate, focus }) {
             {!authored ? (
               <>
                 <p style={{ fontSize: 13, color: C.textMid, lineHeight: 1.7, margin: "0 0 14px" }}>
-                  This course has no material yet. QumulusAI can draft a 3-module curriculum with a knowledge check — you review it before it becomes official. (AI drafts, humans approve — per our AI governance.)
+                  This course has no material yet. {brand.name} can draft a 3-module curriculum with a knowledge check — you review it before it becomes official. (AI drafts, humans approve — per our AI governance.)
                 </p>
                 <button onClick={() => authorCourse(course)} disabled={authoring}
                   style={{ background: C.emerald, color: "#fff", border: "none", borderRadius: 8, padding: "11px 22px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: authoring ? 0.6 : 1 }}>
@@ -3193,7 +3193,7 @@ function HRCompliance({ onNavigate }) {
   const eths = [...new Set(emps.map(e => ethLabels[e.ethnicity] || "Undisclosed"))];
 
   function exportEEO() {
-    const rows = [["EEO-1 Component 1 style report — QumulusAI (voluntary self-identification)", "", "", ""], ["Job Category", "Gender", "Race/Ethnicity", "Count"]];
+    const rows = [["EEO-1 Component 1 style report — " + brand.name + " (voluntary self-identification)", "", "", ""], ["Job Category", "Gender", "Race/Ethnicity", "Count"]];
     categories.forEach(cat => {
       genders.forEach(g => {
         eths.forEach(et => {
@@ -3207,7 +3207,7 @@ function HRCompliance({ onNavigate }) {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `QumulusAI_EEO_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.href = url; a.download = `${brand.name.replace(/\s+/g, "")}_EEO_Report_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
@@ -3627,7 +3627,7 @@ export default function App() {
     security:  <SecurityActivity user={session?.user} />,
   };
 
-  const currentPageLabel = NAV.find(n => n.id === active)?.label || "QumulusAI";
+  const currentPageLabel = NAV.find(n => n.id === active)?.label || brand.name;
 
   return (
     <div style={{ minHeight: "100vh", display: isMobile ? "block" : "flex", fontFamily: "'Inter', -apple-system, sans-serif", background: C.bg, overflowX: "hidden" }}>

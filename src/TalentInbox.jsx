@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useBreakpoint } from "./useBreakpoint";
 import { supabase } from "./supabase";
+import { brand } from "./brand";
 
 const STATUSES = ["new", "reviewing", "interview", "offer", "rejected", "hired"];
 
@@ -450,7 +451,7 @@ function InterviewIntelligence({ app }) {
       const { data, error } = await supabase.functions.invoke("ai-query", {
         body: {
           max_tokens: 1200,
-          system: `You are QumulusAI's Interview Intelligence engine. When given interview notes or a transcript, produce a structured debrief with:
+          system: `You are ${brand.name}'s Interview Intelligence engine. When given interview notes or a transcript, produce a structured debrief with:
 OVERALL RECOMMENDATION: (Strong Hire / Hire / No Hire / Strong No Hire)
 EXECUTIVE SUMMARY (2-3 sentences)
 COMPETENCY ASSESSMENT: rate key competencies 1-5 with evidence
@@ -553,7 +554,7 @@ function OfferLetter({ app }) {
       const { data, error } = await supabase.functions.invoke("ai-query", {
         body: {
           max_tokens: 1000,
-          messages: [{ role: "user", content: `Write a professional offer letter from QumulusAI (the hiring company) to ${app.full_name} (the candidate) for the role of ${app.role_title} in the ${app.department} department. Always refer to the employer as "QumulusAI" — never use the candidate's name as the company name. Compensation: Base Salary $${salary}, Start Date ${startDate}${bonus ? `, Annual Bonus ${bonus}` : ''}${rsu ? `, RSU Grant ${rsu}` : ''}${signOnBonus ? `, Sign-On Bonus ${signOnBonus}` : ''}${relocation ? `, Relocation Assistance ${relocation}` : ''}. Do not include a title or heading like "OFFER LETTER" at the very start of the letter — begin directly with the company name and date. Only mention compensation items that have values provided.` }],
+          messages: [{ role: "user", content: `Write a professional offer letter from ${brand.name} (the hiring company) to ${app.full_name} (the candidate) for the role of ${app.role_title} in the ${app.department} department. Always refer to the employer as "${brand.name}" — never use the candidate's name as the company name. Compensation: Base Salary $${salary}, Start Date ${startDate}${bonus ? `, Annual Bonus ${bonus}` : ''}${rsu ? `, RSU Grant ${rsu}` : ''}${signOnBonus ? `, Sign-On Bonus ${signOnBonus}` : ''}${relocation ? `, Relocation Assistance ${relocation}` : ''}. Do not include a title or heading like "OFFER LETTER" at the very start of the letter — begin directly with the company name and date. Only mention compensation items that have values provided.` }],
         },
       });
       if (error) throw error;

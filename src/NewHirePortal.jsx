@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useBreakpoint } from "./useBreakpoint";
 import { supabase } from "./supabase";
+import { brand } from "./brand";
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const STEPS = ["W-4 Tax Withholding", "Direct Deposit", "I-9 Eligibility", "Voluntary Self-ID"];
@@ -187,8 +188,8 @@ export default function NewHirePortal({ token }) {
       supabase.from("messages").insert({ channel, sender_name, content });
 
     await post(
-      "QumulusAI People & Culture",
-      `🎉 Welcome ${employee.full_name} to QumulusAI!\n\nRole: ${employee.role_title} | Start: ${startDate}\n\nAll onboarding documents have been completed ✅\n\n@hiring-manager @it-team @payroll — please see your action items below.`
+      `${brand.name} People & Culture`,
+      `🎉 Welcome ${employee.full_name} to ${brand.name}!\n\nRole: ${employee.role_title} | Start: ${startDate}\n\nAll onboarding documents have been completed ✅\n\n@hiring-manager @it-team @payroll — please see your action items below.`
     );
 
     await post(
@@ -210,7 +211,7 @@ export default function NewHirePortal({ token }) {
 
     await post(
       "People & Culture Bot",
-      `👋 Manager Checklist for ${employee.full_name}'s First Day\n\n    Before ${startDate}:\n    □ Schedule Day 1 welcome 1:1\n    □ Prepare 30-60-90 day plan\n    □ Send team introduction email\n    □ Review QumulusAI onboarding guide\n\n    Day 1:\n    □ Morning coffee/welcome chat\n    □ Team introductions\n    □ Share current priorities\n    □ Set up recurring 1:1 cadence\n\n    React ✅ when complete.`
+      `👋 Manager Checklist for ${employee.full_name}'s First Day\n\n    Before ${startDate}:\n    □ Schedule Day 1 welcome 1:1\n    □ Prepare 30-60-90 day plan\n    □ Send team introduction email\n    □ Review ${brand.name} onboarding guide\n\n    Day 1:\n    □ Morning coffee/welcome chat\n    □ Team introductions\n    □ Share current priorities\n    □ Set up recurring 1:1 cadence\n\n    React ✅ when complete.`
     );
 
     // AI-generated first day agenda
@@ -218,14 +219,14 @@ export default function NewHirePortal({ token }) {
       const { data: aiData } = await supabase.functions.invoke("ai-query", {
         body: {
           max_tokens: 600,
-          system: "You are QumulusAI's AI Chief of Staff. Write a warm, practical first-day agenda for a new hire. Be specific to their role. Format with clear time blocks.",
-          messages: [{ role: "user", content: `Create a first-day agenda for ${employee.full_name}, a new ${employee.role_title} starting on ${startDate} at QumulusAI (a fast-growing GPU AI infrastructure company in Atlanta, GA).` }],
+          system: "You are " + brand.name + "'s AI Chief of Staff. Write a warm, practical first-day agenda for a new hire. Be specific to their role. Format with clear time blocks.",
+          messages: [{ role: "user", content: `Create a first-day agenda for ${employee.full_name}, a new ${employee.role_title} starting on ${startDate} at ${brand.name}.` }],
         },
       });
       const agenda = aiData?.content?.[0]?.text || "First day agenda to be shared by your manager.";
-      await post("QumulusAI Chief of Staff", `📋 Personalized First Day Agenda — ${employee.full_name}\n\n${agenda}`);
+      await post(brand.name + " Chief of Staff",`📋 Personalized First Day Agenda — ${employee.full_name}\n\n${agenda}`);
     } catch (_) {
-      await post("QumulusAI Chief of Staff", `📋 First Day Agenda for ${employee.full_name}\n\nYour manager will share your personalized Day 1 schedule shortly. Welcome to the team!`);
+      await post(brand.name + " Chief of Staff",`📋 First Day Agenda for ${employee.full_name}\n\nYour manager will share your personalized Day 1 schedule shortly. Welcome to the team!`);
     }
   }
 
@@ -310,7 +311,7 @@ export default function NewHirePortal({ token }) {
         <h2 style={S.succTitle}>Documents Complete!</h2>
         <p style={S.succSub}>
           Thanks, <strong>{employee?.full_name?.split(" ")[0]}</strong>. Your W-4, Direct Deposit, and I-9 have been submitted successfully.<br /><br />
-          Your HR team will be in touch with next steps. Welcome to QumulusAI!
+          Your HR team will be in touch with next steps. Welcome to {brand.name}!
         </p>
       </div>
     </div>
@@ -322,7 +323,7 @@ export default function NewHirePortal({ token }) {
     <div style={S.shell}>
       <div style={{...S.header, padding: isMobile ? "14px 16px" : "24px 32px", flexWrap: "wrap", gap: 8}}>
         <div>
-          <h1 style={S.wordmark}>Qumulus<span style={S.ai}>AI</span></h1>
+          <h1 style={S.wordmark}>{brand.wordmark.lead}{brand.wordmark.body}<span style={S.ai}>{brand.wordmark.tail}</span></h1>
           <p style={S.subtitle}>New Hire Document Portal</p>
         </div>
         <div style={{ marginLeft: "auto", fontSize: 13, color: "#64748B" }}>
@@ -337,7 +338,7 @@ export default function NewHirePortal({ token }) {
         {step === 1 && (
           <div style={{...S.card, padding: isMobile ? 16 : 28}}>
             <h2 style={S.cardTitle}>Step 1 of 3 — W-4 Federal Tax Withholding</h2>
-            <p style={S.cardSub}>Tell QumulusAI how much federal income tax to withhold from each paycheck. You can update this any time through People & Culture.</p>
+            <p style={S.cardSub}>Tell {brand.name} how much federal income tax to withhold from each paycheck. You can update this any time through People & Culture.</p>
 
             <Field label="Legal Name"><input style={S.inputRo} value={employee?.full_name || ""} readOnly /></Field>
 
@@ -399,7 +400,7 @@ export default function NewHirePortal({ token }) {
         {step === 2 && (
           <div style={{...S.card, padding: isMobile ? 16 : 28}}>
             <h2 style={S.cardTitle}>Step 2 of 3 — Direct Deposit Authorization</h2>
-            <p style={S.cardSub}>Authorize QumulusAI to deposit your net pay directly to your bank account each pay period.</p>
+            <p style={S.cardSub}>Authorize {brand.name} to deposit your net pay directly to your bank account each pay period.</p>
 
             <Field label="Bank Name">
               <input style={S.input} placeholder="e.g. Chase, Wells Fargo, Bank of America"
@@ -443,7 +444,7 @@ export default function NewHirePortal({ token }) {
             <div style={S.infoBox}>100% of net pay will be deposited to this account each pay period.</div>
 
             <div style={S.divider}>
-              <p style={S.signNote}>By signing below, I authorize QumulusAI to initiate electronic credit entries to the account listed above.</p>
+              <p style={S.signNote}>By signing below, I authorize {brand.name} to initiate electronic credit entries to the account listed above.</p>
               <input style={S.signInput} placeholder={`Type your full legal name to authorize (${employee?.full_name})`}
                 value={dd.signature} onChange={e => setDd(p => ({ ...p, signature: e.target.value }))} />
               <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
@@ -557,7 +558,7 @@ export default function NewHirePortal({ token }) {
           <div style={{...S.card, padding: isMobile ? 16 : 28}}>
             <h2 style={S.cardTitle}>Step 4 of 4 — Voluntary Self-Identification</h2>
             <p style={S.cardSub}>
-              QumulusAI is an equal opportunity employer. Providing this information is <strong>completely voluntary</strong> and will not affect your employment. It is used only for anonymized EEO reporting and diversity insights. You may decline any question.
+              {brand.name} is an equal opportunity employer. Providing this information is <strong>completely voluntary</strong> and will not affect your employment. It is used only for anonymized EEO reporting and diversity insights. You may decline any question.
             </p>
 
             <Field label="Gender">

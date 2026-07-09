@@ -11,6 +11,7 @@ import EmployeePortal from "./EmployeePortal";
 import OfferSigning from "./OfferSigning";
 import NewHirePortal from "./NewHirePortal";
 import AISourcing from "./AISourcing";
+import InterviewNotetaker from "./InterviewNotetaker";
 import SecurityActivity from "./SecurityActivity";
 import AssessmentPortal from "./AssessmentPortal";
 import Payroll from "./Payroll";
@@ -511,7 +512,6 @@ function RequisitionsTab() {
 // ─── RECRUITING ENGINE ────────────────────────────────────────────────────────
 function RecruitingEngine() {
   const intake = useAI();
-  const interview = useAI();
   const candidate = useAI();
   const [activeTab, setActiveTab] = useState("intake");
   const { isMobile } = useBreakpoint();
@@ -530,21 +530,6 @@ SUGGESTED COMPENSATION RANGE:
 RECRUITING STRATEGY:
 
 Be specific, practical, and tailored. This will be used by a recruiter immediately.`;
-
-  const interviewSys = `You are ${brand.name}'s Interview Intelligence engine. When given interview notes or a transcript, produce a structured debrief. Use these sections:
-
-CANDIDATE:
-ROLE:
-OVERALL RECOMMENDATION: (Strong Hire / Hire / No Hire / Strong No Hire)
-EXECUTIVE SUMMARY (2-3 sentences):
-COMPETENCY ASSESSMENT:
-- [Competency]: [Rating 1-5] — [Evidence from interview]
-KEY STRENGTHS:
-RISKS & CONCERNS:
-SUGGESTED FOLLOW-UP QUESTIONS:
-COMPARATIVE NOTES (if multiple candidates mentioned):
-
-Be direct. Hiring managers need clarity, not hedging.`;
 
   const candidateSys = `You are ${brand.name}'s Candidate Evaluation engine. When given candidate information (resume summary, background, interview notes), evaluate them against the role. Use:
 
@@ -651,22 +636,7 @@ Be specific. Avoid generic language.`;
             </>
           )}
 
-          {activeTab === "interview" && (
-            <>
-              <Label color={C.violet}>Interview Intelligence</Label>
-              <p style={{ color: C.textMid, fontSize: 13, lineHeight: 1.7, marginBottom: 8 }}>
-                Paste interview notes or a transcript. {brand.name} produces a structured debrief with competency ratings, hire recommendation, risks, and suggested follow-ups.
-              </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 8 }}>
-                {[
-                  "Interview with Sarah Chen for VP Eng. She described rebuilding Stripe's infra team from 15 to 55 people over 3 years. Struggled to answer questions about org design at scale. Strong on technical vision, weaker on people development.",
-                  "Interview with David Park for AI PM. Passionate, deep LLM knowledge, shipped 3 AI features at OpenAI. Seemed uncomfortable with enterprise sales cycles and customer discovery.",
-                ].map(q => <Chip key={q} label={q.slice(0, 48) + "…"} accent={C.violet} onClick={() => interview.ask(interviewSys, q)} />)}
-              </div>
-              <AIInput placeholder="Paste interview notes or transcript…" onSubmit={q => interview.ask(interviewSys, q)} loading={interview.loading} accent={C.violet} />
-              <AIBox loading={interview.loading} response={interview.response} accent={C.violet} />
-            </>
-          )}
+          {activeTab === "interview" && <InterviewNotetaker />}
 
           {activeTab === "requisitions" && <RequisitionsTab />}
         </div>

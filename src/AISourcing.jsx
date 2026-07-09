@@ -93,8 +93,12 @@ Be specific and actionable.`,
   }
 
   // Real candidate sourcing via People Data Labs (source-candidates edge function).
-  async function handleSourceReal() {
-    if (!roleDesc.trim()) return;
+  // Accepts optional overrides so the chat copilot can drive the search directly.
+  async function handleSourceReal(roleArg, locArg, skArg) {
+    const role = (roleArg ?? roleDesc).trim();
+    const loc = locArg ?? location;
+    const sk = skArg ?? skillList();
+    if (!role) return;
     setSourcing(true);
     setCandidates([]);
     setCandidateSource("");
@@ -102,7 +106,7 @@ Be specific and actionable.`,
     setSourcingNotice("");
     try {
       const { data, error } = await supabase.functions.invoke("source-candidates", {
-        body: { role_title: roleDesc, location, skills: skillList(), size: 10 },
+        body: { role_title: role, location: loc, skills: sk, size: 10 },
       });
       if (error) { setSourcingError("Error: " + error.message); setSourcing(false); return; }
 
@@ -118,12 +122,49 @@ Be specific and actionable.`,
         return;
       }
 
-      setCandidates(data.candidates.map(c => ({ ...c, location: c.location || location })));
+      setCandidates(data.candidates.map(c => ({ ...c, location: c.location || loc })));
       setCandidateSource("real");
     } catch (e) {
       setSourcingError("Sourcing error: " + e.message);
     }
     setSourcing(false);
+  }
+
+  // Extract a structured search from the chat and run the real sourcing query.
+  async function findCandidatesFromChat() {
+    if (chatBusy || sourcing || chat.length === 0) return;
+    setSourcing(true);
+    setCandidates([]);
+    setCandidateSource("");
+    setSourcingError("");
+    setSourcingNotice("");
+    try {
+      const convo = chat.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
+      const { data, error } = await supabase.functions.invoke("ai-query", {
+        body: {
+          max_tokens: 400,
+          system: `Extract the target candidate search from this recruiting conversation. Return ONLY valid JSON, no markdown: {"role_title": string, "skills": string[], "location": string}. Use the most specific target job title discussed. If a field is unknown use "" (or [] for skills).`,
+          messages: [{ role: "user", content: convo }],
+        },
+      });
+      if (error) throw error;
+      const text = data?.content?.map(b => b.text || "").join("") || "";
+      const m = text.match(/\{[\s\S]*\}/);
+      if (!m) { setSourcingError("Couldn't extract a profile from the chat — refine it a bit more."); setSourcing(false); return; }
+      const crit = JSON.parse(m[0]);
+      const role = (crit.role_title || roleDesc || "").trim();
+      const loc = crit.location || location;
+      const sk = Array.isArray(crit.skills) && crit.skills.length ? crit.skills : skillList();
+      if (!role) { setSourcingError("The chat doesn't specify a target role yet."); setSourcing(false); return; }
+      // Reflect the extracted profile in the form so it's visible and editable.
+      setRoleDesc(role);
+      if (loc) setLocation(loc);
+      if (sk.length) setSkills(sk.join(", "));
+      await handleSourceReal(role, loc, sk);
+    } catch (e) {
+      setSourcingError("Couldn't apply profile from chat: " + e.message);
+      setSourcing(false);
+    }
   }
 
   // AI-generated EXAMPLE profiles (clearly labeled — not real people). Useful for
@@ -238,7 +279,7 @@ Be specific and actionable.`,
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button onClick={handleSourceReal} disabled={sourcing || !roleDesc.trim()}
+          <button onClick={() => handleSourceReal()} disabled={sourcing || !roleDesc.trim()}
             style={{ flex: "1 1 200px", background: C.blue, border: "none", borderRadius: 8, padding: "13px 20px", color: "#fff", fontSize: 14, fontWeight: 700, cursor: sourcing ? "default" : "pointer", opacity: sourcing ? 0.7 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
             {sourcing ? "Sourcing…" : "◈ Find Real Candidates"}
           </button>
@@ -356,6 +397,14 @@ Be specific and actionable.`,
             Send
           </button>
         </div>
+
+        {/* Turn the refined conversation into a real candidate search. */}
+        {chat.some(m => m.role === "assistant") && (
+          <button onClick={findCandidatesFromChat} disabled={sourcing || chatBusy}
+            style={{ marginTop: 10, width: "100%", background: `${C.blue}12`, border: `1px solid ${C.blue}40`, borderRadius: 8, padding: "11px 0", color: C.blue, fontSize: 13.5, fontWeight: 700, cursor: sourcing || chatBusy ? "default" : "pointer", opacity: sourcing || chatBusy ? 0.6 : 1, fontFamily: "inherit" }}>
+            {sourcing ? "Sourcing…" : "◈ Find candidates from this chat"}
+          </button>
+        )}
       </div>
 
       {/* AI Strategy result */}

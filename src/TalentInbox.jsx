@@ -59,9 +59,13 @@ export default function TalentInbox() {
 
   async function updateStatus(id, newStatus) {
     setUpdating(id);
-    await supabase.from("applications").update({ status: newStatus }).eq("id", id);
-    setApps((prev) => prev.map((a) => a.id === id ? { ...a, status: newStatus } : a));
-    setSelected((s) => s?.id === id ? { ...s, status: newStatus } : s);
+    // Record the human decision (who/when) — this is the sign-off that gates any
+    // AI recommendation from taking effect on its own.
+    const { data: { user } } = await supabase.auth.getUser();
+    const decided = { decided_by: user?.id ?? null, decided_at: new Date().toISOString() };
+    await supabase.from("applications").update({ status: newStatus, ...decided }).eq("id", id);
+    setApps((prev) => prev.map((a) => a.id === id ? { ...a, status: newStatus, ...decided } : a));
+    setSelected((s) => s?.id === id ? { ...s, status: newStatus, ...decided } : s);
     if (newStatus === "hired") {
       const app = apps.find((a) => a.id === id);
       if (app) {
@@ -231,6 +235,20 @@ function DetailPanel({ app, onUpdateStatus, updating }) {
       {app.status === "interview" && <ScheduleInterview app={app} />}
       {app.status === "interview" && <InterviewIntelligence app={app} />}
       {app.status === "offer" && <OfferLetter app={app} />}
+      {app.ai_recommended_status && !app.decided_at && app.ai_recommended_status !== app.status && (
+        <Section title="AI Recommendation">
+          <div style={{ background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, color: "#4C1D95", lineHeight: 1.5, flex: 1, minWidth: 180 }}>
+              🤖 Based on the assessment, AI recommends moving to{" "}
+              <strong style={{ textTransform: "capitalize" }}>{(STATUS_META[app.ai_recommended_status] ?? { label: app.ai_recommended_status }).label}</strong>. A recruiter must confirm.
+            </span>
+            <button disabled={updating} onClick={() => onUpdateStatus(app.id, app.ai_recommended_status)}
+              style={{ background: "#7C3AED", color: "#fff", border: "none", borderRadius: 8, padding: "9px 16px", fontSize: 13, fontWeight: 700, cursor: updating ? "default" : "pointer", opacity: updating ? 0.6 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}>
+              Accept & move
+            </button>
+          </div>
+        </Section>
+      )}
       <Section title="Move Pipeline">
         <div style={styles.pipelineGrid}>
           {STATUSES.map((s) => {

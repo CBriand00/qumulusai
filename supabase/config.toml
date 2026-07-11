@@ -1,0 +1,28 @@
+# Supabase CLI configuration.
+#
+# project_id is the project "ref" (Dashboard → Project Settings → General →
+# Reference ID). It is PER-TENANT — set it to the new company's project ref
+# before running the CLI, or link at runtime instead of hardcoding:
+#
+#   supabase link --project-ref <ref>
+#   supabase db push          # apply everything in supabase/migrations
+#   supabase functions deploy # deploy everything in supabase/functions
+#   supabase secrets set ANTHROPIC_API_KEY=... PDL_API_KEY=...
+#
+# See SETUP.md for the full new-tenant runbook.
+project_id = "your-project-ref"
+
+[db]
+# Local dev database port (used by `supabase start`).
+port = 54322
+
+[api]
+# Schemas exposed through the auto-generated REST/GraphQL API.
+schemas = ["public"]
+extra_search_path = ["public"]
+
+[auth]
+# Set to the deployed app URL per tenant. Used for email links (confirmation,
+# password reset). Additional allowed redirect targets go in additional_redirect_urls.
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173"]

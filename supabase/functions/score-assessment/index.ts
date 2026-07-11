@@ -5,8 +5,11 @@ const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SUPABASE_URL = "https://oomdaguzvdheotrkqdxs.supabase.co";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL"); // auto-injected per project
 const ORG_ID = "00000000-0000-0000-0000-000000000001";
+// Company identity for AI scoring context — set per tenant (see .env.example).
+const COMPANY_NAME = Deno.env.get("COMPANY_NAME") || "QumulusAI";
+const COMPANY_CONTEXT = Deno.env.get("COMPANY_CONTEXT") || "a vertically integrated AI infrastructure company (bare-metal GPU cloud), based in Marietta, Georgia";
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -115,7 +118,7 @@ Deno.serve(async (req) => {
           "apikey": anonKey,
         },
         body: JSON.stringify({
-          system: `You are an expert talent assessor for QumulusAI (bare-metal GPU cloud, Atlanta). Score this candidate rigorously. Return ONLY valid JSON — no markdown, no code fences.`,
+          system: `You are an expert talent assessor for ${COMPANY_NAME} — ${COMPANY_CONTEXT}. Score this candidate rigorously. Return ONLY valid JSON — no markdown, no code fences.`,
           messages: [{
             role: "user",
             content: `Score the assessment for: ${assessment.role_title}

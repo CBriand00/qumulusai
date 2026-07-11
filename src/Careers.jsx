@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "./supabase";
-import { brand, companyBlurb } from "./brand";
+import { brand, company, companyBlurb } from "./brand";
  
 const C = {
   bg:        "#F7F8FA",
@@ -471,7 +471,7 @@ Resume/Background: ${formData.resume}`
       </main>
 
       <footer style={{ borderTop: `1px solid ${C.border}`, padding: "24px 40px", textAlign: "center", color: C.textMuted, fontSize: 12, marginTop: 60 }}>
-        © 2026 {brand.name} · Marietta, GA · Universalizing access to AI compute
+        © 2026 {brand.name} · {company.location} · {company.mission.replace(/^to /, "").replace(/^./, c => c.toUpperCase())}
       </footer>
     </div>
   );

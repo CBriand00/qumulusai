@@ -130,6 +130,10 @@ Return ONLY this JSON (no code blocks):
 Scoring: 80–100 = strong advance, 65–79 = advance with notes, 50–64 = hold, below 50 = pass. Be specific.`,
           }],
           max_tokens: 1000,
+          temperature: 0,               // reproducible, auditable scoring
+          feature: "assessment_score",  // logged + firewalled by the ai-query gateway
+          entity_type: "application",
+          entity_id: assessment.application_id,
         }),
       });
 
@@ -160,14 +164,16 @@ Scoring: 80–100 = strong advance, 65–79 = advance with notes, 50–64 = hold
       anonKey
     );
 
-    // ── 6. Update application status ──────────────────────────────────────────
+    // ── 6. Record an AI RECOMMENDATION (human-in-the-loop) ─────────────────────
+    // The AI does NOT change the application's status — a recruiter reviews the
+    // recommendation and makes the actual stage decision in the Talent Inbox.
     if (assessment.application_id) {
-      const newStatus =
-        scoring.overall_score >= 70 ? "interview" :
-        scoring.overall_score >= 50 ? "screening" : "review";
+      // Map to the app's real pipeline statuses (new/reviewing/interview/…):
+      // strong scores -> interview, everything else -> reviewing (human reviews).
+      const recommended = scoring.overall_score >= 70 ? "interview" : "reviewing";
       await restPatch(
         `applications?id=eq.${assessment.application_id}`,
-        { status: newStatus },
+        { ai_recommended_status: recommended, ai_recommendation_at: new Date().toISOString() },
         anonKey
       );
     }
@@ -194,7 +200,7 @@ Scoring: 80–100 = strong advance, 65–79 = advance with notes, 50–64 = hold
     try {
       await restInsert("messages", {
         recipient_name: "Recruiting Team",
-        content: `📋 Assessment scored: ${assessment.candidate_name} — ${scoring.overall_score}/100 for ${assessment.role_title}. ${scoring.overall_score >= 70 ? "Recommended for interview." : "Review recommended."}`,
+        content: `📋 Assessment scored: ${assessment.candidate_name} — ${scoring.overall_score}/100 for ${assessment.role_title}. AI recommends ${scoring.overall_score >= 70 ? "Interview" : "Reviewing"} — awaiting recruiter decision.`,
         sent_at: new Date().toISOString(),
         type: "assessment_notification",
       }, anonKey);

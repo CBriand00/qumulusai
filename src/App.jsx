@@ -131,12 +131,13 @@ function useAI() {
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState("");
 
-  const ask = async (system, user) => {
+  // opts may carry governance fields: { feature, temperature, max_tokens, prompt_version }
+  const ask = async (system, user, opts = {}) => {
     setLoading(true);
     setResponse("");
     try {
       const { data, error } = await supabase.functions.invoke("ai-query", {
-        body: { system, messages: [{ role: "user", content: user }], max_tokens: 1000 },
+        body: { system, messages: [{ role: "user", content: user }], max_tokens: 1000, ...opts },
       });
       if (error) throw error;
       if (data?.error) {
@@ -624,9 +625,9 @@ Be specific. Avoid generic language.`;
                   "VP of Engineering to lead our 40-person team through a platform rebuild",
                   "Senior AI Product Manager to own our LLM product roadmap",
                   "Head of People Ops as we scale from 200 to 500 employees",
-                ].map(q => <Chip key={q} label={isMobile ? q.slice(0, 38) + "…" : q} accent={C.violet} onClick={() => intake.ask(intakeSys, q)} />)}
+                ].map(q => <Chip key={q} label={isMobile ? q.slice(0, 38) + "…" : q} accent={C.violet} onClick={() => intake.ask(intakeSys, q, { feature: "intake_package" })} />)}
               </div>
-              <AIInput placeholder="Describe the role or paste intake notes…" onSubmit={q => intake.ask(intakeSys, q)} loading={intake.loading} accent={C.violet} />
+              <AIInput placeholder="Describe the role or paste intake notes…" onSubmit={q => intake.ask(intakeSys, q, { feature: "intake_package" })} loading={intake.loading} accent={C.violet} />
               <AIBox loading={intake.loading} response={intake.response} accent={C.violet} />
             </>
           )}
@@ -644,9 +645,9 @@ Be specific. Avoid generic language.`;
                   "Candidate: 8 yrs eng leadership at Stripe and Plaid, built teams of 60+, strong distributed systems background. Role: VP Engineering",
                   "Candidate: 5 yrs PM at Google, 2 yrs at OpenAI on GPT-4 integrations, MBA Stanford. Role: Senior AI Product Manager",
                   "Candidate: CHRO at 300-person SaaS for 4 yrs, previously recruiting at Workday, no AI-native company experience. Role: Head of People Ops",
-                ].map(q => <Chip key={q} label={q.slice(0, 48) + "…"} accent={C.violet} onClick={() => candidate.ask(candidateSys, q)} />)}
+                ].map(q => <Chip key={q} label={q.slice(0, 48) + "…"} accent={C.violet} onClick={() => candidate.ask(candidateSys, q, { feature: "candidate_eval", temperature: 0 })} />)}
               </div>
-              <AIInput placeholder="Paste candidate background, resume summary, or LinkedIn…" onSubmit={q => candidate.ask(candidateSys, q)} loading={candidate.loading} accent={C.violet} />
+              <AIInput placeholder="Paste candidate background, resume summary, or LinkedIn…" onSubmit={q => candidate.ask(candidateSys, q, { feature: "candidate_eval", temperature: 0 })} loading={candidate.loading} accent={C.violet} />
               <AIBox loading={candidate.loading} response={candidate.response} accent={C.violet} />
             </>
           )}
@@ -2842,6 +2843,7 @@ const AI_LAWS = [
 function AIGovernance({ onNavigate }) {
   const { isMobile } = useBreakpoint();
   const [training, setTraining] = useState(null);
+  const [aiLog, setAiLog] = useState(null); // { rows, total, byFeature, avgLatency, errors }
 
   useEffect(() => {
     Promise.all([
@@ -2852,6 +2854,31 @@ function AIGovernance({ onNavigate }) {
       const done = new Set((recs || []).filter(r => r.status === "completed").map(r => r.employee_id));
       setTraining({ required: managers.length, completed: managers.filter(m => done.has(m.id)).length });
     });
+  }, []);
+
+  // Live AI activity from the audit log (populated by the ai-query gateway).
+  useEffect(() => {
+    supabase.from("ai_audit_log")
+      .select("feature, model, temperature, latency_ms, status, output_preview, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50)
+      .then(({ data, error }) => {
+        if (error || !data) { setAiLog({ unavailable: true }); return; }
+        const byFeature = {};
+        let latencySum = 0, latencyN = 0, errors = 0;
+        data.forEach(r => {
+          byFeature[r.feature || "general"] = (byFeature[r.feature || "general"] || 0) + 1;
+          if (typeof r.latency_ms === "number") { latencySum += r.latency_ms; latencyN++; }
+          if (r.status === "error") errors++;
+        });
+        setAiLog({
+          rows: data,
+          total: data.length,
+          byFeature: Object.entries(byFeature).sort((a, b) => b[1] - a[1]),
+          avgLatency: latencyN ? Math.round(latencySum / latencyN) : null,
+          errors,
+        });
+      });
   }, []);
 
   const riskChip = r => {
@@ -2904,6 +2931,57 @@ function AIGovernance({ onNavigate }) {
             </tbody>
           </table>
         </div>
+      </Card>
+
+      {/* Live AI activity — real calls captured by the ai-query audit gateway */}
+      <Card style={{ marginBottom: 14 }}>
+        <Label color={C.cyan}>AI Activity — Audit Log (last 50 calls)</Label>
+        {!aiLog ? (
+          <p style={{ fontSize: 13, color: C.textMuted, margin: "6px 0 0" }}>Loading…</p>
+        ) : aiLog.unavailable ? (
+          <p style={{ fontSize: 13, color: C.textMuted, margin: "6px 0 0", lineHeight: 1.6 }}>
+            No audit data yet. Apply the <code>ai_audit_log</code> migration and route AI calls through the <code>ai-query</code> gateway — every call is then logged here automatically.
+          </p>
+        ) : aiLog.total === 0 ? (
+          <p style={{ fontSize: 13, color: C.textMuted, margin: "6px 0 0" }}>No AI calls logged yet. Use any AI feature and it will appear here.</p>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 22, flexWrap: "wrap", margin: "6px 0 14px" }}>
+              <div><div style={{ fontSize: 22, fontWeight: 900, color: C.textDark }}>{aiLog.total}</div><div style={{ fontSize: 11, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Calls</div></div>
+              <div><div style={{ fontSize: 22, fontWeight: 900, color: C.textDark }}>{aiLog.avgLatency != null ? `${aiLog.avgLatency}ms` : "—"}</div><div style={{ fontSize: 11, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Avg latency</div></div>
+              <div><div style={{ fontSize: 22, fontWeight: 900, color: aiLog.errors ? C.rose : C.emerald }}>{aiLog.errors}</div><div style={{ fontSize: 11, color: C.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Errors</div></div>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 7, marginBottom: 14 }}>
+              {aiLog.byFeature.map(([f, n]) => (
+                <span key={f} style={{ fontSize: 11.5, fontWeight: 600, background: `${C.cyan}12`, color: C.textMid, border: `1px solid ${C.cyan}30`, borderRadius: 20, padding: "3px 11px" }}>{f} · {n}</span>
+              ))}
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{ background: "#F8FAFC" }}>
+                    {["When", "Feature", "Temp", "Latency", "Status"].map(h => (
+                      <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {aiLog.rows.slice(0, 12).map((r, i) => (
+                    <tr key={i} style={{ borderBottom: `1px solid ${C.border}` }}>
+                      <td style={{ padding: "8px 12px", color: C.textMuted, whiteSpace: "nowrap" }}>{new Date(r.created_at).toLocaleString()}</td>
+                      <td style={{ padding: "8px 12px", color: C.textDark, fontWeight: 600 }}>{r.feature || "general"}</td>
+                      <td style={{ padding: "8px 12px", color: C.textMid }}>{r.temperature == null ? "—" : r.temperature}</td>
+                      <td style={{ padding: "8px 12px", color: C.textMid }}>{r.latency_ms != null ? `${r.latency_ms}ms` : "—"}</td>
+                      <td style={{ padding: "8px 12px" }}>
+                        <span style={{ fontSize: 10.5, fontWeight: 800, color: r.status === "error" ? C.rose : C.emerald, textTransform: "uppercase" }}>{r.status || "ok"}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </Card>
 
       {/* Legal + training side by side */}

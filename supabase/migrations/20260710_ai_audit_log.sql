@@ -25,6 +25,7 @@ create table if not exists public.ai_audit_log (
   input_tokens    integer,
   output_tokens   integer,
   latency_ms      integer,
+  redactions      integer,       -- # of protected/PII spans scrubbed before the model saw the input
   status          text,          -- 'ok' | 'error'
   error           text,
   entity_type     text,          -- optional link, e.g. 'application'

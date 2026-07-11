@@ -39,6 +39,37 @@ async function sha256(s: string): Promise<string> {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+// ─── Protected-attribute firewall ────────────────────────────────────────────
+// For decision-grade features (evaluation / scoring), scrub protected-class
+// markers and sensitive PII from the prompt BEFORE the model sees them, so an
+// employment decision can't be influenced by (or leak) that data. This is
+// defense-in-depth — the primary control is simply never querying self-ID into
+// an evaluation prompt.
+const DECISION_FEATURES = new Set(["candidate_eval", "assessment_score", "interview_debrief"]);
+
+const REDACTIONS: Array<[RegExp, string]> = [
+  [/\b\d{3}-\d{2}-\d{4}\b/g, "[REDACTED-SSN]"],                       // SSN
+  [/\b\d{13,19}\b/g, "[REDACTED-NUM]"],                              // card / account numbers
+  // Protected-class attributes stated as "field: value"
+  [/\b(race|ethnicity|gender|sex|disability|disabled|veteran|pregnan\w*|religion|national origin|date of birth|dob|marital status|age)\b\s*[:=]\s*\S[^\n]*/gi, "[REDACTED-PROTECTED]"],
+];
+
+function firewall(messages: Array<{ role: string; content: unknown }>, feature: string) {
+  if (!DECISION_FEATURES.has(feature)) return { messages, count: 0 };
+  let count = 0;
+  const scrub = (text: string) => {
+    let t = text;
+    for (const [re, repl] of REDACTIONS) {
+      t = t.replace(re, () => { count++; return repl; });
+    }
+    return t;
+  };
+  const out = messages.map((m) =>
+    typeof m.content === "string" ? { ...m, content: scrub(m.content) } : m
+  );
+  return { messages: out, count };
+}
+
 // Best-effort write to the audit log. Never throws — logging must not break a
 // user-facing AI call.
 async function logAudit(row: Record<string, unknown>) {
@@ -88,6 +119,9 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Firewall: strip protected-class / PII spans from decision-grade prompts.
+    const { messages: safeMessages, count: redactions } = firewall(messages, feature);
+
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -100,19 +134,19 @@ Deno.serve(async (req) => {
         max_tokens: maxTokens,
         ...(temperature !== undefined ? { temperature } : {}),
         ...(system ? { system } : {}),
-        messages,
+        messages: safeMessages,
       }),
     });
 
     const data = await res.json();
-    const inputStr = (system ? system + "\n" : "") + JSON.stringify(messages);
+    const inputStr = (system ? system + "\n" : "") + JSON.stringify(safeMessages);
 
     if (!res.ok) {
       await logAudit({
         actor_id: actor, feature, model: AI_CONFIG.model, prompt_version: promptVersion,
         temperature, max_tokens: maxTokens,
         input_hash: await sha256(inputStr), input_chars: inputStr.length,
-        latency_ms: Date.now() - started, status: "error",
+        latency_ms: Date.now() - started, redactions, status: "error",
         error: typeof data?.error === "string" ? data.error : JSON.stringify(data?.error || data),
         entity_type: entityType, entity_id: entityId,
       });
@@ -133,7 +167,7 @@ Deno.serve(async (req) => {
       output_preview: outText.slice(0, 2000), output_chars: outText.length,
       input_tokens: data?.usage?.input_tokens ?? null,
       output_tokens: data?.usage?.output_tokens ?? null,
-      latency_ms: Date.now() - started, status: "ok",
+      latency_ms: Date.now() - started, redactions, status: "ok",
       entity_type: entityType, entity_id: entityId,
     });
 

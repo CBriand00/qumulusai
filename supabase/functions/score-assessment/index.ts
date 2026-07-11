@@ -130,6 +130,10 @@ Return ONLY this JSON (no code blocks):
 Scoring: 80–100 = strong advance, 65–79 = advance with notes, 50–64 = hold, below 50 = pass. Be specific.`,
           }],
           max_tokens: 1000,
+          temperature: 0,               // reproducible, auditable scoring
+          feature: "assessment_score",  // logged + firewalled by the ai-query gateway
+          entity_type: "application",
+          entity_id: assessment.application_id,
         }),
       });
 

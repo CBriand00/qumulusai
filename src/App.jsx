@@ -2856,6 +2856,51 @@ function AIGovernance({ onNavigate }) {
     });
   }, []);
 
+  // Fairness: workforce representation (employees) + applicant adverse impact
+  // (applications), the EEOC 4/5ths-rule analysis.
+  const [fairness, setFairness] = useState(null);
+  useEffect(() => {
+    Promise.all([
+      supabase.from("employees").select("gender, ethnicity").eq("status", "active"),
+      supabase.from("applications").select("gender, status"),
+    ]).then(([{ data: emps }, { data: apps, error: appErr }]) => {
+      // Representation from employees self-ID.
+      const tally = (rows, key) => {
+        const m = {};
+        (rows || []).forEach(r => {
+          const v = (r[key] || "").trim();
+          if (!v || v === "decline") return;
+          m[v] = (m[v] || 0) + 1;
+        });
+        const total = Object.values(m).reduce((a, b) => a + b, 0);
+        return { rows: Object.entries(m).sort((a, b) => b[1] - a[1]), total };
+      };
+
+      // Adverse impact on applications by gender (4/5ths rule).
+      // "Selected" = advanced past screening into interview/offer/hired.
+      const ADVANCED = new Set(["interview", "offer", "hired"]);
+      const withSelfId = (apps || []).filter(a => a.gender && a.gender !== "decline");
+      const groups = {};
+      withSelfId.forEach(a => {
+        const g = a.gender;
+        groups[g] = groups[g] || { total: 0, selected: 0 };
+        groups[g].total++;
+        if (ADVANCED.has((a.status || "").toLowerCase())) groups[g].selected++;
+      });
+      const rateRows = Object.entries(groups).map(([g, v]) => ({ group: g, ...v, rate: v.total ? v.selected / v.total : 0 }));
+      const maxRate = rateRows.reduce((m, r) => Math.max(m, r.rate), 0);
+      const impact = rateRows.map(r => ({ ...r, ratio: maxRate ? r.rate / maxRate : null })).sort((a, b) => b.rate - a.rate);
+
+      setFairness({
+        unavailable: !!appErr,
+        gender: tally(emps, "gender"),
+        ethnicity: tally(emps, "ethnicity"),
+        impact,
+        impactN: withSelfId.length,
+      });
+    });
+  }, []);
+
   // Live AI activity from the audit log (populated by the ai-query gateway).
   useEffect(() => {
     supabase.from("ai_audit_log")
@@ -2981,6 +3026,83 @@ function AIGovernance({ onNavigate }) {
               </table>
             </div>
           </>
+        )}
+      </Card>
+
+      {/* Fairness / adverse-impact monitoring */}
+      <Card style={{ marginBottom: 14 }}>
+        <Label color={C.violet}>Fairness Monitoring — Representation & Adverse Impact (4/5ths rule)</Label>
+        {!fairness ? (
+          <p style={{ fontSize: 13, color: C.textMuted, margin: "6px 0 0" }}>Loading…</p>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20, marginTop: 8 }}>
+            {/* Workforce representation */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textDark, marginBottom: 8 }}>Current workforce representation</div>
+              {["ethnicity", "gender"].map(dim => {
+                const d = fairness[dim];
+                if (!d || d.total === 0) return <div key={dim} style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>No {dim} self-ID recorded.</div>;
+                return (
+                  <div key={dim} style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>{dim}</div>
+                    {d.rows.map(([label, n]) => {
+                      const pct = Math.round((n / d.total) * 100);
+                      return (
+                        <div key={label} style={{ marginBottom: 5 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.textMid, marginBottom: 2 }}>
+                            <span style={{ textTransform: "capitalize" }}>{label.replace(/_/g, " ")}</span><span>{pct}%</span>
+                          </div>
+                          <div style={{ height: 6, background: C.bg, borderRadius: 4, overflow: "hidden" }}>
+                            <div style={{ width: `${pct}%`, height: "100%", background: C.violet }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Applicant adverse impact */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.textDark, marginBottom: 8 }}>Applicant selection rate by gender</div>
+              {fairness.impactN < 5 ? (
+                <p style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>
+                  Awaiting voluntary self-ID data on applications ({fairness.impactN} recorded). Once candidates opt in on the application form, the 4/5ths-rule analysis appears here automatically.
+                </p>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ background: "#F8FAFC" }}>
+                      {["Group", "n", "Selected", "Rate", "Ratio", ""].map(h => (
+                        <th key={h} style={{ padding: "6px 8px", textAlign: "left", fontSize: 10, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", borderBottom: `1px solid ${C.border}` }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fairness.impact.map(r => {
+                      const flagged = r.ratio != null && r.ratio < 0.8;
+                      return (
+                        <tr key={r.group} style={{ borderBottom: `1px solid ${C.border}` }}>
+                          <td style={{ padding: "6px 8px", color: C.textDark, fontWeight: 600, textTransform: "capitalize" }}>{r.group}</td>
+                          <td style={{ padding: "6px 8px", color: C.textMid }}>{r.total}</td>
+                          <td style={{ padding: "6px 8px", color: C.textMid }}>{r.selected}</td>
+                          <td style={{ padding: "6px 8px", color: C.textMid }}>{Math.round(r.rate * 100)}%</td>
+                          <td style={{ padding: "6px 8px", color: C.textMid }}>{r.ratio != null ? r.ratio.toFixed(2) : "—"}</td>
+                          <td style={{ padding: "6px 8px" }}>
+                            <span style={{ fontSize: 10, fontWeight: 800, color: flagged ? C.rose : C.emerald, textTransform: "uppercase" }}>{flagged ? "⚠ review" : "ok"}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+              <p style={{ fontSize: 10.5, color: C.textMuted, marginTop: 8, lineHeight: 1.5 }}>
+                Ratio &lt; 0.80 vs. the highest-selected group may indicate adverse impact and warrants review. Aggregate, de-identified; self-ID is never used in AI evaluation.
+              </p>
+            </div>
+          </div>
         )}
       </Card>
 

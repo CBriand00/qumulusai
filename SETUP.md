@@ -104,23 +104,50 @@ Functions in this project:
 \* `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are
 injected into every function automatically — you do not set them.
 
-## 7. Rebrand
+**Company identity for edge functions** — candidate/new-hire emails and a few AI
+prompts live server-side in edge functions, so they read company identity from
+secrets (not `brand.js`). Set these per tenant, or they fall back to QumulusAI:
 
-All white-labeling is centralized:
+```bash
+supabase secrets set \
+  COMPANY_NAME="Acme Corp" \
+  COMPANY_CONTEXT="a fintech company building payments infrastructure, based in Austin, TX" \
+  APP_URL="https://acme-hr.vercel.app"
+```
 
-- **`src/brand.js`** — `name`, `wordmark` (split so accent letters color
+## 7. Rebrand — the complete checklist
+
+White-labeling is centralized in two config surfaces (`brand.js` for the app,
+edge-function secrets for server-side copy). Work through all of these:
+
+**Frontend config**
+- [ ] **`src/brand.js`** → `name`, `wordmark` (split so accent letters color
   correctly), `tagline`, `website`, `support`, `emailDomain`, `accent`. **And**
   the `company` block (`description`, `location`, `mission`, `ceo`, `stage`,
-  `roles`) — this feeds the AI system prompts via `companyBlurb`, so updating it
-  stops the assistant from talking about QumulusAI's business.
-- **`src/theme.js`** — color tokens for AcmeCo's palette.
-- **`index.html`** — the `<title>`.
-- Swap logo / favicon assets.
+  `roles`) — this feeds AI prompts via `companyBlurb` and now also drives the
+  Careers footer and default sourcing location.
+- [ ] **`src/theme.js`** → color tokens for the new palette.
+- [ ] **`index.html`** → the `<title>`.
+- [ ] Swap **logo / favicon** assets.
+
+**Demo content to replace** (company-specific, not driven by `brand.js`)
+- [ ] **`src/Careers.jsx`** → the `ROLES` array is QumulusAI's GPU job postings.
+  Replace with the new company's open roles (titles, descriptions, locations).
+- [ ] **`supabase/seed.sql`** → QumulusAI demo employees/departments (see step 5).
+
+**Server-side identity** (edge-function secrets, step 6)
+- [ ] `COMPANY_NAME`, `COMPANY_CONTEXT`, `APP_URL`.
+
+**Connection** (never hardcoded anymore — all env-driven)
+- [ ] Frontend: `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` (step 3).
+- [ ] Functions: `SUPABASE_URL` is auto-injected — nothing to set.
 
 Sanity check for stray hardcoded copy:
 
 ```bash
-grep -rniE "qumulus" src index.html   # should only match brand.js/theme.js you intend
+grep -rniE "qumulus|atlanta|marietta|gpu" src supabase/functions index.html
+# remaining hits should only be brand.js/theme.js values you intend, the Careers
+# ROLES you're replacing, or the QumulusAI fallback defaults in edge functions.
 ```
 
 ## 8. Configure Auth

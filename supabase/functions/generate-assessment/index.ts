@@ -1,8 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
-const SUPABASE_URL = "https://oomdaguzvdheotrkqdxs.supabase.co";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL"); // auto-injected per project
 const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+// Company identity for candidate-facing copy — set per tenant (see .env.example).
+const COMPANY_NAME = Deno.env.get("COMPANY_NAME") || "QumulusAI";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -31,7 +33,7 @@ Deno.serve(async (req) => {
         max_tokens: 2000,
         messages: [{
           role: "user",
-          content: `Generate a candidate assessment for ${role_title} at QumulusAI.
+          content: `Generate a candidate assessment for ${role_title} at ${COMPANY_NAME}.
           Create 10 questions mixing behavioral, situational, and role-specific types.
           Return ONLY a JSON array: [{"type":"behavioral","question":"...","input_type":"text"},...]`
         }]
@@ -105,10 +107,10 @@ Deno.serve(async (req) => {
           candidateName: candidate_name,
           role: role_title,
           signingLink: assessLink,
-          subject: `Your QumulusAI Assessment — ${role_title}`,
+          subject: `Your ${COMPANY_NAME} Assessment — ${role_title}`,
           customBody: `<div style="font-family: -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #0A2540;">Hi ${candidate_name},</h2>
-            <p>Thank you for applying for <strong>${role_title}</strong> at QumulusAI!</p>
+            <p>Thank you for applying for <strong>${role_title}</strong> at ${COMPANY_NAME}!</p>
             <p>The next step is to complete a brief assessment. This takes approximately 20-30 minutes.</p>
             <p style="margin: 24px 0;">
               <a href="${assessLink}" style="background: #0A2540; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
@@ -117,7 +119,7 @@ Deno.serve(async (req) => {
             </p>
             <p style="color: #7E8FA3; font-size: 14px;">This link expires in 7 days. If the button doesn't work: ${assessLink}</p>
             <p>Good luck!</p>
-            <p>— QumulusAI People & Culture</p>
+            <p>— ${COMPANY_NAME} People & Culture</p>
           </div>`
         })
       });

@@ -3,6 +3,10 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// Company identity for new-hire-facing copy — set per tenant (see .env.example).
+const COMPANY_NAME = Deno.env.get("COMPANY_NAME") || "QumulusAI";
+const COMPANY_CONTEXT = Deno.env.get("COMPANY_CONTEXT") || "a fast-growing GPU AI infrastructure company in Atlanta, GA";
+const APP_URL = Deno.env.get("APP_URL") || "https://qumulusai.vercel.app";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -63,7 +67,7 @@ Deno.serve(async (req) => {
     }
 
     // Generate personalized first day agenda via ai-query
-    let agenda = "Your manager will share your personalized Day 1 schedule shortly. Welcome to QumulusAI!";
+    let agenda = `Your manager will share your personalized Day 1 schedule shortly. Welcome to ${COMPANY_NAME}!`;
     try {
       const aiRes = await fetch(`${SUPABASE_URL}/functions/v1/ai-query`, {
         method: "POST",
@@ -73,10 +77,10 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           max_tokens: 500,
-          system: "You are QumulusAI's AI Chief of Staff. Write a warm, practical first-day agenda for a new hire. Be specific to their role. Format with clear time blocks. Keep it under 300 words.",
+          system: `You are ${COMPANY_NAME}'s AI Chief of Staff. Write a warm, practical first-day agenda for a new hire. Be specific to their role. Format with clear time blocks. Keep it under 300 words.`,
           messages: [{
             role: "user",
-            content: `Create a first-day agenda for ${fullName}, a new ${roleTitle || "team member"} starting on ${startDate || "their first day"} at QumulusAI (a fast-growing GPU AI infrastructure company in Atlanta, GA).`,
+            content: `Create a first-day agenda for ${fullName}, a new ${roleTitle || "team member"} starting on ${startDate || "their first day"} at ${COMPANY_NAME} (${COMPANY_CONTEXT}).`,
           }],
         }),
       });
@@ -85,13 +89,13 @@ Deno.serve(async (req) => {
     } catch (_) { /* use fallback agenda */ }
 
     // Send welcome email with login credentials
-    const loginUrl = "https://qumulusai.vercel.app";
+    const loginUrl = APP_URL;
     const firstName = fullName.split(" ")[0];
     const startDisplay = startDate ? new Date(startDate).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }) : "your start date";
 
     const emailBody = `Hi ${firstName},
 
-Welcome to QumulusAI! We're thrilled to have you joining us.
+Welcome to ${COMPANY_NAME}! We're thrilled to have you joining us.
 
 Your employee account is ready. Here are your login credentials:
 
@@ -110,7 +114,7 @@ ${agenda}
 If you have any questions before your start date, don't hesitate to reach out to People & Culture.
 
 Welcome aboard,
-The QumulusAI Team`;
+The ${COMPANY_NAME} Team`;
 
     await fetch(`${SUPABASE_URL}/functions/v1/send-offer-email`, {
       method: "POST",
@@ -123,7 +127,7 @@ The QumulusAI Team`;
         candidateName: fullName,
         role: roleTitle || "Team Member",
         signingLink: loginUrl,
-        subject: `Welcome to QumulusAI — Your Login & First Day Agenda`,
+        subject: `Welcome to ${COMPANY_NAME} — Your Login & First Day Agenda`,
         bodyText: emailBody,
       }),
     });

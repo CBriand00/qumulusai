@@ -1869,7 +1869,7 @@ function Learning({ onNavigate, focus }) {
         body: {
           max_tokens: 3000,
           system: `You write internal corporate training. Return ONLY valid JSON: an array of exactly 3 modules, each {"title": string, "content": string (markdown with ## heading, bold, bullet lists; 200-350 words), "quiz": null or array of 2 objects {"q": string, "options": [3 strings], "answer": index}}. The final module must include a quiz. No text outside the JSON.`,
-          messages: [{ role: "user", content: `Write the course "${course.name}" for ${brand.name}. ${companyBlurb} Company context is an AI-native GPU cloud (NeoCloud) infrastructure company preparing for public markets. Course description: ${course.description}. Audience: ${course.applies_to === "all" ? "all employees" : "employees in roles matching: " + course.applies_to}.` }],
+          messages: [{ role: "user", content: `Write the course "${course.name}" for ${brand.name}. ${companyBlurb} Course description: ${course.description}. Audience: ${course.applies_to === "all" ? "all employees" : "employees in roles matching: " + course.applies_to}.` }],
         },
       });
       if (error) throw error;

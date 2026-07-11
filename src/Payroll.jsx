@@ -22,7 +22,7 @@ const C = {
   green:     "#16A34A",
 };
 
-const SUPABASE_URL = "https://oomdaguzvdheotrkqdxs.supabase.co";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt$(n) {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabase";
-import { brand } from "./brand";
+import { brand, company } from "./brand";
 
 const C = {
   bg: "#F7F8FA", surface: "#FFFFFF", border: "#E5E7EB",
@@ -26,7 +26,7 @@ function renderMd(text) {
 
 export default function AISourcing() {
   const [roleDesc, setRoleDesc]   = useState("");
-  const [location, setLocation]   = useState("Atlanta, GA");
+  const [location, setLocation]   = useState(company.location);
   const [skills, setSkills]       = useState("");
   const [aiResult, setAiResult]   = useState("");
   const [generating, setGenerating] = useState(false);

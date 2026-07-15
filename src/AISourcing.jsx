@@ -39,6 +39,11 @@ export default function AISourcing() {
   const [sourcingNotice, setSourcingNotice] = useState("");
   const [addedIds, setAddedIds]   = useState(new Set());
 
+  // Candidate profile drawer
+  const [profileCand, setProfileCand]       = useState(null);
+  const [profileSummary, setProfileSummary] = useState("");
+  const [profileBusy, setProfileBusy]       = useState(false);
+
   // Conversational sourcing chat
   const [chat, setChat] = useState([]); // { role: "user" | "assistant", content }
   const [chatInput, setChatInput] = useState("");
@@ -63,7 +68,7 @@ export default function AISourcing() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat, chatBusy]);
 
-  const skillList = () => skills.split(",").map(s => s.trim()).filter(Boolean);
+  const skillList = () => skills.split(/[,;]/).map(s => s.trim()).filter(Boolean);
 
   async function handleGenerate() {
     if (!roleDesc.trim()) return;
@@ -115,9 +120,13 @@ Be specific and actionable.`,
         setSourcing(false);
         return;
       }
-      if (data?.error) { setSourcingError("Sourcing error: " + data.error); setSourcing(false); return; }
+      // PDL returns a "no records" error for an empty match — treat that as a
+      // friendly notice, not a red error.
+      if (data?.error && !/no records/i.test(String(data.error))) {
+        setSourcingError("Sourcing error: " + data.error); setSourcing(false); return;
+      }
       if (!data?.candidates?.length) {
-        setSourcingNotice("No matching candidates found. Try broadening the role or skills.");
+        setSourcingNotice("No matches for that search. Try a broader role title, fewer skills, or clearing the location.");
         setSourcing(false);
         return;
       }
@@ -234,6 +243,37 @@ Be specific and actionable.`,
     setChatBusy(false);
   }
 
+  function openProfile(c) { setProfileCand(c); setProfileSummary(""); }
+
+  // AI profile + fit summary — reasons ONLY over the real data we have (no fabrication).
+  async function generateProfileSummary(c) {
+    setProfileBusy(true);
+    setProfileSummary("");
+    try {
+      const facts = [
+        `Name: ${c.name}`,
+        c.title && `Current title: ${c.title}`,
+        c.company && `Company: ${c.company}`,
+        c.location && `Location: ${c.location}`,
+        c.years_experience != null && `Years of experience: ${c.years_experience}`,
+        c.skills?.length && `Skills: ${c.skills.join(", ")}`,
+      ].filter(Boolean).join("\n");
+      const { data, error } = await supabase.functions.invoke("ai-query", {
+        body: {
+          max_tokens: 600,
+          feature: "candidate_profile",
+          system: `You are a recruiting assistant. Using ONLY the candidate facts provided, write a brief profile for a recruiter: a 2-3 sentence summary, likely strengths, and how they may fit "${roleDesc || "the open role"}". Do NOT invent employers, dates, degrees, or contact details that aren't provided. If the data is thin, say so honestly.`,
+          messages: [{ role: "user", content: facts }],
+        },
+      });
+      if (error) throw error;
+      setProfileSummary(data?.content?.map(b => b.text || "").join("") || "No summary.");
+    } catch (e) {
+      setProfileSummary("Couldn't generate summary: " + e.message);
+    }
+    setProfileBusy(false);
+  }
+
   async function addToPipeline(c) {
     const key = c.linkedin_url || c.name;
     const { data } = await supabase.from("applications").insert({
@@ -321,7 +361,8 @@ Be specific and actionable.`,
                     {c.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{c.name}</div>
+                    <div onClick={() => openProfile(c)} title="View candidate profile"
+                      style={{ fontWeight: 700, fontSize: 14, color: C.blue, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2, width: "fit-content" }}>{c.name}</div>
                     <div style={{ fontSize: 12, color: C.muted }}>{c.title}{c.company ? ` · ${c.company}` : ""}</div>
                     {c.location && <div style={{ fontSize: 12, color: C.muted }}>📍 {c.location}{c.years_experience ? ` · ${c.years_experience} yrs exp` : ""}</div>}
                     {c.skills?.length > 0 && <div style={{ fontSize: 11, color: C.muted, marginTop: 3 }}>{c.skills.slice(0, 4).join(" · ")}</div>}
@@ -342,6 +383,55 @@ Be specific and actionable.`,
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Candidate profile drawer */}
+      {profileCand && (
+        <div onClick={() => setProfileCand(null)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.35)", zIndex: 1000, display: "flex", justifyContent: "flex-end" }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: C.surface, width: "min(480px, 100%)", height: "100%", overflowY: "auto", padding: 24, boxShadow: "-8px 0 40px rgba(0,0,0,0.18)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18 }}>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <div style={{ width: 48, height: 48, borderRadius: "50%", background: `${C.blue}15`, color: C.blue, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 700, flexShrink: 0 }}>
+                  {profileCand.name?.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{profileCand.name}</div>
+                  <div style={{ fontSize: 13, color: C.muted }}>{profileCand.title}{profileCand.company ? ` · ${profileCand.company}` : ""}</div>
+                </div>
+              </div>
+              <button onClick={() => setProfileCand(null)} style={{ background: "none", border: "none", fontSize: 20, color: C.muted, cursor: "pointer", padding: 4 }}>✕</button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 7, fontSize: 13, color: "#334155", marginBottom: 16 }}>
+              {profileCand.location && <div>📍 {profileCand.location}</div>}
+              {profileCand.years_experience != null && <div>🧭 {profileCand.years_experience} yrs experience</div>}
+              {profileCand.skills?.length > 0 && <div>🛠 {profileCand.skills.join(" · ")}</div>}
+              {profileCand.why_fit && <div style={{ lineHeight: 1.5, color: "#475569" }}>{profileCand.why_fit}</div>}
+            </div>
+
+            <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14, marginBottom: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: C.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Contact</div>
+              {profileCand.email
+                ? <div style={{ fontSize: 13, marginBottom: 6 }}>✉️ <a href={`mailto:${profileCand.email}`} style={{ color: C.blue }}>{profileCand.email}</a></div>
+                : <div style={{ fontSize: 12, color: C.muted, marginBottom: 6, lineHeight: 1.5 }}>No verified email in the search result. Contact details require PDL candidate enrichment (a paid per-lookup upgrade).</div>}
+              {profileCand.phone && <div style={{ fontSize: 13, marginBottom: 6 }}>📞 {profileCand.phone}</div>}
+              {profileCand.linkedin_url && <a href={profileCand.linkedin_url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: C.blue, textDecoration: "none" }}>🔗 LinkedIn profile →</a>}
+            </div>
+
+            <div style={{ marginBottom: 18 }}>
+              <button onClick={() => generateProfileSummary(profileCand)} disabled={profileBusy}
+                style={{ background: C.violet, border: "none", borderRadius: 8, padding: "10px 16px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: profileBusy ? "default" : "pointer", opacity: profileBusy ? 0.6 : 1, fontFamily: "inherit" }}>
+                {profileBusy ? "◈ Writing…" : "✦ AI Profile & Fit Summary"}
+              </button>
+              {profileSummary && <div style={{ marginTop: 12 }}>{renderMd(profileSummary)}</div>}
+            </div>
+
+            <button onClick={() => addToPipeline(profileCand)} disabled={addedIds.has(profileCand.linkedin_url || profileCand.name)}
+              style={{ width: "100%", background: addedIds.has(profileCand.linkedin_url || profileCand.name) ? "#ECFDF5" : C.blue, border: "none", borderRadius: 8, padding: "12px 0", color: addedIds.has(profileCand.linkedin_url || profileCand.name) ? C.emerald : "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+              {addedIds.has(profileCand.linkedin_url || profileCand.name) ? "✓ Added to pipeline" : "+ Add to pipeline"}
+            </button>
           </div>
         </div>
       )}

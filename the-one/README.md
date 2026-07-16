@@ -14,31 +14,37 @@ build.
 
 ---
 
-## Status — Phase 1 complete
+## Status — Phases 1 & 2 complete
 
 The build is delivered in phases (see [Implementation plan](#implementation-plan)).
-**Phase 1 is implemented, typechecked, tested, and builds cleanly.**
+**Phases 1 and 2 are implemented, typechecked, tested, and build cleanly.**
 
 | Area | State |
 | --- | --- |
-| Project foundation (Next.js 14 App Router, TS, Tailwind, shadcn-style UI) | ✅ |
-| Design system + tokens (CSS variables, luxury editorial palette) | ✅ |
-| Central branding/config (`site.ts`, `content.ts`, `legal.ts`, `compatibility.ts`) | ✅ |
-| Public pages (landing, about, looking-for, how-it-works, safety, FAQ, 6 legal drafts) | ✅ |
-| Auth (register + email verify, login, password reset, sign-out) | ✅ |
-| Roles + protected routes (public / applicant / admin) via middleware + layouts | ✅ |
-| Full database schema (30+ tables), enums, triggers, indexes, constraints | ✅ |
-| Row Level Security policies for every table | ✅ |
-| Private storage buckets + signed-URL access model | ✅ |
-| Modular AI service layer (mock + OpenAI-ready) | ✅ (scaffold) |
-| Modular email layer (console + Resend-ready) + templates | ✅ (scaffold) |
-| Seed data (1 admin + 8 fictional applicants) | ✅ |
-| Unit tests (validation + compatibility scoring) | ✅ |
-| Applicant dashboard + admin command-center shells | ✅ |
-| Multi-step application, messaging, dates, AI analysis, CMS, audit UI | ▢ Phases 2–5 |
+| Project foundation (Next.js 14 App Router, TS, Tailwind, shadcn-style UI) | ✅ P1 |
+| Design system + tokens (CSS variables, luxury editorial palette) | ✅ P1 |
+| Central branding/config (`site.ts`, `content.ts`, `legal.ts`, `compatibility.ts`) | ✅ P1 |
+| Public pages (landing, about, looking-for, how-it-works, safety, FAQ, 6 legal drafts) | ✅ P1 |
+| Auth (register + email verify, login, password reset, sign-out) | ✅ P1 |
+| Roles + protected routes (public / applicant / admin) via middleware + layouts | ✅ P1 |
+| Full database schema (30+ tables), enums, triggers, indexes, constraints | ✅ P1 |
+| Row Level Security policies for every table | ✅ P1 |
+| Private storage buckets + signed-URL access model | ✅ P1 |
+| Modular AI service layer (mock + OpenAI-ready) | ✅ P1 (scaffold) |
+| Modular email layer (console + Resend-ready) + templates | ✅ P1 |
+| Seed data (1 admin + 8 fictional applicants) | ✅ P1 |
+| Applicant dashboard + admin command-center shells | ✅ P1 |
+| **12-step application** (schema-driven, all steps) | ✅ P2 |
+| **Autosave** (debounced) + progress bar + prev/next + per-field validation | ✅ P2 |
+| **Media upload** (photos + video) to private bucket, signed-URL previews | ✅ P2 |
+| **Consent & certification** (typed name + timestamp, all certifications) | ✅ P2 |
+| **Review & submit** workflow (lock fields, application ID, email, notify admin) | ✅ P2 |
+| **Applicant dashboard** (completion %, next action, notifications) | ✅ P2 |
+| **Privacy controls** (download my data, withdraw, request deletion) | ✅ P2 |
+| Unit tests (auth + application validation + compatibility scoring — 18 passing) | ✅ |
+| Admin review table, scoring UI, messaging, dates, AI analysis UI, audit | ▢ Phases 3–5 |
 
-Later phases mount onto the already-built, role-guarded routes and schema — the
-foundations (tables, RLS, statuses, config) they need already exist.
+Later phases mount onto the already-built, role-guarded routes and schema.
 
 ---
 

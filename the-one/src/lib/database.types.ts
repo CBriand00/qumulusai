@@ -80,8 +80,131 @@ export interface Database {
           current_step?: number;
           submitted_at?: string | null;
           application_code?: string | null;
+          locked_at?: string | null;
           updated_at?: string;
         };
+        Relationships: [];
+      };
+      applicant_profiles: {
+        Row: Record<string, unknown> & { applicant_id: string };
+        Insert: { applicant_id: string } & Record<string, unknown>;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      application_answers: {
+        Row: {
+          id: string;
+          application_id: string;
+          question_key: string;
+          value_text: string | null;
+          value_number: number | null;
+          value_bool: boolean | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          application_id: string;
+          question_key: string;
+          value_text?: string | null;
+          value_number?: number | null;
+          value_bool?: boolean | null;
+        };
+        Update: {
+          value_text?: string | null;
+          value_number?: number | null;
+          value_bool?: boolean | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      applicant_media: {
+        Row: {
+          id: string;
+          applicant_id: string;
+          kind: string;
+          storage_path: string;
+          mime_type: string | null;
+          size_bytes: number | null;
+          duration_seconds: number | null;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          applicant_id: string;
+          kind: string;
+          storage_path: string;
+          mime_type?: string | null;
+          size_bytes?: number | null;
+          duration_seconds?: number | null;
+          sort_order?: number;
+        };
+        Update: {
+          kind?: string;
+          sort_order?: number;
+        };
+        Relationships: [];
+      };
+      status_history: {
+        Row: {
+          id: string;
+          application_id: string;
+          from_status: ApplicantStatus | null;
+          to_status: ApplicantStatus;
+          changed_by: string | null;
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          application_id: string;
+          from_status?: ApplicantStatus | null;
+          to_status: ApplicantStatus;
+          changed_by?: string | null;
+          reason?: string | null;
+        };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      consent_records: {
+        Row: {
+          id: string;
+          user_id: string;
+          consent_key: string;
+          consented: boolean;
+          typed_name: string | null;
+          ip_address: string | null;
+          user_agent: string | null;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          consent_key: string;
+          consented: boolean;
+          typed_name?: string | null;
+          ip_address?: string | null;
+          user_agent?: string | null;
+        };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          kind: string;
+          title: string;
+          body: string | null;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          kind: string;
+          title: string;
+          body?: string | null;
+        };
+        Update: { read_at?: string | null };
         Relationships: [];
       };
     };

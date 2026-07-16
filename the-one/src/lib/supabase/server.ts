@@ -1,15 +1,17 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import type { Database } from "@/lib/database.types";
 
 /**
  * Server Supabase client bound to the request's cookies. Subject to RLS as the
  * signed-in user. Use in Server Components, Route Handlers, and Server Actions.
+ *
+ * Read result shapes are typed explicitly at call sites via `.single<T>()` /
+ * `.returns<T>()`; see src/lib/database.types.ts for the model definitions.
  */
 export function createClient() {
   const cookieStore = cookies();
 
-  return createServerClient<Database>(
+  return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {

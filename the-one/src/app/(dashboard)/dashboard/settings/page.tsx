@@ -1,17 +1,39 @@
 import type { Metadata } from "next";
+import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
-import { PhasePlaceholder } from "@/components/dashboard/phase-placeholder";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AccountControls } from "@/features/account/account-controls";
 
 export const metadata: Metadata = { title: "Settings" };
+export const dynamic = "force-dynamic";
+
+const WITHDRAWABLE = new Set([
+  "draft", "submitted", "under_review", "additional_info_requested",
+  "shortlisted", "approved_to_connect", "messaging_open", "date_invited", "dating", "paused",
+]);
 
 export default async function SettingsPage() {
-  await requireRole("applicant");
+  const profile = await requireRole("applicant");
+  const supabase = createClient();
+
+  const { data: app } = await supabase
+    .from("applications")
+    .select("status")
+    .eq("applicant_id", profile.id)
+    .maybeSingle<{ status: string }>();
+
   return (
-    <PhasePlaceholder eyebrow="Account" title="Settings & Privacy" phase="Account controls">
-      Account settings, privacy controls, downloading a copy of your data,
-      withdrawing your application, and deleting your account are wired to the
-      data-export and deletion workflows in Phase 5. Your right to withdraw and
-      delete is honored at any time.
-    </PhasePlaceholder>
+    <div className="space-y-6">
+      <div>
+        <p className="eyebrow">Account</p>
+        <h1 className="mt-1 text-3xl">Settings &amp; Privacy</h1>
+      </div>
+      <Card>
+        <CardHeader><CardTitle>Your data &amp; account</CardTitle></CardHeader>
+        <CardContent>
+          <AccountControls canWithdraw={WITHDRAWABLE.has(app?.status ?? "draft")} />
+        </CardContent>
+      </Card>
+    </div>
   );
 }

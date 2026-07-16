@@ -14,6 +14,7 @@ import AISourcing from "./AISourcing";
 import SecurityActivity from "./SecurityActivity";
 import AssessmentPortal from "./AssessmentPortal";
 import Payroll from "./Payroll";
+import { WorkersComp, Osha300A, WOTC, Unemployment } from "./RiskCompliance";
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -88,6 +89,16 @@ const NAV_GROUPS = [
       { id: "compliance",label: "Compliance",          icon: "⚖", accent: C.amber },
       { id: "aigov",     label: "AI Governance",       icon: "✦", accent: C.cyan },
       { id: "security",  label: "Security Center",     icon: "⚔", accent: C.blue },
+    ],
+  },
+  {
+    id: "risk",
+    label: "Risk & Compliance",
+    items: [
+      { id: "workerscomp",  label: "Workers' Comp",     icon: "⛑", accent: C.rose },
+      { id: "osha",         label: "OSHA 300A",         icon: "▤", accent: C.amber },
+      { id: "wotc",         label: "WOTC",              icon: "◈", accent: C.emerald },
+      { id: "unemployment", label: "Unemployment",      icon: "◇", accent: C.violet },
     ],
   },
   {
@@ -3618,6 +3629,10 @@ export default function App() {
     contractors:<Contractors onNavigate={navigate} />,
     relations: <EmployeeRelations onNavigate={navigate} userRole={userRole} />,
     compliance:<HRCompliance onNavigate={navigate} />,
+    workerscomp:<WorkersComp onNavigate={navigate} />,
+    osha:      <Osha300A onNavigate={navigate} />,
+    wotc:      <WOTC onNavigate={navigate} />,
+    unemployment:<Unemployment onNavigate={navigate} />,
     aigov:     <AIGovernance onNavigate={navigate} />,
     executive: <WorkforceIntel onNavigate={navigate} />,
     careers:   <CareersPortal />,

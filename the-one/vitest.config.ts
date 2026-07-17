@@ -10,6 +10,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // `server-only`/`client-only` throw outside their runtime; stub in tests.
+      "server-only": path.resolve(__dirname, "./src/test/empty-module.ts"),
+      "client-only": path.resolve(__dirname, "./src/test/empty-module.ts"),
     },
   },
   test: {

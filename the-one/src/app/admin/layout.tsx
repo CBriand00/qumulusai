@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LayoutGrid, Users, MessageSquare, Calendar, FileEdit, ScrollText } from "lucide-react";
+import { LayoutGrid, Users, MessageSquare, Calendar, FileEdit, ScrollText, BarChart3, ShieldCheck } from "lucide-react";
 import { requireRole } from "@/lib/auth";
 import { siteConfig } from "@/config/site";
 import { signOut } from "@/app/(auth)/actions";
@@ -10,7 +10,9 @@ const nav = [
   { href: "/admin/applicants", label: "Applicants", icon: Users },
   { href: "/admin/messages", label: "Messages", icon: MessageSquare },
   { href: "/admin/dates", label: "Dates", icon: Calendar },
+  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/admin/content", label: "Content", icon: FileEdit },
+  { href: "/admin/privacy", label: "Privacy", icon: ShieldCheck },
   { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
 ];
 

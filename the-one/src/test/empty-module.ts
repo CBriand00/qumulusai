@@ -1,0 +1,3 @@
+// Test stub for `server-only` / `client-only` marker packages, which throw
+// when imported outside their intended runtime. Aliased in vitest.config.ts.
+export {};

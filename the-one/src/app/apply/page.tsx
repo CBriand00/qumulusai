@@ -1,15 +1,16 @@
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth";
-import { siteConfig } from "@/config/site";
+import { getSiteOverrides } from "@/lib/site-settings";
 
 /**
  * Application entry point.
  * - Not signed in → register.
  * - Signed-in admin → admin dashboard (admins don't apply).
- * - Signed-in applicant → the multi-step application (Phase 2).
+ * - Signed-in applicant → the multi-step application.
  */
 export default async function ApplyPage() {
-  if (!siteConfig.applicationsOpen) {
+  const { applicationsOpen } = await getSiteOverrides();
+  if (!applicationsOpen) {
     redirect("/apply/closed");
   }
 

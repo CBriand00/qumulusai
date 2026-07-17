@@ -13,6 +13,7 @@ import { StatusControl } from "@/features/admin/status-control";
 import { NoteForm } from "@/features/admin/note-form";
 import { ScoringPanel } from "@/features/admin/scoring-panel";
 import { FlagControl } from "@/features/admin/flag-control";
+import { AiPanel } from "@/features/admin/ai-panel";
 
 export const metadata: Metadata = { title: "Applicant" };
 export const dynamic = "force-dynamic";
@@ -107,26 +108,11 @@ export default async function ApplicantDetailPage({ params }: { params: { id: st
             </CardContent>
           </Card>
 
-          {/* AI analysis (generated in Phase 5) */}
+          {/* AI analysis (decision-support only) */}
           <Card>
             <CardHeader><CardTitle>AI analysis</CardTitle></CardHeader>
             <CardContent>
-              {detail.aiAnalysis.length > 0 ? (
-                <ul className="space-y-3">
-                  {detail.aiAnalysis.map((a) => (
-                    <li key={a.id} className="rounded-md border border-border p-3">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">{a.kind}</p>
-                      <pre className="mt-1 whitespace-pre-wrap text-sm">{JSON.stringify(a.content, null, 2)}</pre>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No AI summaries yet. AI-generated summaries, strengths, concerns,
-                  contradictions, and suggested follow-ups are produced in Phase 5.
-                  AI output is decision-support only.
-                </p>
-              )}
+              <AiPanel applicantId={detail.applicantId} analyses={detail.aiAnalysis} />
             </CardContent>
           </Card>
 

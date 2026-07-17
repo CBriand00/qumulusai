@@ -14,7 +14,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { siteConfig } from "@/config/site";
+import { getSiteOverrides } from "@/lib/site-settings";
 import {
   howItWorksSteps,
   valuesContent,
@@ -23,18 +23,22 @@ import {
   faqItems,
 } from "@/config/content";
 
-export default function LandingPage() {
+// Reads admin-editable hero copy from the CMS (with static fallbacks).
+export const dynamic = "force-dynamic";
+
+export default async function LandingPage() {
+  const overrides = await getSiteOverrides();
   return (
     <>
       {/* Hero */}
       <section className="relative overflow-hidden bg-ink text-paper">
         <div className="container-editorial flex min-h-[85vh] flex-col justify-center py-24">
-          <p className="eyebrow mb-6 text-gold animate-fade-up">{siteConfig.tagline}</p>
+          <p className="eyebrow mb-6 text-gold animate-fade-up">{overrides.tagline}</p>
           <h1 className="max-w-4xl text-5xl leading-[1.05] md:text-7xl animate-fade-up">
-            {siteConfig.heroHeadline}
+            {overrides.heroHeadline}
           </h1>
           <p className="mt-8 max-w-2xl text-xl leading-relaxed text-paper/75 animate-fade-up">
-            {siteConfig.heroSubhead} Every application is for the opportunity to
+            {overrides.heroSubhead} Every application is for the opportunity to
             build something real with one person — reviewed privately, and with
             intention.
           </p>

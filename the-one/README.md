@@ -14,10 +14,10 @@ build.
 
 ---
 
-## Status — Phases 1–4 complete
+## Status — all 5 phases complete
 
 The build is delivered in phases (see [Implementation plan](#implementation-plan)).
-**Phases 1–4 are implemented, typechecked, tested, and build cleanly.**
+**All five phases are implemented, typechecked, tested (26 passing), and build cleanly.**
 
 | Area | State |
 | --- | --- |
@@ -50,8 +50,12 @@ The build is delivered in phases (see [Implementation plan](#implementation-plan
 | **Messaging** (1:1 threads, read receipts, report, admin safety review, open/close) | ✅ P4 |
 | **Date scheduling** (propose/accept/decline/suggest/reschedule/cancel/complete + notes) | ✅ P4 |
 | **Notifications + email delivery** (submit, status, messaging, new message, dates) | ✅ P4 |
-| Unit tests (auth + application validation + compatibility scoring — 18 passing) | ✅ |
-| AI analysis UI, audit-log viewer, analytics, expanded tests | ▢ Phase 5 |
+| **AI analysis** (9 analysis kinds, versioned prompts, regeneration history, admin-only) | ✅ P5 |
+| **Audit-log viewer** (append-only, actor-resolved) | ✅ P5 |
+| **Privacy workflows** (process/reject deletion, mark export delivered) | ✅ P5 |
+| **Analytics** (completion rate, avg completion time, status distribution) | ✅ P5 |
+| **Content management** (editable hero copy + applications-open toggle, DB-backed) | ✅ P5 |
+| Unit tests (auth, application, compatibility, AI + config integrity — 26 passing) | ✅ |
 
 Later phases mount onto the already-built, role-guarded routes and schema.
 
@@ -177,8 +181,17 @@ built in. Change the palette in one place to re-theme.
 - **Phase 3:** admin applicant table (filters/sort), detail page, notes, status
   changes, compatibility scoring UI.
 - **Phase 4:** messaging, notifications, date scheduling, email delivery.
-- **Phase 5:** AI analysis UI, audit log viewer, data export + deletion, analytics,
-  expanded tests (RLS, e2e).
+- **Phase 5 (done):** AI analysis (9 kinds, versioned prompts, regeneration
+  history), audit-log viewer, data export + deletion admin workflows, analytics,
+  DB-backed content management, expanded tests.
+
+### Remaining before a real launch
+This is a complete, working build of all five phases. Before going live you
+still need to: run the migrations against a real Supabase project and seed an
+admin; complete legal review of `src/config/legal.ts`; wire the real Resend +
+OpenAI keys (flip `EMAIL_PROVIDER`/`AI_PROVIDER`); add end-to-end and
+database-level RLS tests against a live instance; and work through the
+checklists in `SECURITY.md`, `PRIVACY_IMPLEMENTATION.md`, and `DEPLOYMENT.md`.
 
 ## Safety, privacy & AI notes
 

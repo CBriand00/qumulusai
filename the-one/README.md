@@ -14,10 +14,10 @@ build.
 
 ---
 
-## Status — Phases 1 & 2 complete
+## Status — Phases 1–3 complete
 
 The build is delivered in phases (see [Implementation plan](#implementation-plan)).
-**Phases 1 and 2 are implemented, typechecked, tested, and build cleanly.**
+**Phases 1, 2, and 3 are implemented, typechecked, tested, and build cleanly.**
 
 | Area | State |
 | --- | --- |
@@ -41,8 +41,14 @@ The build is delivered in phases (see [Implementation plan](#implementation-plan
 | **Review & submit** workflow (lock fields, application ID, email, notify admin) | ✅ P2 |
 | **Applicant dashboard** (completion %, next action, notifications) | ✅ P2 |
 | **Privacy controls** (download my data, withdraw, request deletion) | ✅ P2 |
+| **Admin applicant table** (filters, sorting, favorites, photo/video/score/flags) | ✅ P3 |
+| **Applicant detail page** (gallery, video, full application, timeline) | ✅ P3 |
+| **Private notes, flags, favorites** (admin-only via RLS) | ✅ P3 |
+| **Status controls** (shortlist/approve/pause/not-selected/archive/block/delete) | ✅ P3 |
+| **Compatibility scoring UI** (per-category score + override + weighted overall) | ✅ P3 |
+| **Request info / unlock messaging** actions + audit logging | ✅ P3 |
 | Unit tests (auth + application validation + compatibility scoring — 18 passing) | ✅ |
-| Admin review table, scoring UI, messaging, dates, AI analysis UI, audit | ▢ Phases 3–5 |
+| Messaging threads, date scheduling, notifications delivery, AI analysis UI, audit viewer | ▢ Phases 4–5 |
 
 Later phases mount onto the already-built, role-guarded routes and schema.
 

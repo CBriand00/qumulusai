@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Admin Overview" };
+export const dynamic = "force-dynamic";
 
 /** Overview stat, computed from a filtered count query (RLS: admin only). */
 async function statCount(filter: (q: any) => any): Promise<number> {
@@ -14,12 +17,14 @@ async function statCount(filter: (q: any) => any): Promise<number> {
 }
 
 export default async function AdminOverview() {
-  const [total, submitted, underReview, shortlisted, approved] = await Promise.all([
+  const [total, submitted, underReview, shortlisted, approved, withdrawn, blocked] = await Promise.all([
     statCount((q) => q),
     statCount((q) => q.eq("status", "submitted")),
     statCount((q) => q.eq("status", "under_review")),
     statCount((q) => q.eq("status", "shortlisted")),
-    statCount((q) => q.in("status", ["approved_to_connect", "messaging_open", "dating"])),
+    statCount((q) => q.in("status", ["approved_to_connect", "messaging_open", "date_invited", "dating"])),
+    statCount((q) => q.eq("status", "withdrawn")),
+    statCount((q) => q.eq("status", "blocked")),
   ]);
 
   const stats = [
@@ -27,7 +32,9 @@ export default async function AdminOverview() {
     { label: "New / Submitted", value: submitted },
     { label: "Under Review", value: underReview },
     { label: "Under Consideration", value: shortlisted },
-    { label: "Approved", value: approved },
+    { label: "Approved / Connecting", value: approved },
+    { label: "Withdrawn", value: withdrawn },
+    { label: "Blocked", value: blocked },
   ];
 
   return (
@@ -53,17 +60,19 @@ export default async function AdminOverview() {
       </div>
 
       <Card>
-        <CardHeader><CardTitle>Getting started</CardTitle></CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
+        <CardHeader><CardTitle>Review applicants</CardTitle></CardHeader>
+        <CardContent className="space-y-4 text-sm text-muted-foreground">
           <p>
-            The applicant review table, filters, compatibility scoring, notes,
-            and status controls arrive in Phase 3. Messaging, dates, and
-            notifications in Phase 4. AI analysis, audit, export, and deletion
-            in Phase 5.
+            Open the applicant table to filter, sort, favorite, review full
+            applications and media, add private notes and flags, assign
+            compatibility scores, and manage status — including approving,
+            unlocking messaging, and requesting more information.
           </p>
-          <p>
-            Counts above are live from the database via row-level-security-scoped
-            admin queries.
+          <Button asChild variant="gold" size="sm"><Link href="/admin/applicants">Open applicants</Link></Button>
+          <p className="text-xs">
+            Messaging, dates, and notifications complete in Phase 4; AI analysis,
+            audit viewer, and analytics in Phase 5. Counts above are live via
+            RLS-scoped admin queries.
           </p>
         </CardContent>
       </Card>

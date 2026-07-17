@@ -9,6 +9,7 @@ export const brand = {
   name:        "QumulusAI",                 // full product/company name
   // Wordmark split so the accent letters can be colored (Q…AI).
   wordmark:    { lead: "Q", body: "umulus", tail: "AI" },
+  mark:        "Q",                         // single-letter logo glyph (falls back to name[0])
   tagline:     "People Operating System",
   website:     "https://www.qumulusai.com",
   support:     "people@qumulusai.com",

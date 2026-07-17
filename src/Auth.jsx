@@ -495,14 +495,14 @@ export default function Auth({ onAuth }) {
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <div style={{ width: 36, height: 36, background: `${C.brand}1A`, border: `1px solid ${C.brand}35`, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <span style={{ color: C.brand, fontWeight: 900, fontSize: 16 }}>Q</span>
+              <span style={{ color: C.brand, fontWeight: 900, fontSize: 16 }}>{brand.mark ?? brand.name.charAt(0)}</span>
             </div>
             <h1 style={{ fontSize: 22, fontWeight: 900, color: C.text, letterSpacing: "-0.04em", margin: 0 }}>
               {brand.wordmark.lead}{brand.wordmark.body}<span style={{ color: C.brand }}>{brand.wordmark.tail}</span>
             </h1>
           </div>
           <p style={{ fontSize: 11, color: C.textMuted, margin: 0, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 }}>
-            AI Workforce Operating System
+            {brand.tagline}
           </p>
         </div>
 

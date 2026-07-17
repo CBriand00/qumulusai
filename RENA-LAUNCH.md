@@ -30,7 +30,8 @@ cat > src/brand.js <<'BRAND'
 export const brand = {
   name:        "Rena Labs",
   wordmark:    { lead: "Rena", body: " ", tail: "Labs" },
-  tagline:     "People Operating System",
+  mark:        "R",
+  tagline:     "AI Workforce Operating System",
   website:     "https://www.rena-world.com",
   support:     "people@rena-world.com",
   emailDomain: "rena-world.com",

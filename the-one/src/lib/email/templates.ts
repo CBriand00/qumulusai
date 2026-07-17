@@ -50,3 +50,36 @@ export function messagingUnlockedEmail(to: string): EmailMessage {
     ),
   };
 }
+
+export function newMessageEmail(to: string): EmailMessage {
+  return {
+    to,
+    subject: `You have a new message — ${siteConfig.name}`,
+    html: wrap(
+      "New message",
+      `<p>You have a new private message. Please sign in to read and reply. For your privacy, message contents are not included in email.</p>`,
+    ),
+  };
+}
+
+export function dateInvitationEmail(to: string): EmailMessage {
+  return {
+    to,
+    subject: `A date invitation — ${siteConfig.name}`,
+    html: wrap(
+      "A date invitation",
+      `<p>You've received a date invitation. Please sign in to your private dashboard to view the details and respond.</p>`,
+    ),
+  };
+}
+
+export function dateUpdatedEmail(to: string, kind: "updated" | "cancelled"): EmailMessage {
+  return {
+    to,
+    subject: `Your date invitation was ${kind} — ${siteConfig.name}`,
+    html: wrap(
+      kind === "cancelled" ? "Date cancelled" : "Date updated",
+      `<p>A date invitation has been ${kind}. Please sign in to your private dashboard for the latest details.</p>`,
+    ),
+  };
+}

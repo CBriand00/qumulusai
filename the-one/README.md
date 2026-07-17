@@ -14,10 +14,10 @@ build.
 
 ---
 
-## Status — Phases 1–3 complete
+## Status — Phases 1–4 complete
 
 The build is delivered in phases (see [Implementation plan](#implementation-plan)).
-**Phases 1, 2, and 3 are implemented, typechecked, tested, and build cleanly.**
+**Phases 1–4 are implemented, typechecked, tested, and build cleanly.**
 
 | Area | State |
 | --- | --- |
@@ -47,8 +47,11 @@ The build is delivered in phases (see [Implementation plan](#implementation-plan
 | **Status controls** (shortlist/approve/pause/not-selected/archive/block/delete) | ✅ P3 |
 | **Compatibility scoring UI** (per-category score + override + weighted overall) | ✅ P3 |
 | **Request info / unlock messaging** actions + audit logging | ✅ P3 |
+| **Messaging** (1:1 threads, read receipts, report, admin safety review, open/close) | ✅ P4 |
+| **Date scheduling** (propose/accept/decline/suggest/reschedule/cancel/complete + notes) | ✅ P4 |
+| **Notifications + email delivery** (submit, status, messaging, new message, dates) | ✅ P4 |
 | Unit tests (auth + application validation + compatibility scoring — 18 passing) | ✅ |
-| Messaging threads, date scheduling, notifications delivery, AI analysis UI, audit viewer | ▢ Phases 4–5 |
+| AI analysis UI, audit-log viewer, analytics, expanded tests | ▢ Phase 5 |
 
 Later phases mount onto the already-built, role-guarded routes and schema.
 

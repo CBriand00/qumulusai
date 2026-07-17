@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, BadgeCheck } from "lucide-react";
 import { getApplicantDetail } from "@/features/admin/queries";
+import { adminDatesForApplicant } from "@/features/dates/queries";
+import { DateInviteForm } from "@/features/dates/date-invite-form";
 import { applicationSteps } from "@/config/application-schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/admin/status-badge";
@@ -18,6 +20,7 @@ export const dynamic = "force-dynamic";
 export default async function ApplicantDetailPage({ params }: { params: { id: string } }) {
   const detail = await getApplicantDetail(params.id);
   if (!detail) notFound();
+  const dates = await adminDatesForApplicant(params.id);
 
   const profile = detail.profile ?? {};
   const photos = detail.media.filter((m) => m.kind !== "video_intro");
@@ -149,7 +152,29 @@ export default async function ApplicantDetailPage({ params }: { params: { id: st
         <div className="space-y-6">
           <Card>
             <CardHeader><CardTitle>Status &amp; actions</CardTitle></CardHeader>
-            <CardContent><StatusControl applicantId={detail.applicantId} /></CardContent>
+            <CardContent className="space-y-4">
+              <StatusControl applicantId={detail.applicantId} />
+              <Link href={`/admin/messages/${detail.applicantId}`} className="inline-block text-sm text-gold hover:underline">
+                Open conversation →
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Date scheduling</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              {dates.length > 0 ? (
+                <ul className="space-y-2 border-b border-border pb-4 text-sm">
+                  {dates.map((d) => (
+                    <li key={d.id} className="flex items-center justify-between gap-2">
+                      <span>{d.proposedAt ? new Date(d.proposedAt).toLocaleString() : "TBD"}</span>
+                      <span className="rounded-full bg-secondary px-2 py-0.5 text-xs capitalize">{d.status.replace("_", " ")}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <DateInviteForm applicantId={detail.applicantId} />
+            </CardContent>
           </Card>
 
           <Card>

@@ -67,6 +67,7 @@ export async function generateAnalysis(applicantId: string, kind: AnalysisKind):
       applicantContext: context,
       promptName: prompt.name,
       promptVersion: prompt.version,
+      systemPrompt: prompt.template,
     });
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "AI generation failed." };

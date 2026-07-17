@@ -50,7 +50,10 @@ class ResendEmailProvider implements EmailProvider {
         text: message.text,
       }),
     });
-    if (!res.ok) throw new Error(`Resend error: ${res.status}`);
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`Resend error ${res.status}: ${detail.slice(0, 300)}`);
+    }
     const data = (await res.json()) as { id: string };
     return { id: data.id };
   }

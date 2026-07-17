@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { getAIProvider } from "@/lib/ai/provider";
 import { aiPrompts, aiKinds } from "@/config/ai-prompts";
 import { applicationSteps, consentItems } from "@/config/application-schema";
@@ -29,6 +29,72 @@ describe("AI provider (mock)", () => {
       promptVersion: "1.0.0",
     });
     expect(Array.isArray(res.content.items)).toBe(true);
+  });
+});
+
+describe("AI provider selection", () => {
+  it("uses the OpenAI provider when configured, and requires a key", async () => {
+    const prevProvider = process.env.AI_PROVIDER;
+    const prevKey = process.env.OPENAI_API_KEY;
+    process.env.AI_PROVIDER = "openai";
+    delete process.env.OPENAI_API_KEY;
+    try {
+      const provider = getAIProvider();
+      await expect(
+        provider.generate({
+          kind: "summary",
+          applicantContext: {},
+          promptName: "applicant_summary",
+          promptVersion: "1.0.0",
+          systemPrompt: "test",
+        }),
+      ).rejects.toThrow(/OPENAI_API_KEY/);
+    } finally {
+      process.env.AI_PROVIDER = prevProvider;
+      if (prevKey) process.env.OPENAI_API_KEY = prevKey;
+    }
+  });
+
+  it("builds a JSON-mode request and parses text + items (mocked)", async () => {
+    const prevProvider = process.env.AI_PROVIDER;
+    const prevKey = process.env.OPENAI_API_KEY;
+    process.env.AI_PROVIDER = "openai";
+    process.env.OPENAI_API_KEY = "sk-test";
+
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: '{"text":"Summary.","items":["q1","q2"]}' } }] }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      const res = await getAIProvider().generate({
+        kind: "follow_up_questions",
+        applicantContext: { answers: { why_now: "ready" } },
+        promptName: "follow_ups",
+        promptVersion: "1.0.0",
+        systemPrompt: "Do not decide.",
+      });
+      // Request shape.
+      expect(fetchMock).toHaveBeenCalledOnce();
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain("/chat/completions");
+      const body = JSON.parse(init.body as string);
+      expect(body.response_format).toEqual({ type: "json_object" });
+      expect(body.messages[0]).toEqual({ role: "system", content: "Do not decide." });
+      expect((init.headers as Record<string, string>).Authorization).toBe("Bearer sk-test");
+      // Parsed result.
+      expect(res.content.text).toBe("Summary.");
+      expect(res.content.items).toEqual(["q1", "q2"]);
+      expect(res.promptVersion).toBe("1.0.0");
+    } finally {
+      vi.unstubAllGlobals();
+      process.env.AI_PROVIDER = prevProvider;
+      if (prevKey) process.env.OPENAI_API_KEY = prevKey;
+      else delete process.env.OPENAI_API_KEY;
+    }
   });
 });
 

@@ -34,6 +34,8 @@ export interface AnalysisRequest {
   applicantContext: Record<string, unknown>;
   promptName: string;
   promptVersion: string;
+  /** System instructions (guardrails + task). Falls back to a safe default. */
+  systemPrompt?: string;
 }
 
 export interface AnalysisResult {
@@ -79,20 +81,71 @@ class MockAIProvider implements AIProvider {
 }
 
 /**
- * OpenAI-compatible provider stub. Implement the fetch call when a key is
- * configured; the shape intentionally matches MockAIProvider so nothing else
- * changes. Left unimplemented on purpose until Phase 5 wiring + prompts land.
+ * OpenAI provider — real Chat Completions call. Requests a JSON object so the
+ * result maps cleanly onto `{ text, items }`. The base URL is overridable
+ * (`OPENAI_BASE_URL`) so any OpenAI-compatible endpoint can be used.
  */
 class OpenAIProvider implements AIProvider {
   readonly model: string;
+  private readonly baseUrl: string;
+
   constructor(model = process.env.AI_MODEL ?? "gpt-4o-mini") {
     this.model = model;
+    this.baseUrl = process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1";
   }
-  async generate(_req: AnalysisRequest): Promise<AnalysisResult> {
-    throw new Error(
-      "OpenAIProvider not yet enabled. Set AI_PROVIDER=mock for development, " +
-        "or implement the API call in src/lib/ai/provider.ts for Phase 5.",
-    );
+
+  async generate(req: AnalysisRequest): Promise<AnalysisResult> {
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) throw new Error("OPENAI_API_KEY is not configured.");
+
+    const system = req.systemPrompt ?? DECISION_SUPPORT_NOTE;
+    const user =
+      "Base your response ONLY on the applicant's own words below.\n" +
+      `Applicant context:\n${JSON.stringify(req.applicantContext, null, 2)}\n\n` +
+      'Respond as a JSON object: {"text": string, "items"?: string[]}. ' +
+      "Use `items` for lists (questions, topics, bullet points); otherwise omit it.";
+
+    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: this.model,
+        temperature: 0.4,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`OpenAI error ${res.status}: ${detail.slice(0, 300)}`);
+    }
+
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const raw = data.choices?.[0]?.message?.content ?? "{}";
+    let parsed: { text?: unknown; items?: unknown };
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = { text: raw };
+    }
+
+    return {
+      kind: req.kind,
+      content: {
+        text: typeof parsed.text === "string" ? parsed.text : String(parsed.text ?? ""),
+        items: Array.isArray(parsed.items) ? parsed.items.map((x) => String(x)) : undefined,
+      },
+      model: this.model,
+      promptName: req.promptName,
+      promptVersion: req.promptVersion,
+      generatedAt: new Date().toISOString(),
+    };
   }
 }
 

@@ -30,8 +30,8 @@ The build is delivered in phases (see [Implementation plan](#implementation-plan
 | Full database schema (30+ tables), enums, triggers, indexes, constraints | ✅ P1 |
 | Row Level Security policies for every table | ✅ P1 |
 | Private storage buckets + signed-URL access model | ✅ P1 |
-| Modular AI service layer (mock + OpenAI-ready) | ✅ P1 (scaffold) |
-| Modular email layer (console + Resend-ready) + templates | ✅ P1 |
+| Modular AI service layer (mock **or real OpenAI**, env-selected) | ✅ |
+| Modular email layer (console **or real Resend**, env-selected) + templates | ✅ |
 | Seed data (1 admin + 8 fictional applicants) | ✅ P1 |
 | Applicant dashboard + admin command-center shells | ✅ P1 |
 | **12-step application** (schema-driven, all steps) | ✅ P2 |
@@ -206,10 +206,28 @@ built in. Change the palette in one place to re-theme.
 ### Remaining before a real launch
 This is a complete, working build of all five phases. Before going live you
 still need to: run the migrations against a real Supabase project and seed an
-admin; complete legal review of `src/config/legal.ts`; wire the real Resend +
-OpenAI keys (flip `EMAIL_PROVIDER`/`AI_PROVIDER`); extend the E2E suite to cover
-authenticated flows against a live instance; and work through the checklists in
-`SECURITY.md`, `PRIVACY_IMPLEMENTATION.md`, and `DEPLOYMENT.md`.
+admin; complete legal review of `src/config/legal.ts`; set the real provider
+keys and flip `EMAIL_PROVIDER=resend` / `AI_PROVIDER=openai` (both providers are
+implemented — see below); extend the E2E suite to cover authenticated flows
+against a live instance; and work through the checklists in `SECURITY.md`,
+`PRIVACY_IMPLEMENTATION.md`, and `DEPLOYMENT.md`.
+
+### Live providers (OpenAI + Resend)
+
+Both integrations are fully implemented and modular; they run as mock/console by
+default so development needs no keys.
+
+- **AI** — set `AI_PROVIDER=openai`, `OPENAI_API_KEY`, and optionally `AI_MODEL`
+  (default `gpt-4o-mini`) or `OPENAI_BASE_URL` (any OpenAI-compatible endpoint).
+  The provider calls Chat Completions in JSON mode and maps the result onto
+  `{ text, items }`; every stored analysis keeps its model + prompt version.
+  Guardrails are enforced in the system prompt; AI remains decision-support only.
+- **Email** — set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, and `EMAIL_FROM`
+  (an address on a domain you've verified in Resend).
+
+> Outbound calls go through the platform's network egress. On Vercel this is
+> direct; in a restricted/proxied environment ensure `api.openai.com` and
+> `api.resend.com` are reachable.
 
 ## Safety, privacy & AI notes
 

@@ -100,7 +100,9 @@ need a Supabase project (below).
 | `npm run dev` | Local dev server |
 | `npm run build` / `npm start` | Production build / serve |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run test` | Vitest unit tests |
+| `npm run test` | Vitest unit tests (26; RLS integration auto-skips) |
+| `npm run test:rls` | Live-DB RLS policy tests (boots a throwaway Postgres) |
+| `npm run test:e2e` | Playwright public-flow E2E (production build) |
 | `npm run seed` | Fictional dev seed (admin + 8 applicants) |
 
 ---
@@ -185,13 +187,29 @@ built in. Change the palette in one place to re-theme.
   history), audit-log viewer, data export + deletion admin workflows, analytics,
   DB-backed content management, expanded tests.
 
+### Testing
+
+- **Unit** (`npm run test`) — 26 tests: auth + application validation, the age
+  gate, compatibility scoring, AI provider + prompt guardrails, and config
+  integrity. The RLS integration file auto-skips unless `RLS_TEST_DB` is set.
+- **RLS** (`npm run test:rls`) — 9 tests that apply the real migrations to a
+  throwaway Postgres (a local cluster, or Docker as a fallback) and assert the
+  policies for real: applicant isolation, admin-only tables, cross-applicant
+  message isolation, role-escalation blocking, the closed-messaging gate,
+  public content access, and the signup trigger. `src/test/rls/bootstrap.sql`
+  emulates the Supabase runtime (`auth.uid()`, roles) on plain Postgres.
+- **E2E** (`npm run test:e2e`) — 7 Playwright specs covering the public flows
+  (landing, nav, FAQ accordion, legal notice, safety, unauthenticated `/apply`
+  → register, auth forms) against a production build. Auth-gated flows need a
+  live Supabase/GoTrue backend and are exercised via seed data + the RLS suite.
+
 ### Remaining before a real launch
 This is a complete, working build of all five phases. Before going live you
 still need to: run the migrations against a real Supabase project and seed an
 admin; complete legal review of `src/config/legal.ts`; wire the real Resend +
-OpenAI keys (flip `EMAIL_PROVIDER`/`AI_PROVIDER`); add end-to-end and
-database-level RLS tests against a live instance; and work through the
-checklists in `SECURITY.md`, `PRIVACY_IMPLEMENTATION.md`, and `DEPLOYMENT.md`.
+OpenAI keys (flip `EMAIL_PROVIDER`/`AI_PROVIDER`); extend the E2E suite to cover
+authenticated flows against a live instance; and work through the checklists in
+`SECURITY.md`, `PRIVACY_IMPLEMENTATION.md`, and `DEPLOYMENT.md`.
 
 ## Safety, privacy & AI notes
 

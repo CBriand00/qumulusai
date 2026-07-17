@@ -27,3 +27,8 @@ next-env.d.ts
 
 # typescript
 *.tsbuildinfo
+
+# playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/

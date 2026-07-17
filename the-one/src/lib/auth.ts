@@ -12,9 +12,16 @@ export interface SessionProfile {
 /** Returns the current user's profile, or null if not signed in. */
 export async function getSessionProfile(): Promise<SessionProfile | null> {
   const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+
+  // Treat an unreachable/erroring auth service as "logged out" rather than
+  // throwing, so protected pages degrade to a redirect instead of a 500.
+  let user;
+  try {
+    const res = await supabase.auth.getUser();
+    user = res.data.user;
+  } catch {
+    return null;
+  }
   if (!user) return null;
 
   const { data: profile } = await supabase

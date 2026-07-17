@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens — The One
+ * Luxury editorial palette stored as CSS variables (HSL channels).
+ * Change these to re-theme the entire platform.
+ */
+@layer base {
+  :root {
+    /* Brand palette */
+    --ink: 0 0% 7%;              /* near-black */
+    --paper: 40 33% 98%;         /* warm white */
+    --cream: 40 38% 94%;         /* soft cream */
+    --gold: 41 34% 54%;          /* muted gold */
+    --espresso: 25 26% 18%;      /* deep espresso */
+    --burgundy: 345 42% 26%;     /* optional accent */
+
+    /* Semantic tokens (light) */
+    --background: 40 33% 98%;
+    --foreground: 0 0% 7%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 7%;
+
+    --primary: 25 26% 18%;              /* espresso */
+    --primary-foreground: 40 33% 98%;
+
+    --secondary: 40 38% 94%;            /* cream */
+    --secondary-foreground: 25 26% 18%;
+
+    --muted: 40 20% 90%;
+    --muted-foreground: 25 8% 38%;
+
+    --accent: 41 34% 54%;               /* gold */
+    --accent-foreground: 0 0% 7%;
+
+    --destructive: 0 62% 42%;
+    --destructive-foreground: 40 33% 98%;
+
+    --border: 30 14% 85%;
+    --input: 30 14% 85%;
+    --ring: 41 34% 54%;
+
+    --radius: 0.25rem;
+
+    --font-serif: "Cormorant Garamond", "Georgia", serif;
+    --font-sans: "Inter", system-ui, sans-serif;
+  }
+
+  /* Dark editorial variant (used by dashboards / admin) */
+  .dark {
+    --background: 0 0% 7%;
+    --foreground: 40 33% 98%;
+
+    --card: 25 12% 11%;
+    --card-foreground: 40 33% 98%;
+
+    --primary: 41 34% 54%;
+    --primary-foreground: 0 0% 7%;
+
+    --secondary: 25 12% 15%;
+    --secondary-foreground: 40 33% 98%;
+
+    --muted: 25 10% 18%;
+    --muted-foreground: 40 12% 70%;
+
+    --accent: 41 34% 54%;
+    --accent-foreground: 0 0% 7%;
+
+    --destructive: 0 62% 46%;
+    --destructive-foreground: 40 33% 98%;
+
+    --border: 25 10% 22%;
+    --input: 25 10% 22%;
+    --ring: 41 34% 54%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "kern", "liga";
+  }
+  h1, h2, h3, h4 {
+    @apply font-serif tracking-tight;
+  }
+
+  /* Accessible, visible focus states */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer components {
+  .eyebrow {
+    @apply text-xs uppercase tracking-editorial text-muted-foreground font-sans;
+  }
+  .container-editorial {
+    @apply mx-auto w-full max-w-[1200px] px-6;
+  }
+}
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
